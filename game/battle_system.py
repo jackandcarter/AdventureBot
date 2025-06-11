@@ -841,12 +841,10 @@ class BattleSystem(commands.Cog):
             )
         elif result.type == "dot":
             dot = result.dot
-            # schedule the DoT on the enemy…
-            enemy.setdefault("dot_effects", []).append(dot)
             # apply the first tick immediately
             enemy["hp"] = max(enemy["hp"] - dot["damage_per_turn"], 0)
             session.game_log.append(
-                f"{enemy['enemy_name']} has been afflicted by {dot['effect_name']}."
+                f"{dot['effect_name']} deals {dot['damage_per_turn']} damage to {enemy['enemy_name']}!"
             )
             if enemy["hp"] <= 0:
                 return await self.handle_enemy_defeat(interaction, session, enemy)
@@ -955,8 +953,7 @@ class BattleSystem(commands.Cog):
             elif result.type == "set_hp":
                 enemy["hp"] = result.amount
             elif result.type == "dot":
-                enemy.setdefault("dot_effects", []).append(result.dot)
-                enemy["hp"] = max(enemy["hp"] - result.dot["damage_per_turn"], 0)
+                pass  # handled above
             elif result.type == "hot":
                 bucket = "player_effects" if target in ("self","ally") else "enemy_effects"
                 session.battle_state[bucket].append(result.dot)
