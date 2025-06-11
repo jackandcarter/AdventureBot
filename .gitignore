@@ -1,0 +1,37 @@
+# Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+env/
+venv/
+ENV/
+.venv/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Logs and caches
+*.log
+*.sqlite3
+*.db
+*.sqlite
+*.pkl
+*.pid
+*.gz
+*.zip
+*.cache
+.mypy_cache/
+.pytest_cache/
+
+# IDE directories
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
