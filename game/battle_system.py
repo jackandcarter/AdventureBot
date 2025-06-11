@@ -840,37 +840,60 @@ class BattleSystem(commands.Cog):
                 f"You use {ability_meta['ability_name']} and deal {result.amount} damage!"
             )
         elif result.type == "dot":
-            if result.type == "dot":
-                dot = result.dot
-                # schedule the DoT on the enemy…
-                enemy.setdefault("dot_effects", []).append(dot)
-                # apply the first tick immediately
-                enemy["hp"] = max(enemy["hp"] - dot["damage_per_turn"], 0)
+            dot = result.dot
+            # schedule the DoT on the enemy…
+            enemy.setdefault("dot_effects", []).append(dot)
+            # apply the first tick immediately
+            enemy["hp"] = max(enemy["hp"] - dot["damage_per_turn"], 0)
+            session.game_log.append(
+                f"{enemy['enemy_name']} has been afflicted by {dot['effect_name']}."
+            )
+            if enemy["hp"] <= 0:
+                return await self.handle_enemy_defeat(interaction, session, enemy)
+        elif result.type == "hot":
+            hot = result.dot
+            bucket = "player_effects" if target in ("self", "ally") else "enemy_effects"
+            session.battle_state[bucket].append(hot)
+            # apply the first tick immediately
+            if bucket == "player_effects":
+                old_hp = player["hp"]
+                new_hp = min(old_hp + hot["heal_per_turn"], player["max_hp"])
+                self._update_player_hp(pid, session.session_id, new_hp)
+                healed = new_hp - old_hp
                 session.game_log.append(
-                    f"{enemy['enemy_name']} has been afflicted by {dot['effect_name']}."
+                    f"You are rejuvenated by {hot['effect_name']} for {healed} HP."
                 )
-                if enemy["hp"] <= 0:
-                    return await self.handle_enemy_defeat(interaction, session, enemy)
             else:
-                # miss, heal, pilfer, mug, etc.
-                session.game_log.extend(result.logs)
-                # ── If we’re *outside* battle and this was a self‐target skill ──
-                if not in_battle and target == "self":
-                    # 1) Persist any status‐effects exactly as before
-                    if result.status_effects:
-                        SessionPlayerModel.update_status_effects(
-                            session.session_id,
-                            pid,
-                            session.battle_state.get("player_effects", []) + result.status_effects
-                        )
+                old_hp = enemy.get("hp", 0)
+                cap = enemy.get("max_hp", 0)
+                new_hp = min(old_hp + hot["heal_per_turn"], cap)
+                enemy["hp"] = new_hp
+                healed = new_hp - old_hp
+                session.game_log.append(
+                    f"{enemy['enemy_name']} is bolstered by {hot['effect_name']} for {healed} HP."
+                )
+        else:
+            # miss, heal, pilfer, mug, etc.
+            session.game_log.extend(result.logs)
+            # ── If we’re *outside* battle and this was a self‑target skill ──
+            if not in_battle and target == "self":
+                # 1) Persist any status‑effects exactly as before
+                if result.status_effects:
+                    SessionPlayerModel.update_status_effects(
+                        session.session_id,
+                        pid,
+                        session.battle_state.get("player_effects", []) + result.status_effects
+                    )
 
                 # 2) If this skill also heals immediately on use, write that to the DB now:
                 if result.type in ("heal", "set_hp"):
                     # e.g. “heal” gives you result.amount HP
                     # or “set_hp” forces to exactly result.amount
                     old_hp = self._get_player_hp(pid, session.session_id)
-                    new_hp = result.amount if result.type=="set_hp" else min(old_hp + result.amount,
-                                                                            self._get_player_max_hp(pid, session.session_id))
+                    new_hp = result.amount if result.type == "set_hp" else min(
+                        old_hp + result.amount,
+                        self._get_player_max_hp(pid, session.session_id)
+                    )
                     self._update_player_hp(pid, session.session_id, new_hp)
                     session.game_log.append(f"You are healed to {new_hp} HP.")
 
@@ -892,7 +915,8 @@ class BattleSystem(commands.Cog):
             raw_se.setdefault("target", ability_meta.get("target_type", "self"))
             se = self._normalize_se(raw_se)
             bucket = "player_effects" if se["target"] == "self" else "enemy_effects"
-            session.battle_state[bucket].append(se)
+            if not any(e.get("effect_name") == se.get("effect_name") for e in session.battle_state[bucket]):
+                session.battle_state[bucket].append(se)
 
             # initial application log
             if se["target"] == "self":
@@ -914,7 +938,7 @@ class BattleSystem(commands.Cog):
         self.reduce_player_cooldowns(session, pid)
 
         # 7) handle the result types
-        if result.type in ("damage","heal","set_hp","dot"):
+        if result.type in ("damage","heal","set_hp","dot","hot"):
             # update enemy.hp or player.hp as needed
             if result.type == "damage":
                 enemy["hp"] = max(enemy["hp"] - result.amount, 0)
@@ -933,6 +957,20 @@ class BattleSystem(commands.Cog):
             elif result.type == "dot":
                 enemy.setdefault("dot_effects", []).append(result.dot)
                 enemy["hp"] = max(enemy["hp"] - result.dot["damage_per_turn"], 0)
+            elif result.type == "hot":
+                bucket = "player_effects" if target in ("self","ally") else "enemy_effects"
+                session.battle_state[bucket].append(result.dot)
+                if bucket == "player_effects":
+                    new_hp = min(player["hp"] + result.dot["heal_per_turn"], player["max_hp"])
+                    self._update_player_hp(pid, session.session_id, new_hp)
+                    session.game_log.append(
+                        f"You regain {result.dot['heal_per_turn']} HP from {result.dot['effect_name']}."
+                    )
+                else:
+                    enemy["hp"] = min(enemy["hp"] + result.dot["heal_per_turn"], enemy["max_hp"])
+                    session.game_log.append(
+                        f"{enemy['enemy_name']} regenerates {result.dot['heal_per_turn']} HP."
+                    )
 
 
         else:
@@ -1055,6 +1093,15 @@ class BattleSystem(commands.Cog):
             self._update_player_hp(pid, session.session_id, new_hp)
             session.game_log.append(
                 f"<@{pid}> has been hurt from {dot['effect_name']} for {dot['damage_per_turn']} HP."
+            )
+            await self.update_battle_embed(interaction, pid, enemy)
+            return await self._end_enemy_action(interaction)
+        if result.type == "hot":
+            hot = result.dot
+            session.battle_state["enemy_effects"].append(hot)
+            enemy["hp"] = min(enemy["hp"] + hot["heal_per_turn"], enemy["max_hp"])
+            session.game_log.append(
+                f"{enemy['enemy_name']} gains {hot['effect_name']} and recovers {hot['heal_per_turn']} HP."
             )
             await self.update_battle_embed(interaction, pid, enemy)
             return await self._end_enemy_action(interaction)
