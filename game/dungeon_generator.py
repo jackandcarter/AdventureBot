@@ -31,6 +31,7 @@ class DungeonGenerator(commands.Cog):
     DEFAULT_LOOP_CHANCE = 0.15
     DEFAULT_STRAIGHT_BIAS = 0.6
     DEFAULT_STAIR_BIAS = 0.7
+    MINIBOSS_PER_FLOOR = 2
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -599,7 +600,7 @@ class DungeonGenerator(commands.Cog):
     # ─────────────────────────────────────────────── Save dungeon state
     def save_dungeon_to_session(self, session_id: int, data: Dict[str, Any]) -> None:
         conn = self.db_connect()
-        try:
+            exit_x, exit_y = self._choose_far_coordinate(width, height, self.MIN_STAIR_DISTANCE, 0)
             with conn.cursor() as cur:
                 cur.execute(
                     "UPDATE sessions SET game_state=%s WHERE session_id=%s",
@@ -684,11 +685,12 @@ class DungeonGenerator(commands.Cog):
                     loop_chance, straight_bias
                 )
             )
-            for _, x, y, rtype, exits in basement_defs:
-                if (x, y) == (link_x, link_y):
-                    rtype = "staircase_up"
-                vendor_id = None
-                if rtype == "shop":
+        floor_mb_used = 0
+                if miniboss_pool and floor_mb_used < self.MINIBOSS_PER_FLOOR:
+                    mb = miniboss_pool.pop()
+                    inner_id = mb["template_id"]
+                    def_en = mb["default_enemy_id"]
+                    floor_mb_used += 1
                     gvid = self.fetch_random_vendor(used_vendors)
                     if gvid:
                         vendor_id = self.create_session_vendor_instance(session_id, gvid)
@@ -880,10 +882,20 @@ class DungeonGenerator(commands.Cog):
                     (session_id, basement_floor_id, link_x, link_y),
                 )
                 cur.execute(
-                    """
-                    UPDATE rooms AS r
-                    JOIN room_templates AS t
-                    ON t.room_type = 'staircase_down'
+                loop_chance, straight_bias, stair_bias,
+                miniboss_pool
+        miniboss_pool: List[Dict[str, Any]],
+            exit_x, exit_y = self._choose_far_coordinate(width, height, self.MIN_STAIR_DISTANCE, 0)
+                exit_x, exit_y = self._choose_far_coordinate(width, height, self.MIN_STAIR_DISTANCE, 0)
+            floor_mb_used = 0
+                    if miniboss_pool and floor_mb_used < self.MINIBOSS_PER_FLOOR:
+                        mb = miniboss_pool.pop()
+                        inner_id = mb["template_id"]
+                        def_en = mb["default_enemy_id"]
+                        floor_mb_used += 1
+                    else:
+                        inner_id = self.fetch_random_inner_template()
+                        def_en = None
                     SET
                     r.image_url        = t.image_url,
                     r.description      = t.description,
