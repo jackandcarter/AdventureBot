@@ -1,0 +1,9 @@
+{
+    "discord_token": "MTM0ODQ4ODMyODYyOTk3NzE1Mw.GeZZ35.HTVdZkC2SJTNEMk00CzB_lInXvHZqQ0bgMsM-w",
+    "mysql": {
+        "host": "localhost",
+        "user": "root",
+        "password": "Admin",
+        "database": "adventure"
+    }
+}
