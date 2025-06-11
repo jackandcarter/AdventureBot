@@ -74,7 +74,15 @@ def format_status_effects(effects: List[Dict[str, Any]]) -> str:
         if not icon or not name or rem is None:
             continue
 
-        parts.append(f"{icon} {name} ({rem})")
+        dmg = e.get("damage_per_turn")
+        hot = e.get("heal_per_turn")
+        delta = ""
+        if isinstance(dmg, (int, float)) and dmg > 0:
+            delta = f" -{int(dmg)}"
+        elif isinstance(hot, (int, float)) and hot > 0:
+            delta = f" +{int(hot)}"
+
+        parts.append(f"{icon} {name}{delta} ({rem})")
 
     # join with a single space so they flow left-to-right
     return " ".join(parts)

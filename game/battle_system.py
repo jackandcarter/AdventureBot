@@ -741,6 +741,14 @@ class BattleSystem(commands.Cog):
         if not ability_meta:
             return await interaction.response.send_message("❌ Ability not found.", ephemeral=True)
 
+        # Cooldown check
+        pid = session.current_turn
+        cds = session.ability_cooldowns.get(pid, {})
+        if cds.get(ability_id, 0) > 0:
+            return await interaction.response.send_message(
+                "❌ That ability is on cooldown.", ephemeral=True
+            )
+
         # 2) If it’s an enemy‑target skill but we’re not in a battle, block it
         in_battle = bool(session.current_enemy)
         if ability_meta["target_type"] == "enemy" and not in_battle:
