@@ -141,14 +141,30 @@ class InventoryShop(commands.Cog):
         if hub_mgr and interaction.channel.id == hub_mgr.hub_channel_id:
             return
 
+        cid = interaction.data.get("custom_id", "")
+
+        # only handle shop-related custom IDs; otherwise let other cogs respond
+        relevant = (
+            cid.startswith("shop_main_")
+            or cid.startswith("action_shop_")
+            or cid.startswith("shop_buy_")
+            or cid.startswith("shop_sell_")
+            or cid.startswith("buy_")
+            or cid.startswith("sell_")
+            or cid.startswith("use_item_")
+            or cid in {"back_from_use", "shop_back_room"}
+        )
+        if not relevant:
+            return
+
         # Always defer so edits/followups are possible; ignore if already acknowledged
         try:
             if not interaction.response.is_done():
                 await interaction.response.defer()
         except discord.errors.HTTPException as e:
-            logger.debug("Deferred interaction failed (already acknowledged): %s", e)
-
-        cid = interaction.data.get("custom_id", "")
+            logger.debug(
+                "Deferred interaction failed (already acknowledged): %s", e
+            )
 
         try:
             # ---------------- Shop main ----------------
