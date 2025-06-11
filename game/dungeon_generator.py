@@ -1,14 +1,14 @@
 # cogs/dungeon_generator.py
-
 from __future__ import annotations
-import time
+
 import asyncio
 import functools
 import json
 import logging
 import random
+import time
 from collections import deque
-from typing import Any, Dict, List, Optional, Tuple, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import discord
 from discord.ext import commands
@@ -22,12 +22,12 @@ logger.setLevel(logging.DEBUG)
 class DungeonGenerator(commands.Cog):
     """
     Procedural dungeon generator with multi-floor mazes, loops, staircases,
-    locked/item/boss/shop rooms, treasure chest instancing and
+    locked/item/boss/shop rooms, treasure-chest instancing and
     per-session vendor instances for shop rooms.
     """
 
-    MIN_LOCK_DISTANCE = 5    # minimum tiles from (0,0) before a room can be locked
-    MIN_STAIR_DISTANCE = 6   # minimum tiles from entry before staircase appears
+    MIN_LOCK_DISTANCE = 5       # minimum tiles from (0, 0) before a room can be locked
+    MIN_STAIR_DISTANCE = 6      # minimum tiles from entry before staircase appears
     DEFAULT_LOOP_CHANCE = 0.15
     DEFAULT_STRAIGHT_BIAS = 0.6
     DEFAULT_STAIR_BIAS = 0.7
@@ -38,12 +38,15 @@ class DungeonGenerator(commands.Cog):
         self.db = Database()
         logger.debug("DungeonGenerator cog initialised.")
 
+    # ─────────────────────────────────────────────── DB
     def db_connect(self):
         return self.db.get_connection()
 
     # ─────────────────────────────────────────────── Weighted utilities
     @staticmethod
-    def weighted_choice(defs: List[Dict[str, Any]], key: str = "spawn_weight") -> Optional[Dict[str, Any]]:
+    def weighted_choice(
+        defs: List[Dict[str, Any]], key: str = "spawn_weight"
+    ) -> Optional[Dict[str, Any]]:
         total = sum(d.get(key, 0) for d in defs)
         if total <= 0:
             return None
@@ -82,18 +85,15 @@ class DungeonGenerator(commands.Cog):
             conn.close()
 
     # ─────────────────────────────────────────────── Maze helpers
-    def _carve_perfect_maze(self, w: int, h: int, straight_bias: float = 0.0) -> Dict[Tuple[int, int], Set[Tuple[int, int]]]:
-        """
-        Carve a perfect maze over the full w×h grid using recursive backtracker.
-        When ``straight_bias`` > 0, the algorithm prefers continuing straight
-        from the previous step with that probability.
-        Returns an adjacency map.
-        """
+    def _carve_perfect_maze(
+        self, w: int, h: int, straight_bias: float = 0.0
+    ) -> Dict[Tuple[int, int], Set[Tuple[int, int]]]:
+        """Recursive-backtracker maze (optionally biased toward straight runs)."""
         adj: Dict[Tuple[int, int], Set[Tuple[int, int]]] = {
             (x, y): set() for x in range(w) for y in range(h)
         }
-        stack: List[Tuple[int,int]] = []
-        visited: Set[Tuple[int,int]] = set()
+        stack: List[Tuple[int, int]] = []
+        visited: Set[Tuple[int, int]] = set()
         start = (0, 0)
         visited.add(start)
         stack.append(start)
@@ -102,7 +102,7 @@ class DungeonGenerator(commands.Cog):
             x, y = stack[-1]
             neighbors = [
                 (nx, ny)
-                for dx, dy in ((1,0),(-1,0),(0,1),(0,-1))
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))
                 if 0 <= (nx := x + dx) < w
                 and 0 <= (ny := y + dy) < h
                 and (nx, ny) not in visited
@@ -112,7 +112,9 @@ class DungeonGenerator(commands.Cog):
                 if len(stack) > 1 and random.random() < straight_bias:
                     px, py = stack[-2]
                     dxp, dyp = x - px, y - py
-                    straight = [n for n in neighbors if (n[0] - x, n[1] - y) == (dxp, dyp)]
+                    straight = [
+                        n for n in neighbors if (n[0] - x, n[1] - y) == (dxp, dyp)
+                    ]
                     if straight:
                         nxt = random.choice(straight)
                 if not nxt:
@@ -130,7 +132,7 @@ class DungeonGenerator(commands.Cog):
         adj: Dict[Tuple[int, int], Set[Tuple[int, int]]],
         loop_chance: float = DEFAULT_LOOP_CHANCE,
     ) -> None:
-        """Add extra connections ("loops") between adjacent cells."""
+        """Add extra connections (“loops”) between adjacent cells."""
         cells = list(adj.keys())
         for x, y in cells:
             for dx, dy in ((1, 0), (0, 1)):
@@ -143,12 +145,10 @@ class DungeonGenerator(commands.Cog):
     def _bfs_path(
         self,
         adj: Dict[Tuple[int, int], Set[Tuple[int, int]]],
-        start: Tuple[int,int],
-        end: Tuple[int,int]
-    ) -> List[Tuple[int,int]]:
-        """
-        BFS shortest path over the adjacency map.
-        """
+        start: Tuple[int, int],
+        end: Tuple[int, int],
+    ) -> List[Tuple[int, int]]:
+        """Shortest path over adjacency map (BFS)."""
         dq = deque([[start]])
         seen = {start}
         while dq:
@@ -162,7 +162,7 @@ class DungeonGenerator(commands.Cog):
                     dq.append(p + [nb])
         return [start, end]
 
-    # ─────────────────────────────────────────────── Fetch template helpers
+    # ─────────────────────────────────────────────── Template helpers
     def fetch_random_template(self, rtype: str) -> Optional[Dict[str, Any]]:
         conn = self.db_connect()
         try:
@@ -199,7 +199,7 @@ class DungeonGenerator(commands.Cog):
         finally:
             conn.close()
 
-    # ─────────────────────────────────────────────── Legacy path helpers
+    # ─────────────────────────────────────────────── Misc helpers
     @staticmethod
     def _choose_far_coordinate(
         width: int,
@@ -207,7 +207,7 @@ class DungeonGenerator(commands.Cog):
         min_dist: int,
         edge_bias: float = 0.0,
     ) -> Tuple[int, int]:
-        """Choose a (x, y) coordinate with optional edge bias."""
+        """Choose a coordinate at least `min_dist` Manhattan steps from (0, 0)."""
         all_coords = [
             (x, y)
             for x in range(width)
@@ -215,7 +215,7 @@ class DungeonGenerator(commands.Cog):
             if abs(x) + abs(y) >= min_dist
         ]
         if not all_coords:
-            return (width - 1, height - 1)
+            return width - 1, height - 1
 
         outer_coords = [
             (x, y)
@@ -230,6 +230,7 @@ class DungeonGenerator(commands.Cog):
             return random.choice(outer_coords)
         return random.choice(all_coords)
 
+    # ─────────────────────────────────────────────── Legacy path helper
     def generate_path(
         self,
         sx: int,
@@ -242,8 +243,7 @@ class DungeonGenerator(commands.Cog):
         max_attempts: int = 2000,
     ) -> List[Tuple[int, int]]:
         """
-        Legacy self-avoiding walk from (sx, sy) → (ex, ey), used for basement linking
-        if needed. Falls back to BFS shortest path.
+        Legacy self-avoiding walk from (sx, sy) → (ex, ey). Falls back to BFS.
         """
         for _ in range(max_attempts):
             path: List[Tuple[int, int]] = [(sx, sy)]
@@ -251,7 +251,7 @@ class DungeonGenerator(commands.Cog):
             while len(path) < minimum or path[-1] != (ex, ey):
                 x, y = path[-1]
                 moves: List[Tuple[int, int]] = []
-                for dx, dy in ((1,0),(-1,0),(0,1),(0,-1)):
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
                     nx, ny = x + dx, y + dy
                     if 0 <= nx < w and 0 <= ny < h and (nx, ny) not in visited:
                         moves.append((nx, ny))
@@ -262,27 +262,30 @@ class DungeonGenerator(commands.Cog):
                 path.append(nxt)
             else:
                 return path
-        return self._bfs_path({(sx,sy):{(ex,ey)}}, (sx,sy), (ex,ey))  # fallback
+        return self._bfs_path({(sx, sy): {(ex, ey)}}, (sx, sy), (ex, ey))
 
-    # ─────────────────────────────────────────────── Room exits using adjacency
+    # ─────────────────────────────────────────────── Room exits
     @staticmethod
-    def get_room_exits(x: int,
-                       y: int,
-                       adj_map: Dict[Tuple[int,int], Set[Tuple[int,int]]]
-                       ) -> Dict[str, Tuple[int, int]]:
+    def get_room_exits(
+        x: int,
+        y: int,
+        adj_map: Dict[Tuple[int, int], Set[Tuple[int, int]]],
+    ) -> Dict[str, Tuple[int, int]]:
         exits: Dict[str, Tuple[int, int]] = {}
-        for dir, (dx, dy) in {
+        for dir_, (dx, dy) in {
             "north": (0, -1),
             "south": (0, 1),
-            "east":  (1, 0),
-            "west":  (-1,0),
+            "east": (1, 0),
+            "west": (-1, 0),
         }.items():
-            if (x+dx, y+dy) in adj_map.get((x, y), ()):
-                exits[dir] = (x+dx, y+dy)
+            if (x + dx, y + dy) in adj_map.get((x, y), ()):
+                exits[dir_] = (x + dx, y + dy)
         return exits
 
-    # ─────────────────────────────────────────────── Treasure chest helpers
-    def fetch_random_treasure_chest(self, reward_type: Optional[str] = None) -> List[Dict[str, Any]]:
+    # ─────────────────────────────────────────────── Treasure helpers
+    def fetch_random_treasure_chest(
+        self, reward_type: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         conn = self.db_connect()
         try:
             with conn.cursor(dictionary=True) as cur:
@@ -300,7 +303,9 @@ class DungeonGenerator(commands.Cog):
         finally:
             conn.close()
 
-    def fetch_treasure_chest_rewards(self, chest_id: int) -> List[Dict[str, Any]]:
+    def fetch_treasure_chest_rewards(
+        self, chest_id: int
+    ) -> List[Dict[str, Any]]:
         conn = self.db_connect()
         try:
             with conn.cursor(dictionary=True) as cur:
@@ -320,7 +325,9 @@ class DungeonGenerator(commands.Cog):
         finally:
             conn.close()
 
-    def create_treasure_chest_instance(self, session_id: int, room_id: int, chest_id: int) -> Optional[int]:
+    def create_treasure_chest_instance(
+        self, session_id: int, room_id: int, chest_id: int
+    ) -> Optional[int]:
         conn = self.db_connect()
         try:
             with conn.cursor(dictionary=True) as cur:
@@ -381,21 +388,31 @@ class DungeonGenerator(commands.Cog):
             conn.close()
 
     # ─────────────────────────────────────────────── Vendor helpers
-    def fetch_random_vendor(self, used_vendors: Optional[Set[int]] = None) -> Optional[int]:
+    def fetch_random_vendor(
+        self, used_vendors: Optional[Set[int]] = None
+    ) -> Optional[int]:
         conn = self.db_connect()
         try:
             with conn.cursor() as cur:
                 if used_vendors:
                     placeholders = ",".join(["%s"] * len(used_vendors))
                     cur.execute(
-                        f"SELECT vendor_id FROM npc_vendors WHERE vendor_id NOT IN ({placeholders}) ORDER BY RAND() LIMIT 1",
+                        f"""
+                        SELECT vendor_id
+                          FROM npc_vendors
+                         WHERE vendor_id NOT IN ({placeholders})
+                         ORDER BY RAND()
+                         LIMIT 1
+                        """,
                         tuple(used_vendors),
                     )
                     row = cur.fetchone()
                     if row:
                         return row[0]
 
-                cur.execute("SELECT vendor_id FROM npc_vendors ORDER BY RAND() LIMIT 1")
+                cur.execute(
+                    "SELECT vendor_id FROM npc_vendors ORDER BY RAND() LIMIT 1"
+                )
                 row = cur.fetchone()
                 return row[0] if row else None
         finally:
@@ -405,12 +422,17 @@ class DungeonGenerator(commands.Cog):
         conn = self.db_connect()
         try:
             with conn.cursor(dictionary=True) as cur:
-                cur.execute("SELECT * FROM npc_vendors WHERE vendor_id=%s", (vendor_id,))
+                cur.execute(
+                    "SELECT * FROM npc_vendors WHERE vendor_id=%s",
+                    (vendor_id,),
+                )
                 return cur.fetchone()
         finally:
             conn.close()
 
-    def create_session_vendor_instance(self, session_id: int, global_vendor_id: int) -> Optional[int]:
+    def create_session_vendor_instance(
+        self, session_id: int, global_vendor_id: int
+    ) -> Optional[int]:
         vendor = self.fetch_vendor_by_id(global_vendor_id)
         if not vendor:
             return None
@@ -421,7 +443,8 @@ class DungeonGenerator(commands.Cog):
                 cur.execute(
                     """
                     INSERT INTO session_vendor_instances
-                        (session_id, vendor_id, vendor_name, description, image_url, created_at)
+                        (session_id, vendor_id, vendor_name, description,
+                         image_url, created_at)
                     VALUES (%s,%s,%s,%s,%s,NOW())
                     """,
                     (
@@ -435,7 +458,11 @@ class DungeonGenerator(commands.Cog):
                 session_vendor_id = cur.lastrowid
 
                 cur.execute(
-                    "SELECT item_id, price, stock, instance_stock FROM npc_vendor_items WHERE vendor_id=%s",
+                    """
+                    SELECT item_id, price, stock, instance_stock
+                      FROM npc_vendor_items
+                     WHERE vendor_id=%s
+                    """,
                     (global_vendor_id,),
                 )
                 for item_id, price, stock, instance_stock in cur.fetchall():
@@ -446,14 +473,21 @@ class DungeonGenerator(commands.Cog):
                              stock, instance_stock, session_id)
                         VALUES (%s,%s,%s,%s,%s,%s)
                         """,
-                        (session_vendor_id, item_id, price, stock, instance_stock, session_id),
+                        (
+                            session_vendor_id,
+                            item_id,
+                            price,
+                            stock,
+                            instance_stock,
+                            session_id,
+                        ),
                     )
             conn.commit()
             return session_vendor_id
         finally:
             conn.close()
 
-    # ─────────────────────────────────────────────── Room generation helpers
+    # ─────────────────────────────────────────────── Floor room builder
     def generate_rooms_for_floor(
         self,
         floor_id: int,
@@ -474,12 +508,13 @@ class DungeonGenerator(commands.Cog):
         loop_chance: float = DEFAULT_LOOP_CHANCE,
         straight_bias: float = DEFAULT_STRAIGHT_BIAS,
     ) -> List[Tuple[int, int, int, str, Dict[str, Tuple[int, int]]]]:
-        # 1) carve a full perfect maze + loops
+        """Return a list of (floor_id,x,y,room_type,exits) tuples."""
+        # 1) maze + loops
         adj = self._carve_perfect_maze(width, height, straight_bias)
         self._add_random_loops(adj, loop_chance)
 
-        # 2) compute distance-from-entry for lock/item rules
-        dist: Dict[Tuple[int,int], int] = {(start_x, start_y): 0}
+        # 2) BFS distance map
+        dist: Dict[Tuple[int, int], int] = {(start_x, start_y): 0}
         dq = deque([(start_x, start_y)])
         while dq:
             cx, cy = dq.popleft()
@@ -488,74 +523,68 @@ class DungeonGenerator(commands.Cog):
                     dist[nb] = dist[(cx, cy)] + 1
                     dq.append(nb)
 
-        # 3) shortest path along maze from start to exit
+        # 3) guaranteed path start→exit
         path = self._bfs_path(adj, (start_x, start_y), (end_x, end_y))
         interior = path[1:-1]
 
-        # 4) determine boss/exit coords
+        # 4) boss/exit coordinates
         boss_coord = path[-2] if is_last_floor and len(path) >= 2 else None
         exit_coord = path[-1] if is_last_floor else None
 
-        # 5) select shop positions by distance-percentile, with jitter & dedupe
+        # 5) shops
         shops_needed = min(shop_limit, len(interior))
-        shop_positions: List[Tuple[int,int]] = []
+        shop_positions: List[Tuple[int, int]] = []
         if shops_needed:
-            sorted_by_dist = sorted(interior, key=lambda coord: dist.get(coord, 0))
+            sorted_by_dist = sorted(interior, key=lambda c: dist.get(c, 0))
             n = len(sorted_by_dist)
-            used: Set[Tuple[int,int]] = set()
-            # width of one “segment” for jitter calculation
             segment = n / (shops_needed + 1)
             half_seg = segment / 2
-
+            used: Set[Tuple[int, int]] = set()
             for i in range(shops_needed):
-                # base floating index at the (i+1)/(shops_needed+1) percentile
                 base = (i + 1) * segment
-
-                # optional jitter in ±half‑segment
-                jitter = random.uniform(-half_seg, half_seg)
-                raw_idx = base + jitter
-
-                # clamp and cast to int
-                idx = int(min(max(raw_idx, 0), n - 1))
-
+                idx = int(
+                    min(max(base + random.uniform(-half_seg, half_seg), 0), n - 1)
+                )
                 coord = sorted_by_dist[idx]
-
-                # if duplicate, scan forward for the nearest unused
                 if coord in used:
                     for offset in range(1, n):
                         cand = sorted_by_dist[(idx + offset) % n]
                         if cand not in used:
                             coord = cand
                             break
-
                 shop_positions.append(coord)
                 used.add(coord)
 
-        # 6) floor rules
-        rules     = self.fetch_floor_rules(difficulty, floor_number)
+        # 6) floor rules table
+        rules = self.fetch_floor_rules(difficulty, floor_number)
         remaining = {r["room_type"]: r["max_per_floor"] for r in rules}
-        weights   = {r["room_type"]: r["chance"]      for r in rules}
+        weights = {r["room_type"]: r["chance"] for r in rules}
 
-        def choose_type(exclude_locked=False, exclude_item=False, exclude_shop=False) -> str:
+        def choose_type(
+            exclude_locked=False, exclude_item=False, exclude_shop=False
+        ) -> str:
             avail = [
-                rt for rt, cap in remaining.items()
+                rt
+                for rt, cap in remaining.items()
                 if cap > 0
-                and rt not in ("staircase_up","staircase_down")
+                and rt not in ("staircase_up", "staircase_down")
                 and not (exclude_locked and rt == "locked")
                 and not (exclude_item and rt == "item")
                 and not (exclude_shop and rt == "shop")
             ]
             if not avail:
                 return "monster" if random.random() < enemy_chance else "safe"
-            choice_ = random.choices(avail, weights=[weights[a] for a in avail])[0]
-            remaining[choice_] -= 1
-            if choice_ in ("trap","illusion") and not self.fetch_random_template(choice_):
+            choice_rt = random.choices(avail, weights=[weights[a] for a in avail])[0]
+            remaining[choice_rt] -= 1
+            if choice_rt in ("trap", "illusion") and not self.fetch_random_template(
+                choice_rt
+            ):
                 return "monster" if random.random() < enemy_chance else "safe"
-            return choice_
+            return choice_rt
 
-        # 7) build rooms
-        out: List[Tuple[int,int,int,str,Dict[str,Tuple[int,int]]]] = []
-        room_types: Dict[Tuple[int,int], str] = {}
+        # 7) build room list
+        out: List[Tuple[int, int, int, str, Dict[str, Tuple[int, int]]]] = []
+        room_types: Dict[Tuple[int, int], str] = {}
         for y in range(height):
             for x in range(width):
                 coord = (x, y)
@@ -570,18 +599,18 @@ class DungeonGenerator(commands.Cog):
                 else:
                     rtype = choose_type()
 
-                # lock/item safety
-                if rtype == "locked" and dist.get(coord,0) < self.MIN_LOCK_DISTANCE:
+                # distance & adjacency safety
+                if rtype == "locked" and dist.get(coord, 0) < self.MIN_LOCK_DISTANCE:
                     remaining["locked"] += 1
                     rtype = choose_type(exclude_locked=True)
-                if rtype in ("locked","item") and coord not in path:
+                if rtype in ("locked", "item") and coord not in path:
                     remaining[rtype] += 1
                     rtype = "monster" if random.random() < enemy_chance else "safe"
 
                 if rtype in ("shop", "item"):
                     neighbors = [
                         (x + dx, y + dy)
-                        for dx, dy in ((1,0),(-1,0),(0,1),(0,-1))
+                        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))
                         if 0 <= x + dx < width and 0 <= y + dy < height
                     ]
                     if any(room_types.get(nb) == rtype for nb in neighbors):
@@ -597,10 +626,12 @@ class DungeonGenerator(commands.Cog):
 
         return out
 
-    # ─────────────────────────────────────────────── Save dungeon state
-    def save_dungeon_to_session(self, session_id: int, data: Dict[str, Any]) -> None:
+    # ─────────────────────────────────────────────── Persist state
+    def save_dungeon_to_session(
+        self, session_id: int, data: Dict[str, Any]
+    ) -> None:
         conn = self.db_connect()
-            exit_x, exit_y = self._choose_far_coordinate(width, height, self.MIN_STAIR_DISTANCE, 0)
+        try:
             with conn.cursor() as cur:
                 cur.execute(
                     "UPDATE sessions SET game_state=%s WHERE session_id=%s",
@@ -610,7 +641,7 @@ class DungeonGenerator(commands.Cog):
         finally:
             conn.close()
 
-    # ─────────────────────────────────────────────── first floor generator
+    # ─────────────────────────────────────────────── First-floor generator
     async def generate_dungeon_for_session(
         self, ctx: commands.Context, session_id: int, difficulty_name: str
     ) -> Optional[Dict[str, Any]]:
@@ -619,23 +650,23 @@ class DungeonGenerator(commands.Cog):
             await ctx.send("❌ Difficulty settings not found.", delete_after=10)
             return None
 
-        width        = settings["width"]
-        height       = settings["height"]
-        min_rooms    = settings["min_rooms"]
-        min_floors   = settings["min_floors"]
-        max_floors   = settings["max_floors"]
+        width = settings["width"]
+        height = settings["height"]
+        min_rooms = settings["min_rooms"]
+        min_floors = settings["min_floors"]
+        max_floors = settings["max_floors"]
         enemy_chance = settings["enemy_chance"]
-        npc_count    = settings["npc_count"]
-        shop_limit   = settings.get("shops_per_floor", npc_count)
+        npc_count = settings["npc_count"]
+        shop_limit = settings.get("shops_per_floor", npc_count)
 
-        loop_chance   = settings.get("loop_chance", self.DEFAULT_LOOP_CHANCE)
+        loop_chance = settings.get("loop_chance", self.DEFAULT_LOOP_CHANCE)
         straight_bias = settings.get("straight_bias", self.DEFAULT_STRAIGHT_BIAS)
-        stair_bias    = settings.get("stair_edge_bias", self.DEFAULT_STAIR_BIAS)
+        stair_bias = settings.get("stair_edge_bias", self.DEFAULT_STAIR_BIAS)
 
-        basement_chance    = settings.get("basement_chance", 0.0)
+        basement_chance = settings.get("basement_chance", 0.0)
         basement_min_rooms = settings.get("basement_min_rooms", 0)
         basement_max_rooms = settings.get("basement_max_rooms", 0)
-        include_basement   = random.random() < basement_chance
+        include_basement = random.random() < basement_chance
 
         total_floors = random.randint(min_floors, max_floors)
 
@@ -651,24 +682,31 @@ class DungeonGenerator(commands.Cog):
         if total_floors == 1:
             exit_x, exit_y, is_goal = width - 1, height - 1, True
         else:
-            exit_x, exit_y = self._choose_far_coordinate(width, height, self.MIN_STAIR_DISTANCE, stair_bias)
-            is_goal        = False
+            exit_x, exit_y = self._choose_far_coordinate(
+                width, height, self.MIN_STAIR_DISTANCE, stair_bias
+            )
+            is_goal = False
 
-        basement_floor_id: Optional[int] = None
         loop = asyncio.get_running_loop()
         used_vendors: Set[int] = set()
 
-        # Optional basement
+        # ── Basement (optional) ─────────────────────
+        basement_floor_id: Optional[int] = None
+        basement_defs: List[Tuple[int, int, int, str, Dict[str, Tuple[int, int]]]] = []
         if include_basement:
-            main_path = self.generate_path(entry_x, entry_y, exit_x, exit_y, width, height, min_rooms)
+            main_path = self.generate_path(
+                entry_x, entry_y, exit_x, exit_y, width, height, min_rooms
+            )
             link_x, link_y = random.choice(main_path[1:])
 
             with conn.cursor() as cur:
                 total_b_rooms = random.randint(basement_min_rooms, basement_max_rooms)
                 cur.execute(
-                    "INSERT INTO floors "
-                    "(session_id, difficulty, total_rooms, floor_number, is_goal_floor) "
-                    "VALUES (%s,%s,%s,0,false)",
+                    """
+                    INSERT INTO floors
+                        (session_id, difficulty, total_rooms, floor_number, is_goal_floor)
+                    VALUES (%s,%s,%s,0,false)
+                    """,
                     (session_id, difficulty_name, total_b_rooms),
                 )
                 conn.commit()
@@ -678,91 +716,163 @@ class DungeonGenerator(commands.Cog):
                 None,
                 functools.partial(
                     self.generate_rooms_for_floor,
-                    basement_floor_id, width, height, total_b_rooms,
-                    enemy_chance, npc_count, shop_limit, False,
-                    link_x, link_y, width - 1, height - 1,
-                    difficulty_name, 0, None,
-                    loop_chance, straight_bias
-                )
+                    basement_floor_id,
+                    width,
+                    height,
+                    total_b_rooms,
+                    enemy_chance,
+                    npc_count,
+                    shop_limit,
+                    False,
+                    link_x,
+                    link_y,
+                    width - 1,
+                    height - 1,
+                    difficulty_name,
+                    0,
+                    None,
+                    loop_chance,
+                    straight_bias,
+                ),
             )
-        floor_mb_used = 0
-                if miniboss_pool and floor_mb_used < self.MINIBOSS_PER_FLOOR:
-                    mb = miniboss_pool.pop()
-                    inner_id = mb["template_id"]
-                    def_en = mb["default_enemy_id"]
-                    floor_mb_used += 1
+
+            # insert basement rooms
+            item_rooms: List[int] = []
+            locked_count = 0
+            for _, x, y, rtype, exits in basement_defs:
+                inner_id = None
+                vendor_id = None
+                def_en = None
+
+                if rtype == "locked":
+                    inner_id = self.fetch_random_inner_template()
+                    locked_count += 1
+
+                if rtype == "shop":
                     gvid = self.fetch_random_vendor(used_vendors)
                     if gvid:
-                        vendor_id = self.create_session_vendor_instance(session_id, gvid)
+                        vendor_id = self.create_session_vendor_instance(
+                            session_id, gvid
+                        )
                         used_vendors.add(gvid)
+
                 tmpl = self.fetch_random_template(rtype) or {}
                 desc = tmpl.get("description", "A mysterious room…")
-                img  = tmpl.get("image_url")
-                def_en = tmpl.get("default_enemy_id")
+                img = tmpl.get("image_url")
+                if def_en is None:
+                    def_en = tmpl.get("default_enemy_id")
 
                 with conn.cursor() as cur:
                     cur.execute(
-                        "INSERT INTO rooms "
-                        "(session_id,floor_id,coord_x,coord_y,description,room_type,"
-                        " image_url,default_enemy_id,exits,vendor_id,inner_template_id) "
-                        "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NULL)",
+                        """
+                        INSERT INTO rooms
+                            (session_id,floor_id,coord_x,coord_y,description,
+                             room_type,image_url,default_enemy_id,exits,
+                             vendor_id,inner_template_id)
+                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                        """,
                         (
                             session_id,
                             basement_floor_id,
-                            x, y,
+                            x,
+                            y,
                             desc,
                             rtype,
                             img,
                             def_en,
                             json.dumps(exits),
-                            vendor_id
+                            vendor_id,
+                            inner_id,
                         ),
+                    )
+                    if rtype == "item":
+                        item_rooms.append(cur.lastrowid)
+            conn.commit()
+
+            # chests in basement
+            key_defs = self.fetch_random_treasure_chest("key")
+            all_defs = self.fetch_random_treasure_chest()
+            for rid in item_rooms[:locked_count]:
+                chest = self.weighted_choice(key_defs)
+                if chest:
+                    self.create_treasure_chest_instance(
+                        session_id, rid, chest["chest_id"]
+                    )
+            for rid in item_rooms[locked_count:]:
+                chest = self.weighted_choice(all_defs)
+                if chest:
+                    self.create_treasure_chest_instance(
+                        session_id, rid, chest["chest_id"]
                     )
             conn.commit()
 
-        # First floor record
+        # ── First floor ─────────────────────────────
         with conn.cursor() as cur:
             cur.execute(
-                "INSERT INTO floors "
-                "(session_id, difficulty, total_rooms, floor_number, is_goal_floor) "
-                "VALUES (%s,%s,%s,1,%s)",
+                """
+                INSERT INTO floors
+                    (session_id, difficulty, total_rooms, floor_number, is_goal_floor)
+                VALUES (%s,%s,%s,1,%s)
+                """,
                 (session_id, difficulty_name, min_rooms, is_goal),
             )
             conn.commit()
             first_floor_id = cur.lastrowid
 
-        # build miniboss queue
+        # miniboss pool (for first & later floors)
         with conn.cursor(dictionary=True) as cur:
             cur.execute(
-                "SELECT template_id, default_enemy_id FROM room_templates WHERE room_type='miniboss'"
+                """
+                SELECT template_id, default_enemy_id
+                  FROM room_templates
+                 WHERE room_type='miniboss'
+                """
             )
-            miniboss_pool = cur.fetchall()
+            miniboss_pool: List[Dict[str, Any]] = cur.fetchall()
         random.shuffle(miniboss_pool)
         mb_index = 0
 
-        # generate first-floor rooms
         first_defs = await loop.run_in_executor(
             None,
             functools.partial(
                 self.generate_rooms_for_floor,
-                first_floor_id, width, height, min_rooms,
-                enemy_chance, npc_count, shop_limit, is_goal,
-                entry_x, entry_y, exit_x, exit_y,
-                difficulty_name, 1, None,
-                loop_chance, straight_bias
-            )
+                first_floor_id,
+                width,
+                height,
+                min_rooms,
+                enemy_chance,
+                npc_count,
+                shop_limit,
+                is_goal,
+                entry_x,
+                entry_y,
+                exit_x,
+                exit_y,
+                difficulty_name,
+                1,
+                None,
+                loop_chance,
+                straight_bias,
+            ),
         )
 
+        # link from surface to basement (locked staircase)
         locked_coord = (link_x, link_y) if include_basement else None
         staircase_down_tpl: Optional[int] = None
         if locked_coord:
             with conn.cursor(dictionary=True) as cur:
                 cur.execute(
-                    "SELECT template_id FROM room_templates WHERE room_type='staircase_down' LIMIT 1"
+                    """
+                    SELECT template_id
+                      FROM room_templates
+                     WHERE room_type='staircase_down'
+                     LIMIT 1
+                    """
                 )
                 row = cur.fetchone()
                 staircase_down_tpl = row["template_id"] if row else None
 
+        # insert first-floor rooms
         item_rooms: List[int] = []
         locked_count = 0
         for _, x, y, rtype, exits in first_defs:
@@ -770,8 +880,11 @@ class DungeonGenerator(commands.Cog):
             stair_down_floor_id = None
             stair_down_x = None
             stair_down_y = None
+            vendor_id = None
+            def_en = None
 
             if locked_coord and (x, y) == locked_coord:
+                # this is the locked entrance to basement
                 rtype = "locked"
                 inner_id = staircase_down_tpl
                 stair_down_floor_id = basement_floor_id
@@ -783,45 +896,67 @@ class DungeonGenerator(commands.Cog):
                     mb_index += 1
                 else:
                     inner_id = self.fetch_random_inner_template()
-                    def_en = None
                 locked_count += 1
-            else:
-                def_en = None
 
-            vendor_id = None
             if rtype == "shop":
                 gvid = self.fetch_random_vendor(used_vendors)
                 if gvid:
-                    vendor_id = self.create_session_vendor_instance(session_id, gvid)
+                    vendor_id = self.create_session_vendor_instance(
+                        session_id, gvid
+                    )
                     used_vendors.add(gvid)
 
             tmpl = self.fetch_random_template(rtype) or {}
             desc = tmpl.get("description", "A mysterious room…")
-            img  = tmpl.get("image_url")
+            img = tmpl.get("image_url")
 
             if rtype == "boss":
-                with conn.cursor(dictionary=True) as cur2:
-                    cur2.execute("SELECT enemy_id FROM enemies WHERE role='boss' ORDER BY RAND() LIMIT 1")
-                    row2 = cur2.fetchone()
-                def_en = row2["enemy_id"] if row2 else None
+                role = "boss"
             elif rtype == "monster":
+                role = "normal"
+            else:
+                role = None
+
+            if role:
                 with conn.cursor(dictionary=True) as cur2:
-                    cur2.execute("SELECT enemy_id FROM enemies WHERE role='normal' ORDER BY RAND() LIMIT 1")
+                    cur2.execute(
+                        """
+                        SELECT enemy_id
+                          FROM enemies
+                         WHERE role=%s
+                         ORDER BY RAND()
+                         LIMIT 1
+                        """,
+                        (role,),
+                    )
                     row2 = cur2.fetchone()
-                def_en = row2["enemy_id"] if row2 else None
+                def_en = row2["enemy_id"] if row2 else def_en
 
             with conn.cursor() as cur:
                 cur.execute(
-                    "INSERT INTO rooms "
-                    "(session_id,floor_id,coord_x,coord_y,description,room_type,"
-                    " image_url,default_enemy_id,exits,vendor_id,inner_template_id,"
-                    " stair_down_floor_id,stair_down_x,stair_down_y) "
-                    "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                    """
+                    INSERT INTO rooms
+                        (session_id,floor_id,coord_x,coord_y,description,
+                         room_type,image_url,default_enemy_id,exits,
+                         vendor_id,inner_template_id,
+                         stair_down_floor_id,stair_down_x,stair_down_y)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    """,
                     (
-                        session_id, first_floor_id, x, y,
-                        desc, rtype, img, def_en,
-                        json.dumps(exits), vendor_id, inner_id,
-                        stair_down_floor_id, stair_down_x, stair_down_y,
+                        session_id,
+                        first_floor_id,
+                        x,
+                        y,
+                        desc,
+                        rtype,
+                        img,
+                        def_en,
+                        json.dumps(exits),
+                        vendor_id,
+                        inner_id,
+                        stair_down_floor_id,
+                        stair_down_x,
+                        stair_down_y,
                     ),
                 )
                 rid = cur.lastrowid
@@ -829,9 +964,10 @@ class DungeonGenerator(commands.Cog):
                     item_rooms.append(rid)
         conn.commit()
 
-        # link staircases
+        # staircase-up (inside basement) & staircase-down (surface) link
         if include_basement:
             with conn.cursor() as cur:
+                # basement → up
                 cur.execute(
                     """
                     UPDATE rooms
@@ -841,13 +977,20 @@ class DungeonGenerator(commands.Cog):
                            stair_up_y=%s
                      WHERE session_id=%s
                        AND floor_id=%s
-                       AND coord_x=%s AND coord_y=%s
+                       AND coord_x=%s
+                       AND coord_y=%s
                     """,
                     (
-                        first_floor_id, link_x, link_y,
-                        session_id, basement_floor_id, link_x, link_y,
+                        first_floor_id,
+                        link_x,
+                        link_y,
+                        session_id,
+                        basement_floor_id,
+                        link_x,
+                        link_y,
                     ),
                 )
+                # surface → down
                 cur.execute(
                     """
                     UPDATE rooms
@@ -856,75 +999,55 @@ class DungeonGenerator(commands.Cog):
                            stair_down_y=%s
                      WHERE session_id=%s
                        AND floor_id=%s
-                       AND coord_x=%s AND coord_y=%s
+                       AND coord_x=%s
+                       AND coord_y=%s
                     """,
                     (
-                        basement_floor_id, link_x, link_y,
-                        session_id, first_floor_id, link_x, link_y,
+                        basement_floor_id,
+                        link_x,
+                        link_y,
+                        session_id,
+                        first_floor_id,
+                        link_x,
+                        link_y,
                     ),
                 )
-                # update images & descriptions from templates
+                # decorate staircase_up image/description
                 cur.execute(
                     """
                     UPDATE rooms AS r
                     JOIN room_templates AS t
-                    ON t.room_type = 'staircase_up'
-                    SET
-                    r.image_url        = t.image_url,
-                    r.description      = t.description,
-                    r.inner_template_id= t.template_id
-                    WHERE
-                    r.session_id = %s
-                    AND r.floor_id = %s
-                    AND r.coord_x  = %s
-                    AND r.coord_y  = %s
+                      ON t.room_type = 'staircase_up'
+                       SET r.image_url        = t.image_url,
+                           r.description      = t.description,
+                           r.inner_template_id= t.template_id
+                     WHERE r.session_id=%s
+                       AND r.floor_id=%s
+                       AND r.coord_x =%s
+                       AND r.coord_y =%s
                     """,
                     (session_id, basement_floor_id, link_x, link_y),
                 )
-                cur.execute(
-                loop_chance, straight_bias, stair_bias,
-                miniboss_pool
-        miniboss_pool: List[Dict[str, Any]],
-            exit_x, exit_y = self._choose_far_coordinate(width, height, self.MIN_STAIR_DISTANCE, 0)
-                exit_x, exit_y = self._choose_far_coordinate(width, height, self.MIN_STAIR_DISTANCE, 0)
-            floor_mb_used = 0
-                    if miniboss_pool and floor_mb_used < self.MINIBOSS_PER_FLOOR:
-                        mb = miniboss_pool.pop()
-                        inner_id = mb["template_id"]
-                        def_en = mb["default_enemy_id"]
-                        floor_mb_used += 1
-                    else:
-                        inner_id = self.fetch_random_inner_template()
-                        def_en = None
-                    SET
-                    r.image_url        = t.image_url,
-                    r.description      = t.description,
-                    r.inner_template_id= t.template_id
-                    WHERE
-                    r.session_id = %s
-                    AND r.floor_id = %s
-                    AND r.coord_x  = %s
-                    AND r.coord_y  = %s
-                    """,
-                    (session_id, first_floor_id, link_x, link_y),
-                )
             conn.commit()
 
-        # create chests in item rooms
+        # chests on first floor
         key_defs = self.fetch_random_treasure_chest("key")
         all_defs = self.fetch_random_treasure_chest()
         for rid in item_rooms[:locked_count]:
             chest = self.weighted_choice(key_defs)
             if chest:
-                self.create_treasure_chest_instance(session_id, rid, chest["chest_id"])
+                self.create_treasure_chest_instance(
+                    session_id, rid, chest["chest_id"]
+                )
         for rid in item_rooms[locked_count:]:
             chest = self.weighted_choice(all_defs)
             if chest:
-                self.create_treasure_chest_instance(session_id, rid, chest["chest_id"])
+                self.create_treasure_chest_instance(
+                    session_id, rid, chest["chest_id"]
+                )
         conn.commit()
-        conn.close()
 
-        # build blob and save
+        # ── Build save-blob & persist ───────────────
         blob: Dict[str, Any] = {
             "difficulty": difficulty_name,
             "total_floors": total_floors + (1 if include_basement else 0),
@@ -932,30 +1055,53 @@ class DungeonGenerator(commands.Cog):
             "width": width,
             "height": height,
         }
-        if include_basement:
-            for _, x, y, rtype, exits in basement_defs:
-                blob["rooms"].append({"floor_id": basement_floor_id, "x": x, "y": y, "type": rtype, "exits": exits})
+        for defs in (basement_defs if include_basement else []):
+            _, x, y, rtype, exits = defs
+            blob["rooms"].append(
+                {
+                    "floor_id": basement_floor_id,
+                    "x": x,
+                    "y": y,
+                    "type": rtype,
+                    "exits": exits,
+                }
+            )
         for _, x, y, rtype, exits in first_defs:
-            blob["rooms"].append({"floor_id": first_floor_id, "x": x, "y": y, "type": rtype, "exits": exits})
+            blob["rooms"].append(
+                {
+                    "floor_id": first_floor_id,
+                    "x": x,
+                    "y": y,
+                    "type": rtype,
+                    "exits": exits,
+                }
+            )
         self.save_dungeon_to_session(session_id, blob)
 
-        # remaining floors
+        # ── Remaining floors (async) ────────────────
         if total_floors > 1:
             await self._generate_remaining_floors(
-                session_id, difficulty_name,
-                width, height, min_rooms,
-                enemy_chance, npc_count, shop_limit,
-                total_floors, exit_x, exit_y, first_floor_id,
-        codex/modify-path-generation-heuristics
-                loop_chance, straight_bias, stair_bias
-
-                used_vendors
-        main
+                session_id,
+                difficulty_name,
+                width,
+                height,
+                min_rooms,
+                enemy_chance,
+                npc_count,
+                shop_limit,
+                total_floors,
+                exit_x,
+                exit_y,
+                first_floor_id,
+                loop_chance,
+                straight_bias,
+                stair_bias,
+                used_vendors,
             )
 
         return blob
 
-    # ─────────────────────────────────────────────── async remainder floors
+    # ─────────────────────────────────────────────── Later floors
     async def _generate_remaining_floors(
         self,
         session_id: int,
@@ -970,159 +1116,274 @@ class DungeonGenerator(commands.Cog):
         prev_x: int,
         prev_y: int,
         prev_floor_id: int,
-        codex/modify-path-generation-heuristics
         loop_chance: float,
         straight_bias: float,
         stair_bias: float,
-
         used_vendors: Set[int],
-        main
-    ):
+    ) -> None:
         conn = self.db_connect()
-        cur = conn.cursor(dictionary=True)
-        cur.execute("SELECT game_state FROM sessions WHERE session_id=%s", (session_id,))
-        row = cur.fetchone()
-        blob = json.loads(row["game_state"] or "{}")
-        cur.close()
-
-        loop = asyncio.get_running_loop()
-        current_entry = (prev_x, prev_y)
-
-        for floor_number in range(2, total_floors + 1):
-            is_goal = floor_number == total_floors
-
-            exit_x, exit_y = self._choose_far_coordinate(width, height, self.MIN_STAIR_DISTANCE, stair_bias)
-            while abs(exit_x - current_entry[0]) + abs(exit_y - current_entry[1]) < self.MIN_STAIR_DISTANCE:
-                exit_x, exit_y = self._choose_far_coordinate(width, height, self.MIN_STAIR_DISTANCE, stair_bias)
-
-            with conn.cursor() as cur:
+        try:
+            with conn.cursor(dictionary=True) as cur:
                 cur.execute(
-                    "INSERT INTO floors (session_id, difficulty, total_rooms, floor_number, is_goal_floor) VALUES (%s,%s,%s,%s,%s)",
-                    (session_id, difficulty_name, min_rooms, floor_number, is_goal),
+                    "SELECT game_state FROM sessions WHERE session_id=%s",
+                    (session_id,),
                 )
-                conn.commit()
-                floor_id = cur.lastrowid
+                row = cur.fetchone()
+            blob = json.loads(row["game_state"] or "{}")
 
-            defs = await loop.run_in_executor(
-                None,
-                functools.partial(
-                    self.generate_rooms_for_floor,
-                    floor_id, width, height, min_rooms,
-                    enemy_chance, npc_count, shop_limit, is_goal,
-                    current_entry[0], current_entry[1], exit_x, exit_y,
-                    difficulty_name, floor_number, prev_floor_id,
-                    loop_chance * (1 + 0.05 * (floor_number - 1)),
-                    straight_bias
+            loop = asyncio.get_running_loop()
+            current_entry = (prev_x, prev_y)
+
+            for floor_number in range(2, total_floors + 1):
+                is_goal = floor_number == total_floors
+                exit_x, exit_y = self._choose_far_coordinate(
+                    width, height, self.MIN_STAIR_DISTANCE, stair_bias
                 )
-            )
-
-            item_rooms: List[int] = []
-            locked_count = 0
-
-            for _, x, y, rtype, exits in defs:
-                inner_id = None
-                if rtype == "locked":
-                    inner_id = self.fetch_random_inner_template()
-                    locked_count += 1
-
-                vendor_id = None
-                if rtype == "shop":
-                    gvid = self.fetch_random_vendor(used_vendors)
-                    if gvid:
-                        vendor_id = self.create_session_vendor_instance(session_id, gvid)
-                        used_vendors.add(gvid)
-
-                tmpl = self.fetch_random_template(rtype) or {}
-                desc = tmpl.get("description") or "A mysterious room..."
-                img  = tmpl.get("image_url")
-
-                if rtype in ("miniboss","boss","monster"):
-                    role = "miniboss" if rtype=="miniboss" else ("boss" if rtype=="boss" else "normal")
-                    with conn.cursor(dictionary=True) as cur2:
-                        cur2.execute(
-                            f"SELECT enemy_id FROM enemies WHERE role=%s ORDER BY RAND() LIMIT 1",
-                            (role,)
-                        )
-                        row2 = cur2.fetchone()
-                    def_en = row2["enemy_id"] if row2 else None
-                else:
-                    def_en = None
+                while (
+                    abs(exit_x - current_entry[0]) + abs(exit_y - current_entry[1])
+                    < self.MIN_STAIR_DISTANCE
+                ):
+                    exit_x, exit_y = self._choose_far_coordinate(
+                        width, height, self.MIN_STAIR_DISTANCE, stair_bias
+                    )
 
                 with conn.cursor() as cur:
                     cur.execute(
-                        "INSERT INTO rooms (session_id, floor_id, coord_x, coord_y, description, room_type, image_url, default_enemy_id, exits, vendor_id, inner_template_id) "
-                        "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-                        (session_id, floor_id, x, y, desc, rtype, img, def_en, json.dumps(exits), vendor_id, inner_id),
+                        """
+                        INSERT INTO floors
+                            (session_id,difficulty,total_rooms,floor_number,is_goal_floor)
+                        VALUES (%s,%s,%s,%s,%s)
+                        """,
+                        (
+                            session_id,
+                            difficulty_name,
+                            min_rooms,
+                            floor_number,
+                            is_goal,
+                        ),
                     )
-                    room_id = cur.lastrowid
-                    if rtype == "item":
-                        item_rooms.append(room_id)
+                    conn.commit()
+                    floor_id = cur.lastrowid
 
-            conn.commit()
-
-            # chests
-            key_defs = self.fetch_random_treasure_chest("key")
-            all_defs = self.fetch_random_treasure_chest()
-            for rid in item_rooms[:locked_count]:
-                chest = self.weighted_choice(key_defs)
-                if chest:
-                    self.create_treasure_chest_instance(session_id, rid, chest["chest_id"])
-            for rid in item_rooms[locked_count:]:
-                chest = self.weighted_choice(all_defs)
-                if chest:
-                    self.create_treasure_chest_instance(session_id, rid, chest["chest_id"])
-            conn.commit()
-
-            for _, x, y, rtype, exits in defs:
-                blob.setdefault("rooms", []).append({
-                    "floor_id": floor_id, "x": x, "y": y, "type": rtype, "exits": exits
-                })
-
-            with conn.cursor() as cur:
-                # link stairs
-                cur.execute(
-                    "UPDATE rooms SET room_type='staircase_up', stair_up_floor_id=%s, stair_up_x=%s, stair_up_y=%s "
-                    "WHERE session_id=%s AND floor_id=%s AND coord_x=%s AND coord_y=%s",
-                    (floor_id, current_entry[0], current_entry[1], session_id, prev_floor_id, current_entry[0], current_entry[1])
+                defs = await loop.run_in_executor(
+                    None,
+                    functools.partial(
+                        self.generate_rooms_for_floor,
+                        floor_id,
+                        width,
+                        height,
+                        min_rooms,
+                        enemy_chance,
+                        npc_count,
+                        shop_limit,
+                        is_goal,
+                        current_entry[0],
+                        current_entry[1],
+                        exit_x,
+                        exit_y,
+                        difficulty_name,
+                        floor_number,
+                        prev_floor_id,
+                        loop_chance * (1 + 0.05 * (floor_number - 1)),
+                        straight_bias,
+                    ),
                 )
-                cur.execute(
-                    "UPDATE rooms SET stair_down_floor_id=%s, stair_down_x=%s, stair_down_y=%s "
-                    "WHERE session_id=%s AND floor_id=%s AND coord_x=%s AND coord_y=%s",
-                    (prev_floor_id, current_entry[0], current_entry[1], session_id, floor_id, current_entry[0], current_entry[1])
-                )
-            conn.commit()
 
-            current_entry = (exit_x, exit_y)
-            prev_floor_id = floor_id
+                item_rooms: List[int] = []
+                locked_count = 0
 
-        self.save_dungeon_to_session(session_id, blob)
-        conn.close()
+                for _, x, y, rtype, exits in defs:
+                    inner_id = None
+                    vendor_id = None
+                    def_en = None
 
+                    if rtype == "locked":
+                        inner_id = self.fetch_random_inner_template()
+                        locked_count += 1
+
+                    if rtype == "shop":
+                        gvid = self.fetch_random_vendor(used_vendors)
+                        if gvid:
+                            vendor_id = self.create_session_vendor_instance(
+                                session_id, gvid
+                            )
+                            used_vendors.add(gvid)
+
+                    tmpl = self.fetch_random_template(rtype) or {}
+                    desc = tmpl.get("description") or "A mysterious room..."
+                    img = tmpl.get("image_url")
+
+                    if rtype in ("miniboss", "boss", "monster"):
+                        role = (
+                            "miniboss"
+                            if rtype == "miniboss"
+                            else ("boss" if rtype == "boss" else "normal")
+                        )
+                        with conn.cursor(dictionary=True) as cur2:
+                            cur2.execute(
+                                """
+                                SELECT enemy_id
+                                  FROM enemies
+                                 WHERE role=%s
+                                 ORDER BY RAND()
+                                 LIMIT 1
+                                """,
+                                (role,),
+                            )
+                            row2 = cur2.fetchone()
+                        def_en = row2["enemy_id"] if row2 else None
+
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            """
+                            INSERT INTO rooms
+                                (session_id,floor_id,coord_x,coord_y,description,
+                                 room_type,image_url,default_enemy_id,exits,
+                                 vendor_id,inner_template_id)
+                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                            """,
+                            (
+                                session_id,
+                                floor_id,
+                                x,
+                                y,
+                                desc,
+                                rtype,
+                                img,
+                                def_en,
+                                json.dumps(exits),
+                                vendor_id,
+                                inner_id,
+                            ),
+                        )
+                        room_id = cur.lastrowid
+                        if rtype == "item":
+                            item_rooms.append(room_id)
+                conn.commit()
+
+                # chests
+                key_defs = self.fetch_random_treasure_chest("key")
+                all_defs = self.fetch_random_treasure_chest()
+                for rid in item_rooms[:locked_count]:
+                    chest = self.weighted_choice(key_defs)
+                    if chest:
+                        self.create_treasure_chest_instance(
+                            session_id, rid, chest["chest_id"]
+                        )
+                for rid in item_rooms[locked_count:]:
+                    chest = self.weighted_choice(all_defs)
+                    if chest:
+                        self.create_treasure_chest_instance(
+                            session_id, rid, chest["chest_id"]
+                        )
+                conn.commit()
+
+                for _, x, y, rtype, exits in defs:
+                    blob.setdefault("rooms", []).append(
+                        {
+                            "floor_id": floor_id,
+                            "x": x,
+                            "y": y,
+                            "type": rtype,
+                            "exits": exits,
+                        }
+                    )
+
+                # link stairs between this and previous floor
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        UPDATE rooms
+                           SET room_type='staircase_up',
+                               stair_up_floor_id=%s,
+                               stair_up_x=%s,
+                               stair_up_y=%s
+                         WHERE session_id=%s
+                           AND floor_id=%s
+                           AND coord_x=%s
+                           AND coord_y=%s
+                        """,
+                        (
+                            floor_id,
+                            current_entry[0],
+                            current_entry[1],
+                            session_id,
+                            prev_floor_id,
+                            current_entry[0],
+                            current_entry[1],
+                        ),
+                    )
+                    cur.execute(
+                        """
+                        UPDATE rooms
+                           SET stair_down_floor_id=%s,
+                               stair_down_x=%s,
+                               stair_down_y=%s
+                         WHERE session_id=%s
+                           AND floor_id=%s
+                           AND coord_x=%s
+                           AND coord_y=%s
+                        """,
+                        (
+                            prev_floor_id,
+                            current_entry[0],
+                            current_entry[1],
+                            session_id,
+                            floor_id,
+                            current_entry[0],
+                            current_entry[1],
+                        ),
+                    )
+                conn.commit()
+
+                current_entry = (exit_x, exit_y)
+                prev_floor_id = floor_id
+
+            self.save_dungeon_to_session(session_id, blob)
+        finally:
+            conn.close()
+
+    # ─────────────────────────────────────────────── Admin command
     @commands.command(name="gendungeon")
     @commands.has_permissions(administrator=True)
-    async def cmd_generate_dungeon(self, ctx: commands.Context, difficulty_name: str):
-        """Admin command to manually start dungeon generation."""
+    async def cmd_generate_dungeon(
+        self, ctx: commands.Context, difficulty_name: str
+    ):
+        """Admin command to generate a dungeon for the current session."""
         conn = self.db.get_connection()
         try:
             with conn.cursor(dictionary=True) as cur:
                 cur.execute(
-                    "SELECT session_id FROM sessions WHERE guild_id=%s ORDER BY created_at DESC LIMIT 1",
+                    """
+                    SELECT session_id
+                      FROM sessions
+                     WHERE guild_id=%s
+                     ORDER BY created_at DESC
+                     LIMIT 1
+                    """,
                     (ctx.guild.id,),
                 )
                 row = cur.fetchone()
                 if not row:
-                    return await ctx.send("❌ No active session found.", delete_after=10)
+                    return await ctx.send(
+                        "❌ No active session found.", delete_after=10
+                    )
                 session_id = row["session_id"]
         finally:
             conn.close()
 
-        result = await self.generate_dungeon_for_session(ctx, session_id, difficulty_name)
+        result = await self.generate_dungeon_for_session(
+            ctx, session_id, difficulty_name
+        )
         if result:
             await ctx.send(
-                f"🧱 Dungeon generation started for session **{session_id}** at difficulty **{difficulty_name}**! 🎯 First floor ready!"
+                f"🧱 Dungeon generation started for session **{session_id}** "
+                f"at difficulty **{difficulty_name}**! 🎯 First floor ready!"
             )
         else:
-            await ctx.send("❌ Failed to generate dungeon.", delete_after=10)
+            await ctx.send(
+                "❌ Failed to generate dungeon.", delete_after=10
+            )
 
 
 async def setup(bot: commands.Bot):
