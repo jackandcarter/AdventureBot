@@ -45,16 +45,21 @@ mysql -u <user> -p <database> < database/dump.sql
 
 ## Running the bot
 
-Create a small launcher script that instantiates `commands.Bot`, loads the cogs from the `hub` and `game` packages, and then calls `bot.run()` using the token from `config.json`.
-
-Once the launcher is ready, start the bot with:
+Start the bot with:
 
 ```bash
-python run_bot.py
+python bot.py
 ```
 
 Slash commands such as `/adventuresetup` will then be available in your server.
 =======
+
+## Game Channel Setup
+
+Ensure there is a channel named "Adventurebot" in the server you intend on using the bot with and give the bot needed permission if necessary.
+
+using the /adventuresetup command in the game's hub channel will create the hub embed in order to start interaction with the bot in discord.
+
 ## Configuration
 
 Create a `config.json` file in the project root or provide the settings via
