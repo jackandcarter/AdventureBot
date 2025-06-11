@@ -1,5 +1,6 @@
 # AdventureBot
 
+
 AdventureBot is a Discord bot that powers a turn‑based dungeon adventure. It uses MySQL to store game sessions and data while gameplay logic lives in the `game` package. The `hub` package manages server setup and player interactions.
 
 ## Prerequisites
@@ -50,3 +51,21 @@ python run_bot.py
 ```
 
 Slash commands such as `/adventuresetup` will then be available in your server.
+=======
+## Configuration
+
+Create a `config.json` file in the project root or provide the settings via
+environment variables. An example configuration is available in
+`config.example.json`.
+
+Environment variables will override values found in `config.json`:
+
+- `DISCORD_TOKEN`
+- `MYSQL_HOST`
+- `MYSQL_USER`
+- `MYSQL_PASSWORD`
+- `MYSQL_DATABASE`
+
+If a variable is not provided, the loader falls back to the value in
+`config.json`.
+
