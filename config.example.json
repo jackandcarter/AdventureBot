@@ -2,8 +2,8 @@
     "discord_token": "YOUR_DISCORD_TOKEN",
     "mysql": {
         "host": "localhost",
-        "user": "root",
-        "password": "PASSWORD",
+        "user": "YOUR_DB_USER",
+        "password": "YOUR_DB_PASSWORD",
         "database": "adventure"
     }
 }
