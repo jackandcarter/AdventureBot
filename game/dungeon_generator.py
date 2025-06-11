@@ -28,6 +28,9 @@ class DungeonGenerator(commands.Cog):
 
     MIN_LOCK_DISTANCE = 5    # minimum tiles from (0,0) before a room can be locked
     MIN_STAIR_DISTANCE = 6   # minimum tiles from entry before staircase appears
+    DEFAULT_LOOP_CHANCE = 0.15
+    DEFAULT_STRAIGHT_BIAS = 0.6
+    DEFAULT_STAIR_BIAS = 0.7
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -78,9 +81,11 @@ class DungeonGenerator(commands.Cog):
             conn.close()
 
     # ─────────────────────────────────────────────── Maze helpers
-    def _carve_perfect_maze(self, w: int, h: int) -> Dict[Tuple[int, int], Set[Tuple[int, int]]]:
+    def _carve_perfect_maze(self, w: int, h: int, straight_bias: float = 0.0) -> Dict[Tuple[int, int], Set[Tuple[int, int]]]:
         """
         Carve a perfect maze over the full w×h grid using recursive backtracker.
+        When ``straight_bias`` > 0, the algorithm prefers continuing straight
+        from the previous step with that probability.
         Returns an adjacency map.
         """
         adj: Dict[Tuple[int, int], Set[Tuple[int, int]]] = {
@@ -102,7 +107,15 @@ class DungeonGenerator(commands.Cog):
                 and (nx, ny) not in visited
             ]
             if neighbors:
-                nxt = random.choice(neighbors)
+                nxt = None
+                if len(stack) > 1 and random.random() < straight_bias:
+                    px, py = stack[-2]
+                    dxp, dyp = x - px, y - py
+                    straight = [n for n in neighbors if (n[0] - x, n[1] - y) == (dxp, dyp)]
+                    if straight:
+                        nxt = random.choice(straight)
+                if not nxt:
+                    nxt = random.choice(neighbors)
                 visited.add(nxt)
                 adj[(x, y)].add(nxt)
                 adj[nxt].add((x, y))
@@ -111,15 +124,15 @@ class DungeonGenerator(commands.Cog):
                 stack.pop()
         return adj
 
-    def _add_random_loops(self,
-                          adj: Dict[Tuple[int, int], Set[Tuple[int, int]]],
-                          loop_chance: float = 0.08) -> None:
-        """
-        Add extra connections (“loops”) between adjacent cells with given probability.
-        """
+    def _add_random_loops(
+        self,
+        adj: Dict[Tuple[int, int], Set[Tuple[int, int]]],
+        loop_chance: float = DEFAULT_LOOP_CHANCE,
+    ) -> None:
+        """Add extra connections ("loops") between adjacent cells."""
         cells = list(adj.keys())
         for x, y in cells:
-            for dx, dy in ((1,0),(0,1)):
+            for dx, dy in ((1, 0), (0, 1)):
                 nx, ny = x + dx, y + dy
                 if (nx, ny) in adj and (nx, ny) not in adj[(x, y)]:
                     if random.random() < loop_chance:
@@ -187,12 +200,34 @@ class DungeonGenerator(commands.Cog):
 
     # ─────────────────────────────────────────────── Legacy path helpers
     @staticmethod
-    def _choose_far_coordinate(width: int, height: int, min_dist: int) -> Tuple[int, int]:
-        """Choose a (x, y) coordinate ≥ min_dist manhattan distance from (0,0)."""
-        while True:
-            x, y = random.randint(0, width-1), random.randint(0, height-1)
-            if abs(x) + abs(y) >= min_dist:
-                return x, y
+    def _choose_far_coordinate(
+        width: int,
+        height: int,
+        min_dist: int,
+        edge_bias: float = 0.0,
+    ) -> Tuple[int, int]:
+        """Choose a (x, y) coordinate with optional edge bias."""
+        all_coords = [
+            (x, y)
+            for x in range(width)
+            for y in range(height)
+            if abs(x) + abs(y) >= min_dist
+        ]
+        if not all_coords:
+            return (width - 1, height - 1)
+
+        outer_coords = [
+            (x, y)
+            for x, y in all_coords
+            if x < width // 3
+            or x >= width - width // 3
+            or y < height // 3
+            or y >= height - height // 3
+        ]
+
+        if outer_coords and random.random() < edge_bias:
+            return random.choice(outer_coords)
+        return random.choice(all_coords)
 
     def generate_path(
         self,
@@ -425,10 +460,12 @@ class DungeonGenerator(commands.Cog):
         difficulty: str,
         floor_number: int,
         prev_floor_id: Optional[int] = None,
+        loop_chance: float = DEFAULT_LOOP_CHANCE,
+        straight_bias: float = DEFAULT_STRAIGHT_BIAS,
     ) -> List[Tuple[int, int, int, str, Dict[str, Tuple[int, int]]]]:
         # 1) carve a full perfect maze + loops
-        adj = self._carve_perfect_maze(width, height)
-        self._add_random_loops(adj)
+        adj = self._carve_perfect_maze(width, height, straight_bias)
+        self._add_random_loops(adj, loop_chance)
 
         # 2) compute distance-from-entry for lock/item rules
         dist: Dict[Tuple[int,int], int] = {(start_x, start_y): 0}
@@ -564,6 +601,10 @@ class DungeonGenerator(commands.Cog):
         npc_count    = settings["npc_count"]
         shop_limit   = settings.get("shops_per_floor", npc_count)
 
+        loop_chance   = settings.get("loop_chance", self.DEFAULT_LOOP_CHANCE)
+        straight_bias = settings.get("straight_bias", self.DEFAULT_STRAIGHT_BIAS)
+        stair_bias    = settings.get("stair_edge_bias", self.DEFAULT_STAIR_BIAS)
+
         basement_chance    = settings.get("basement_chance", 0.0)
         basement_min_rooms = settings.get("basement_min_rooms", 0)
         basement_max_rooms = settings.get("basement_max_rooms", 0)
@@ -583,7 +624,7 @@ class DungeonGenerator(commands.Cog):
         if total_floors == 1:
             exit_x, exit_y, is_goal = width - 1, height - 1, True
         else:
-            exit_x, exit_y = self._choose_far_coordinate(width, height, self.MIN_STAIR_DISTANCE)
+            exit_x, exit_y = self._choose_far_coordinate(width, height, self.MIN_STAIR_DISTANCE, stair_bias)
             is_goal        = False
 
         basement_floor_id: Optional[int] = None
@@ -612,7 +653,8 @@ class DungeonGenerator(commands.Cog):
                     basement_floor_id, width, height, total_b_rooms,
                     enemy_chance, npc_count, shop_limit, False,
                     link_x, link_y, width - 1, height - 1,
-                    difficulty_name, 0
+                    difficulty_name, 0, None,
+                    loop_chance, straight_bias
                 )
             )
             for _, x, y, rtype, exits in basement_defs:
@@ -676,7 +718,8 @@ class DungeonGenerator(commands.Cog):
                 first_floor_id, width, height, min_rooms,
                 enemy_chance, npc_count, shop_limit, is_goal,
                 entry_x, entry_y, exit_x, exit_y,
-                difficulty_name, 1
+                difficulty_name, 1, None,
+                loop_chance, straight_bias
             )
         )
 
@@ -861,7 +904,8 @@ class DungeonGenerator(commands.Cog):
                 session_id, difficulty_name,
                 width, height, min_rooms,
                 enemy_chance, npc_count, shop_limit,
-                total_floors, exit_x, exit_y, first_floor_id
+                total_floors, exit_x, exit_y, first_floor_id,
+                loop_chance, straight_bias, stair_bias
             )
 
         return blob
@@ -881,6 +925,9 @@ class DungeonGenerator(commands.Cog):
         prev_x: int,
         prev_y: int,
         prev_floor_id: int,
+        loop_chance: float,
+        straight_bias: float,
+        stair_bias: float,
     ):
         conn = self.db_connect()
         cur = conn.cursor(dictionary=True)
@@ -895,9 +942,9 @@ class DungeonGenerator(commands.Cog):
         for floor_number in range(2, total_floors + 1):
             is_goal = floor_number == total_floors
 
-            exit_x, exit_y = self._choose_far_coordinate(width, height, self.MIN_STAIR_DISTANCE)
+            exit_x, exit_y = self._choose_far_coordinate(width, height, self.MIN_STAIR_DISTANCE, stair_bias)
             while abs(exit_x - current_entry[0]) + abs(exit_y - current_entry[1]) < self.MIN_STAIR_DISTANCE:
-                exit_x, exit_y = self._choose_far_coordinate(width, height, self.MIN_STAIR_DISTANCE)
+                exit_x, exit_y = self._choose_far_coordinate(width, height, self.MIN_STAIR_DISTANCE, stair_bias)
 
             with conn.cursor() as cur:
                 cur.execute(
@@ -914,7 +961,9 @@ class DungeonGenerator(commands.Cog):
                     floor_id, width, height, min_rooms,
                     enemy_chance, npc_count, shop_limit, is_goal,
                     current_entry[0], current_entry[1], exit_x, exit_y,
-                    difficulty_name, floor_number, prev_floor_id
+                    difficulty_name, floor_number, prev_floor_id,
+                    loop_chance * (1 + 0.05 * (floor_number - 1)),
+                    straight_bias
                 )
             )
 
