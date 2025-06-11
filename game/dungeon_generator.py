@@ -380,10 +380,20 @@ class DungeonGenerator(commands.Cog):
             conn.close()
 
     # ─────────────────────────────────────────────── Vendor helpers
-    def fetch_random_vendor(self) -> Optional[int]:
+    def fetch_random_vendor(self, used_vendors: Optional[Set[int]] = None) -> Optional[int]:
         conn = self.db_connect()
         try:
             with conn.cursor() as cur:
+                if used_vendors:
+                    placeholders = ",".join(["%s"] * len(used_vendors))
+                    cur.execute(
+                        f"SELECT vendor_id FROM npc_vendors WHERE vendor_id NOT IN ({placeholders}) ORDER BY RAND() LIMIT 1",
+                        tuple(used_vendors),
+                    )
+                    row = cur.fetchone()
+                    if row:
+                        return row[0]
+
                 cur.execute("SELECT vendor_id FROM npc_vendors ORDER BY RAND() LIMIT 1")
                 row = cur.fetchone()
                 return row[0] if row else None
@@ -525,13 +535,14 @@ class DungeonGenerator(commands.Cog):
         remaining = {r["room_type"]: r["max_per_floor"] for r in rules}
         weights   = {r["room_type"]: r["chance"]      for r in rules}
 
-        def choose_type(exclude_locked=False, exclude_item=False) -> str:
+        def choose_type(exclude_locked=False, exclude_item=False, exclude_shop=False) -> str:
             avail = [
                 rt for rt, cap in remaining.items()
                 if cap > 0
                 and rt not in ("staircase_up","staircase_down")
                 and not (exclude_locked and rt == "locked")
                 and not (exclude_item and rt == "item")
+                and not (exclude_shop and rt == "shop")
             ]
             if not avail:
                 return "monster" if random.random() < enemy_chance else "safe"
@@ -543,6 +554,7 @@ class DungeonGenerator(commands.Cog):
 
         # 7) build rooms
         out: List[Tuple[int,int,int,str,Dict[str,Tuple[int,int]]]] = []
+        room_types: Dict[Tuple[int,int], str] = {}
         for y in range(height):
             for x in range(width):
                 coord = (x, y)
@@ -565,7 +577,21 @@ class DungeonGenerator(commands.Cog):
                     remaining[rtype] += 1
                     rtype = "monster" if random.random() < enemy_chance else "safe"
 
+                if rtype in ("shop", "item"):
+                    neighbors = [
+                        (x + dx, y + dy)
+                        for dx, dy in ((1,0),(-1,0),(0,1),(0,-1))
+                        if 0 <= x + dx < width and 0 <= y + dy < height
+                    ]
+                    if any(room_types.get(nb) == rtype for nb in neighbors):
+                        remaining[rtype] += 1
+                        if rtype == "shop":
+                            rtype = choose_type(exclude_shop=True)
+                        else:
+                            rtype = choose_type(exclude_item=True)
+
                 exits = self.get_room_exits(x, y, adj)
+                room_types[coord] = rtype
                 out.append((floor_id, x, y, rtype, exits))
 
         return out
@@ -629,6 +655,7 @@ class DungeonGenerator(commands.Cog):
 
         basement_floor_id: Optional[int] = None
         loop = asyncio.get_running_loop()
+        used_vendors: Set[int] = set()
 
         # Optional basement
         if include_basement:
@@ -662,9 +689,10 @@ class DungeonGenerator(commands.Cog):
                     rtype = "staircase_up"
                 vendor_id = None
                 if rtype == "shop":
-                    gvid = self.fetch_random_vendor()
+                    gvid = self.fetch_random_vendor(used_vendors)
                     if gvid:
                         vendor_id = self.create_session_vendor_instance(session_id, gvid)
+                        used_vendors.add(gvid)
                 tmpl = self.fetch_random_template(rtype) or {}
                 desc = tmpl.get("description", "A mysterious room…")
                 img  = tmpl.get("image_url")
@@ -760,9 +788,10 @@ class DungeonGenerator(commands.Cog):
 
             vendor_id = None
             if rtype == "shop":
-                gvid = self.fetch_random_vendor()
+                gvid = self.fetch_random_vendor(used_vendors)
                 if gvid:
                     vendor_id = self.create_session_vendor_instance(session_id, gvid)
+                    used_vendors.add(gvid)
 
             tmpl = self.fetch_random_template(rtype) or {}
             desc = tmpl.get("description", "A mysterious room…")
@@ -905,7 +934,11 @@ class DungeonGenerator(commands.Cog):
                 width, height, min_rooms,
                 enemy_chance, npc_count, shop_limit,
                 total_floors, exit_x, exit_y, first_floor_id,
+        codex/modify-path-generation-heuristics
                 loop_chance, straight_bias, stair_bias
+
+                used_vendors
+        main
             )
 
         return blob
@@ -925,9 +958,13 @@ class DungeonGenerator(commands.Cog):
         prev_x: int,
         prev_y: int,
         prev_floor_id: int,
+        codex/modify-path-generation-heuristics
         loop_chance: float,
         straight_bias: float,
         stair_bias: float,
+
+        used_vendors: Set[int],
+        main
     ):
         conn = self.db_connect()
         cur = conn.cursor(dictionary=True)
@@ -978,9 +1015,10 @@ class DungeonGenerator(commands.Cog):
 
                 vendor_id = None
                 if rtype == "shop":
-                    gvid = self.fetch_random_vendor()
+                    gvid = self.fetch_random_vendor(used_vendors)
                     if gvid:
                         vendor_id = self.create_session_vendor_instance(session_id, gvid)
+                        used_vendors.add(gvid)
 
                 tmpl = self.fetch_random_template(rtype) or {}
                 desc = tmpl.get("description") or "A mysterious room..."
