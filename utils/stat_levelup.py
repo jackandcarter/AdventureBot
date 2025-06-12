@@ -1,19 +1,15 @@
-import mysql.connector
 import json
 import logging
-from utils.helpers import load_config
+from models.database import Database
 
 logger = logging.getLogger("StatLevelUp")
 logger.setLevel(logging.DEBUG)
 
-# Load configuration
-config = load_config()
-db_config = config['mysql']
-
+# Database helper
 def db_connect():
     """Create and return a new MySQL connection."""
     try:
-        return mysql.connector.connect(**db_config)
+        return Database().get_connection()
     except Exception as e:
         logger.error("DB connection error in StatLevelUp: %s", e)
         raise

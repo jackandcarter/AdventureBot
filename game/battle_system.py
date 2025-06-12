@@ -1,6 +1,5 @@
 import discord
 from discord.ext import commands
-import mysql.connector
 import aiomysql
 import json
 import time
@@ -10,6 +9,7 @@ import random
 from utils.status_engine   import StatusEffectEngine
 from utils.ability_engine import AbilityEngine
 from utils.helpers import load_config
+from models.database import Database
 from typing import Any, Dict, List, Optional, Set, Tuple
 from utils.ui_helpers import create_progress_bar, create_cooldown_bar, format_status_effects, get_emoji_for_room_type
 from models.session_models import SessionPlayerModel
@@ -21,11 +21,11 @@ logger.setLevel(logging.DEBUG)
 class BattleSystem(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.config = load_config()
-        self.db_config = self.config["mysql"]
+        cfg = load_config()
+        self.db = Database()
         self.embed_manager: Optional[commands.Cog] = self.bot.get_cog("EmbedManager")
         # AbilityEngine handles ALL ability logic & damage formulas
-        self.ability = AbilityEngine(self.db_connect, self.config.get("damage_variance", 0.0))
+        self.ability = AbilityEngine(self.db_connect, cfg.get("damage_variance", 0.0))
 
     # --------------------------------------------------------------------- #
     #                               Helpers                                 #
@@ -37,7 +37,7 @@ class BattleSystem(commands.Cog):
 
     def db_connect(self):
         try:
-            return mysql.connector.connect(**self.db_config)
+            return self.db.get_connection()
         except Exception as e:
             logger.error("DB connection error in BattleSystem: %s", e)
             raise
