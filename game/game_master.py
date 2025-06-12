@@ -12,6 +12,7 @@ import discord
 from discord import Interaction, InteractionType
 from discord.ext import commands
 import mysql.connector
+import aiomysql
 from utils.status_engine  import StatusEffectEngine
 from utils.helpers        import load_config
 from utils.ui_helpers     import get_emoji_for_room_type  # For minimap icons, if needed
@@ -104,6 +105,10 @@ class GameMaster(commands.Cog):
         conn = mysql.connector.connect(**self.db_config)
         conn.autocommit = True
         return conn
+
+    async def adb_connect(self):
+        from models.database import AsyncDatabase
+        return await AsyncDatabase().get_connection()
 
     def _player_has_auto_revive(self, session_id: int, player_id: int) -> bool:
         """
@@ -612,13 +617,13 @@ class GameMaster(commands.Cog):
         # ─── if this player is dead, show the death‐embed under the main game embed ───────
         if SessionPlayerModel.is_player_dead(session.session_id, session.current_turn):
             # fetch “death” template
-            conn = self.db_connect()
-            with conn.cursor(dictionary=True) as cur:
-                cur.execute(
+            conn = await self.adb_connect()
+            async with conn.cursor(aiomysql.DictCursor) as cur:
+                await cur.execute(
                     "SELECT description, image_url FROM room_templates WHERE room_type=%s LIMIT 1",
                     ("death",)
                 )
-                tpl = cur.fetchone()
+                tpl = await cur.fetchone()
             conn.close()
 
             description = tpl["description"] if tpl else "You have fallen and can only be revived."
@@ -680,17 +685,17 @@ class GameMaster(commands.Cog):
         # 2) Only *after* you've ruled out “we’re about to fight” do you do
         #    your staircase template reloads.
         if rtype in ("staircase_up", "staircase_down"):
-            conn = self.db_connect()
+            conn = await self.adb_connect()
             try:
-                with conn.cursor(dictionary=True) as cur:
-                    cur.execute(
+                async with conn.cursor(aiomysql.DictCursor) as cur:
+                    await cur.execute(
                         "SELECT description, image_url FROM room_templates WHERE room_type=%s LIMIT 1",
                         (rtype,)
                     )
-                    tpl = cur.fetchone()
+                    tpl = await cur.fetchone()
                 if tpl:
                     room["description"] = tpl["description"]
-                    room["image_url"]   = tpl["image_url"]
+                    room["image_url"] = tpl["image_url"]
             finally:
                 conn.close()
 
@@ -700,15 +705,15 @@ class GameMaster(commands.Cog):
 
         # Pull player stats for header
         p = None
-        conn = self.db_connect()
+        conn = await self.adb_connect()
         try:
-            with conn.cursor(dictionary=True) as cur:
-                cur.execute(
+            async with conn.cursor(aiomysql.DictCursor) as cur:
+                await cur.execute(
                     "SELECT hp, max_hp, gil FROM players "
                     "WHERE player_id=%s AND session_id=%s",
                     (session.current_turn, session.session_id)
                 )
-                p = cur.fetchone()
+                p = await cur.fetchone()
         except Exception as e:
             logger.error("update_room_view db fetch error: %s", e)
         finally:
@@ -726,14 +731,14 @@ class GameMaster(commands.Cog):
         visible = { (xx,yy) for (_,xx,yy) in discovered_here } | neighbours
 
         # 2) fetch all rooms on this floor
-        conn = self.db_connect()
-        with conn.cursor(dictionary=True) as cur:
-            cur.execute(
+        conn = await self.adb_connect()
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(
                 "SELECT coord_x, coord_y, room_type FROM rooms "
-               "WHERE session_id=%s AND floor_id=%s",
+                "WHERE session_id=%s AND floor_id=%s",
                 (session.session_id, room["floor_id"])
             )
-            floor_rooms = cur.fetchall()
+            floor_rooms = await cur.fetchall()
         conn.close()
 
         # 3) render our 3×3 patch
@@ -813,10 +818,11 @@ class GameMaster(commands.Cog):
 
         # Chest logic: check if chest is still locked
         if room.get("room_type") == "item":
-            conn = self.db_connect()
+            conn = await self.adb_connect()
             try:
-                with conn.cursor(dictionary=True) as cur:
-                    cur.execute("""
+                async with conn.cursor(aiomysql.DictCursor) as cur:
+                    await cur.execute(
+                        """
                         SELECT tci.instance_id, tci.is_unlocked
                         FROM treasure_chest_instances tci
                         JOIN rooms r ON r.room_id = tci.room_id
@@ -825,20 +831,24 @@ class GameMaster(commands.Cog):
                         AND r.coord_x = %s
                         AND r.coord_y = %s
                         LIMIT 1
-                    """, (
-                        session.session_id,
-                        room.get("floor_id"),
-                        x, y
-                    ))
-                    instance = cur.fetchone()
+                        """,
+                        (
+                            session.session_id,
+                            room.get("floor_id"),
+                            x, y
+                        )
+                    )
+                    instance = await cur.fetchone()
 
                 if instance and not instance["is_unlocked"]:
-                    buttons.append((
-                        "🗝️ Unlock Chest",
-                        discord.ButtonStyle.primary,
-                        f"open_chest_{instance['instance_id']}",
-                        2
-                    ))
+                    buttons.append(
+                        (
+                            "🗝️ Unlock Chest",
+                            discord.ButtonStyle.primary,
+                            f"open_chest_{instance['instance_id']}",
+                            2,
+                        )
+                    )
             except Exception as e:
                 logger.error("Chest button fetch failed: %s", e)
             finally:
@@ -1090,13 +1100,15 @@ class GameMaster(commands.Cog):
             await interaction.response.defer_update()
 
         try:
-            with self.db_connect() as conn, conn.cursor(dictionary=True) as cur:
-                cur.execute(
+            conn = await self.adb_connect()
+            async with conn.cursor(aiomysql.DictCursor) as cur:
+                await cur.execute(
                     "SELECT coord_x, coord_y, current_floor_id FROM players "
                     "WHERE player_id=%s AND session_id=%s",
                     (interaction.user.id, session.session_id)
                 )
-                pos = cur.fetchone()
+                pos = await cur.fetchone()
+            conn.close()
 
             if not pos:
                 return await interaction.followup.send("❌ Position error.", ephemeral=True)
@@ -1111,9 +1123,10 @@ class GameMaster(commands.Cog):
         
 
         # ── 2. look up the target tile on the *current* floor ────────
-        conn = self.db_connect()
-        with conn.cursor(dictionary=True) as cur:
-            cur.execute("""
+        conn = await self.adb_connect()
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(
+                """
                 SELECT r.*, f.floor_number
                 FROM rooms  r
                 JOIN floors f ON f.floor_id = r.floor_id
@@ -1122,8 +1135,10 @@ class GameMaster(commands.Cog):
 
                 AND r.coord_x = %s
                 AND r.coord_y = %s
-            """, (session.session_id, floor, nx, ny))
-            target = cur.fetchone()
+                """,
+                (session.session_id, floor, nx, ny)
+            )
+            target = await cur.fetchone()
         conn.close()
 
         if not target:
@@ -1142,14 +1157,14 @@ class GameMaster(commands.Cog):
         logger.debug("Room lookup → sess=%s floor=%s x=%s y=%s", session.session_id, new_floor, nx, ny)
 
         # ── 5. write the movement to the DB ──────────────────────────
-        conn = self.db_connect()
-        with conn.cursor() as cur:
-            cur.execute(
+        conn = await self.adb_connect()
+        async with conn.cursor() as cur:
+            await cur.execute(
                 "UPDATE players SET coord_x=%s, coord_y=%s, current_floor_id=%s "
                 "WHERE player_id=%s AND session_id=%s",
                 (nx, ny, new_floor, interaction.user.id, session.session_id)
             )
-        conn.commit()
+        await conn.commit()
         conn.close()
         # mark this tile permanently discovered now that the move succeeded
         await self.update_permanent_discovered_room(
@@ -1160,9 +1175,10 @@ class GameMaster(commands.Cog):
         self.append_game_log(session.session_id, f"<@{interaction.user.id}> moved {direction}.")
 
         # ── 6. fetch the room we actually landed in ──────────────────
-        conn = self.db_connect()
-        with conn.cursor(dictionary=True) as cur:
-            cur.execute("""
+        conn = await self.adb_connect()
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(
+                """
                 SELECT r.*, f.floor_number
                 FROM rooms  r
                 JOIN floors f ON f.floor_id = r.floor_id
@@ -1171,8 +1187,10 @@ class GameMaster(commands.Cog):
 
                 AND r.coord_x = %s
                 AND r.coord_y = %s
-            """, (session.session_id, new_floor, nx, ny))
-            landed = cur.fetchone()
+                """,
+                (session.session_id, new_floor, nx, ny)
+            )
+            landed = await cur.fetchone()
         conn.close()
 
         if not landed:
