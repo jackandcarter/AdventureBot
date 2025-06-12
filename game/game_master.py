@@ -13,8 +13,8 @@ from discord import Interaction, InteractionType
 from discord.ext import commands
 import mysql.connector
 from utils.status_engine  import StatusEffectEngine
-from utils.helpers        import load_config
 from utils.ui_helpers     import get_emoji_for_room_type  # For minimap icons, if needed
+from models.database import Database
 from core.game_session    import GameSession
 from models.session_models import (
     SessionModel,
@@ -94,14 +94,13 @@ class GameMaster(commands.Cog):
     """Primary gameplay director – dungeon flow, player actions, etc."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        cfg = load_config()
-        self.db_config = cfg["mysql"]
+        self.db = Database()
         # intro_data[ thread_id ] = {"steps": [...], "current_index": int}
         self.intro_data: Dict[int, Dict[str, Any]] = {}
-        logger.debug("★ GameMaster initialised with DB config ✓")
+        logger.debug("★ GameMaster initialised.")
 
     def db_connect(self) -> mysql.connector.MySQLConnection:
-        conn = mysql.connector.connect(**self.db_config)
+        conn = self.db.get_connection()
         conn.autocommit = True
         return conn
 

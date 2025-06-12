@@ -11,7 +11,6 @@ from discord.ext import commands
 
 from models.database import Database
 from models.session_models import SessionPlayerModel
-from utils.helpers import load_config
 
 logger = logging.getLogger("InventoryShop")
 logger.setLevel(logging.DEBUG)
@@ -59,7 +58,6 @@ class InventoryShop(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.db: Database = Database()
-        self.config = load_config()
 
     # --------------------------------------------------------------------- #
     # Vendor helpers

@@ -11,7 +11,6 @@ from discord.ext import commands
 from discord.ui import View, Button
 
 from models.database import Database
-from utils.helpers import load_config
 from utils.ui_helpers import (
     create_cooldown_bar,
     create_progress_bar,
@@ -31,7 +30,6 @@ class EmbedManager(commands.Cog):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.config = load_config()
         self.db = Database()
 
         # channel_id ➜ message_id
