@@ -704,6 +704,9 @@ class BattleSystem(commands.Cog):
         if not abilities:
             return await interaction.response.send_message("⚠️ This Trance has no abilities.", ephemeral=True)
 
+        if not interaction.response.is_done():
+            await interaction.response.defer()
+
         # Annotate cooldowns
         cds = session.ability_cooldowns.get(pid, {})
         buttons = []
@@ -778,7 +781,10 @@ class BattleSystem(commands.Cog):
         cur.close(); conn.close()
         if not player:
             return await interaction.response.send_message("❌ Could not retrieve your stats.", ephemeral=True)
-        
+
+        if not interaction.response.is_done():
+            await interaction.response.defer()
+
 
         # 3) resolve via AbilityEngine
         # if we’re outside battle, treat the player as the “target” for self‑buffs/heals
@@ -1166,6 +1172,9 @@ class BattleSystem(commands.Cog):
             else:
                 await interaction.followup.send("❌ No active battle found.", ephemeral=True)
             return
+
+        if not interaction.response.is_done():
+            await interaction.response.defer()
 
         enemy = session.current_enemy
         pid = session.current_turn
