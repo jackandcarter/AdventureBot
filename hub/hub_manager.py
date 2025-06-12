@@ -263,6 +263,9 @@ class HubManager(commands.Cog):
                 embed=main_embed,
                 view=HubView()
             )
+        if cid == "setup_new_game":
+            # handled in GameMaster.on_interaction
+            return
 
         logger.debug(f"HubManager: unhandled custom_id='{cid}'")
 
