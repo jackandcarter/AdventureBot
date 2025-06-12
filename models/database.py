@@ -34,7 +34,10 @@ class AsyncDatabase:
 
     async def get_connection(self):
         try:
-            conn = await aiomysql.connect(**self.config, autocommit=True)
+            cfg = self.config.copy()
+            if "database" in cfg:
+                cfg["db"] = cfg.pop("database")
+            conn = await aiomysql.connect(**cfg, autocommit=True)
             return conn
         except aiomysql.MySQLError as err:
             logger.error("Async DB connection error: %s", err)
