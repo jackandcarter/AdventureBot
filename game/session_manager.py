@@ -75,9 +75,12 @@ def build_main_menu_view(is_active_turn: bool, vendor_id: Optional[int] = None) 
 class SessionManager(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        # In-memory sessions: keys are session IDs; values are GameSession instances.
+        # In-memory sessions keyed by session_id and by thread_id for fast lookups
         self.sessions: Dict[int, GameSession] = {}
-        logger.info("SessionManager cog initialized. In-memory sessions dict created.")
+        self.sessions_by_thread: Dict[int, GameSession] = {}
+        logger.info(
+            "SessionManager cog initialized. In-memory session dictionaries created."
+        )
 
     def db_connect(self) -> mysql.connector.connection.MySQLConnection:
         logger.debug("SessionManager.db_connect called.")
@@ -177,6 +180,7 @@ class SessionManager(commands.Cog):
             new_session.players = current_players
             new_session.current_turn = owner.id
             self.sessions[session_id] = new_session
+            self.sessions_by_thread[int(thread.id)] = new_session
             logger.info("GameSession %s created and stored in memory.", session_id)
 
             await thread.add_user(owner)
@@ -246,8 +250,9 @@ class SessionManager(commands.Cog):
             logger.info("Session %s state updated: %s", session_id, new_state)
 
     def delete_session_state(self, session_id: int) -> None:
-        if session_id in self.sessions:
-            del self.sessions[session_id]
+        session = self.sessions.pop(session_id, None)
+        if session:
+            self.sessions_by_thread.pop(int(session.thread_id), None)
             logger.info("Session %s removed from memory.", session_id)
 
     async def terminate_session(self, session_id: int, reason: str) -> None:
@@ -266,10 +271,7 @@ class SessionManager(commands.Cog):
             self.delete_session_state(session_id)
 
     def get_session(self, thread_id: int) -> Optional[GameSession]:
-        for s in self.sessions.values():
-            if s.thread_id == str(thread_id):
-                return s
-        return None
+        return self.sessions_by_thread.get(int(thread_id))
 
     async def refresh_current_state(self, interaction: discord.Interaction) -> None:
         logger.debug("refresh_current_state called for channel %s", interaction.channel.id)
@@ -527,6 +529,7 @@ class SessionManager(commands.Cog):
         # 4) now rebuild the in‐memory session exactly as before
         session = GameSession.from_dict(raw)
         self.sessions[session.session_id] = session
+        self.sessions_by_thread[int(thread.id)] = session
 
         # 5) re‑invite all players
         for pid in session.players:
