@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+import aiomysql
 import json
 import time
 import logging
@@ -40,6 +41,10 @@ class BattleSystem(commands.Cog):
         except Exception as e:
             logger.error("DB connection error in BattleSystem: %s", e)
             raise
+
+    async def adb_connect(self):
+        from models.database import AsyncDatabase
+        return await AsyncDatabase().get_connection()
 
     def create_bar(self, current: int, maximum: int, length: int = 10) -> str:
         current = max(current, 0)
@@ -639,9 +644,9 @@ class BattleSystem(commands.Cog):
         class_id, level = me["class_id"], me["level"]
 
         # load unlocked abilities
-        conn = self.db_connect()
-        cur = conn.cursor(dictionary=True)
-        cur.execute(
+        conn = await self.adb_connect()
+        cur = await conn.cursor(aiomysql.DictCursor)
+        await cur.execute(
             """
             SELECT a.ability_id,
                    a.ability_name,
@@ -656,8 +661,8 @@ class BattleSystem(commands.Cog):
             """,
             (class_id, level),
         )
-        abilities = cur.fetchall()
-        cur.close(); conn.close()
+        abilities = await cur.fetchall()
+        await cur.close(); conn.close()
 
         # filter by context
         allowed = {"self", "any"} | ({"enemy"} if in_battle else {"ally"})
