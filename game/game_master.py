@@ -1265,8 +1265,12 @@ class GameMaster(commands.Cog):
         if not session:
             return await interaction.response.send_message("❌ No active session found.", ephemeral=True)
 
-        # Defer the response quietly—no followup message needed
-        await interaction.response.defer()
+        # Defer only if the interaction hasn't already been acknowledged
+        if not interaction.response.is_done():
+            try:
+                await interaction.response.defer()
+            except discord.errors.HTTPException as e:
+                logger.debug("Deferred interaction failed: %s", e)
 
         # Look up the saved flag
         from models.session_models import SessionModel
@@ -1282,6 +1286,8 @@ class GameMaster(commands.Cog):
         # Finally, delete the Discord thread itself
         try:
             await interaction.channel.delete()
+        except discord.errors.HTTPException as e:
+            logger.debug("Thread deletion failed: %s", e)
         except Exception as e:
             logger.error(f"Error deleting thread on quit: {e}", exc_info=True)
 
