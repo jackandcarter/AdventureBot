@@ -392,7 +392,7 @@ class SessionManager(commands.Cog):
             return
 
         if session.battle_state:
-            from game.battle.system import BattleSystem
+            from game.battle_system import BattleSystem
             bs = self.bot.get_cog("BattleSystem")
             if bs:
                 await bs.update_battle_embed(
