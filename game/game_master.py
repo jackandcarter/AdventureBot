@@ -1924,6 +1924,8 @@ class GameMaster(commands.Cog):
         if interaction.type != InteractionType.component:
             return
         cid = (interaction.data.get("custom_id") or "").strip()
+        logger.debug("[Game] on_interaction id=%s done=%s cid=%r",
+                     interaction.id, interaction.response.is_done(), cid)
         # ──────────────────────────────────────────────────────────────────
         # ignore our greyed‑out “⛔” placeholders
         if cid.endswith("_disabled"):
