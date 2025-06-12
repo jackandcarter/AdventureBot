@@ -1286,7 +1286,9 @@ class GameMaster(commands.Cog):
             try:
                 await interaction.response.defer()
             except discord.errors.HTTPException as e:
-                logger.debug("Deferred interaction failed: %s", e)
+                logger.debug(
+                    "Deferred interaction failed (already acknowledged): %s", e
+                )
 
         # Look up the saved flag
         from models.session_models import SessionModel
