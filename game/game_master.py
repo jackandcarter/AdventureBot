@@ -873,6 +873,9 @@ class GameMaster(commands.Cog):
         if not session:
             return await interaction.response.send_message("❌ No active session.", ephemeral=True)
 
+        if not interaction.response.is_done():
+            await interaction.response.defer_update()
+
         # 1) player’s current position
         conn = self.db_connect()
         with conn.cursor(dictionary=True) as cur:
@@ -884,7 +887,7 @@ class GameMaster(commands.Cog):
             pos = cur.fetchone()
         conn.close()
         if not pos:
-            return await interaction.response.send_message("❌ Position error.", ephemeral=True)
+            return await interaction.followup.send("❌ Position error.", ephemeral=True)
         x, y, floor = pos["coord_x"], pos["coord_y"], pos["current_floor_id"]
 
         # 2) fetch locked-room + inner_template info
@@ -914,11 +917,11 @@ class GameMaster(commands.Cog):
         conn.close()
 
         if not room or room["room_type"] != "locked":
-            return await interaction.response.send_message("❌ Nothing to unlock here.", ephemeral=True)
+            return await interaction.followup.send("❌ Nothing to unlock here.", ephemeral=True)
         if not room["inner_template_id"] or not room["new_room_type"]:
-            return await interaction.response.send_message("❌ There’s nothing behind this door.", ephemeral=True)
+            return await interaction.followup.send("❌ There’s nothing behind this door.", ephemeral=True)
         if not _player_has_key(session.session_id, interaction.user.id):
-            return await interaction.response.send_message("🚪 You have no key.", ephemeral=True)
+            return await interaction.followup.send("🚪 You have no key.", ephemeral=True)
 
         # 3) spend a key and log it
         _consume_key(session.session_id, interaction.user.id)
@@ -1082,6 +1085,9 @@ class GameMaster(commands.Cog):
         session = sm.get_session(interaction.channel.id) if sm else None
         if not session:
             return await interaction.followup.send("❌ No active session.", ephemeral=True)
+
+        if not interaction.response.is_done():
+            await interaction.response.defer_update()
 
         try:
             with self.db_connect() as conn, conn.cursor(dictionary=True) as cur:
@@ -1261,6 +1267,9 @@ class GameMaster(commands.Cog):
         if not session:
             return await interaction.followup.send("❌ No session.", ephemeral=True)
 
+        if not interaction.response.is_done():
+            await interaction.response.defer_update()
+
         # Current position
         conn = self.db_connect()
         with conn.cursor(dictionary=True) as cur:
@@ -1360,6 +1369,9 @@ class GameMaster(commands.Cog):
             return await interaction.followup.send("❌ No session.", ephemeral=True)
         if session.battle_state:
             return await interaction.followup.send("⚔️ You can’t look around during battle!", ephemeral=True)
+
+        if not interaction.response.is_done():
+            await interaction.response.defer_update()
 
         # 1) fetch current floor, x, y
         conn = self.db_connect()
@@ -1782,6 +1794,9 @@ class GameMaster(commands.Cog):
                 "❌ No session.", ephemeral=True
             )
 
+        if not interaction.response.is_done():
+            await interaction.response.defer_update()
+
         conn = self.db_connect()
         with conn.cursor(dictionary=True) as cur:
             cur.execute(
@@ -1834,6 +1849,9 @@ class GameMaster(commands.Cog):
                 "❌ No active session.", ephemeral=True
             )
 
+        if not interaction.response.is_done():
+            await interaction.response.defer_update()
+
         # 1) Persist the full session state JSON
         from models.session_models import SessionModel
         SessionModel.update_game_state(session.session_id, session.to_dict())
@@ -1842,7 +1860,7 @@ class GameMaster(commands.Cog):
         SessionModel.mark_saved(session.session_id, True)
 
         # 3) Acknowledge and pop back to wherever we were
-        await interaction.response.send_message(
+        await interaction.followup.send(
             "✅ Game saved!", ephemeral=True
         )
         await sm.return_to_current_view(interaction)
