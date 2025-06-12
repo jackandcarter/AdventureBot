@@ -224,12 +224,34 @@ class EmbedManager(commands.Cog):
             return None
 
     async def update_status_display(self, interaction: discord.Interaction, players: List[Dict[str, Any]]):
+        cid = interaction.channel.id
+
+        # If no players are left, remove any existing status message entirely.
+        if not players:
+            msg_id = self.status_messages.pop(cid, None)
+            if msg_id:
+                try:
+                    msg = await interaction.channel.fetch_message(msg_id)
+                    await msg.delete()
+                except Exception as e:
+                    logger.warning(
+                        "Failed to delete status message in channel %s: %s",
+                        cid,
+                        e,
+                    )
+            return
+
         lines = []
         for p in players:
             turn = "👉 " if p.get("is_current_turn") else ""
             sts = format_status_effects(p.get("status_effects", []))
-            lines.append(f"{turn}{p['username']}: ❤️ {p['hp']}/{p['max_hp']} ⚔️ {p['attack_power']} 🛡️ {p['defense']}" + (f" {sts}" if sts else ""))
-        embed = discord.Embed(title="🛡️ Player Status", description="\n".join(lines), color=discord.Color.green())
+            lines.append(
+                f"{turn}{p['username']}: ❤️ {p['hp']}/{p['max_hp']} ⚔️ {p['attack_power']} 🛡️ {p['defense']}"
+                + (f" {sts}" if sts else "")
+            )
+        embed = discord.Embed(
+            title="🛡️ Player Status", description="\n".join(lines), color=discord.Color.green()
+        )
         await self.send_or_update_status_embed(interaction, embed)
 
     # ──────────────────────────────────────────────────────────────────
