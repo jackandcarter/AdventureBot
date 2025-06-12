@@ -2117,6 +2117,13 @@ class GameMaster(commands.Cog):
                 return await self.end_player_turn(interaction)
 
             if cid == "start_game":
+                if not interaction.response.is_done():
+                    defer_fn = getattr(interaction.response, "defer_update", None)
+                    if callable(defer_fn):
+                        await defer_fn()
+                    else:
+                        await interaction.response.defer()
+
                 sm = self.bot.get_cog("SessionManager")
                 session = sm.get_session(interaction.channel.id) if sm else None
                 if not session:
