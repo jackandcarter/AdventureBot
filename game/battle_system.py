@@ -673,7 +673,13 @@ class BattleSystem(commands.Cog):
         for a in abilities:
             a["current_cooldown"] = cds.get(a["ability_id"], 0)
         
-        await interaction.response.defer()
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer()
+        except discord.errors.HTTPException as e:
+            logger.debug(
+                "Deferred interaction failed (already acknowledged): %s", e
+            )
         await embed_mgr.send_skill_menu_embed(interaction, abilities)
 
     async def display_trance_menu(self, interaction: discord.Interaction) -> None:
