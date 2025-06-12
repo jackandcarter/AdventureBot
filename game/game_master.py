@@ -1584,6 +1584,12 @@ class GameMaster(commands.Cog):
                 "❌ No session.", ephemeral=True
             )
 
+        if not interaction.response.is_done():
+            try:
+                await interaction.response.defer()
+            except discord.errors.HTTPException as e:
+                logger.debug("Deferred interaction failed: %s", e)
+
         pd = next((
             p for p in
             SessionPlayerModel.get_player_states(session.session_id)
@@ -1699,6 +1705,12 @@ class GameMaster(commands.Cog):
         session = sm.get_session(interaction.channel.id) if sm else None
         if not session:
             return await interaction.response.send_message("❌ No session.", ephemeral=True)
+
+        if not interaction.response.is_done():
+            try:
+                await interaction.response.defer()
+            except discord.errors.HTTPException as e:
+                logger.debug("Deferred interaction failed: %s", e)
 
         # pull current player data
         pd = next(p for p in SessionPlayerModel.get_player_states(session.session_id)
