@@ -715,8 +715,13 @@ class BattleSystem(commands.Cog):
         if not abilities:
             return await interaction.response.send_message("⚠️ This Trance has no abilities.", ephemeral=True)
 
-        if not interaction.response.is_done():
-            await interaction.response.defer()
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer()
+        except discord.errors.HTTPException as e:
+            logger.debug(
+                "Deferred interaction failed (already acknowledged): %s", e
+            )
 
         # Annotate cooldowns
         cds = session.ability_cooldowns.get(pid, {})
@@ -793,8 +798,13 @@ class BattleSystem(commands.Cog):
         if not player:
             return await interaction.response.send_message("❌ Could not retrieve your stats.", ephemeral=True)
 
-        if not interaction.response.is_done():
-            await interaction.response.defer()
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer()
+        except discord.errors.HTTPException as e:
+            logger.debug(
+                "Deferred interaction failed (already acknowledged): %s", e
+            )
 
 
         # 3) resolve via AbilityEngine
@@ -1184,8 +1194,13 @@ class BattleSystem(commands.Cog):
                 await interaction.followup.send("❌ No active battle found.", ephemeral=True)
             return
 
-        if not interaction.response.is_done():
-            await interaction.response.defer()
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer()
+        except discord.errors.HTTPException as e:
+            logger.debug(
+                "Deferred interaction failed (already acknowledged): %s", e
+            )
 
         enemy = session.current_enemy
         pid = session.current_turn
