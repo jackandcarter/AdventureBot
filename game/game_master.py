@@ -408,6 +408,8 @@ class GameMaster(commands.Cog):
     async def begin_intro_sequence(self,
                                    interaction: discord.Interaction,
                                    chan_id: int) -> None:
+        if not interaction.response.is_done():
+            await interaction.response.defer()
         data = self.intro_data.get(chan_id)
         if not data:
             return
@@ -553,6 +555,8 @@ class GameMaster(commands.Cog):
     async def skip_intro(self,
                          interaction: discord.Interaction,
                          chan_id: int) -> None:
+        if not interaction.response.is_done():
+            await interaction.response.defer()
         if chan_id in self.intro_data:
             self.intro_data[chan_id]["current_index"] = len(
                 self.intro_data[chan_id]["steps"]
