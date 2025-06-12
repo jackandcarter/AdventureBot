@@ -339,6 +339,12 @@ class GameMaster(commands.Cog):
                 "❌ No active session.", ephemeral=True
             )
 
+        if not interaction.response.is_done():
+            try:
+                await interaction.response.defer()
+            except discord.errors.HTTPException as e:
+                logger.debug("Deferred interaction failed (already acknowledged): %s", e)
+
         SessionPlayerModel.update_player_class(
             session.session_id, interaction.user.id, class_id
         )
