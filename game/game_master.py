@@ -1582,6 +1582,12 @@ class GameMaster(commands.Cog):
                 "❌ No session.", ephemeral=True
             )
 
+        if not interaction.response.is_done():
+            try:
+                await interaction.response.defer()
+            except discord.errors.HTTPException as e:
+                logger.debug("Deferred interaction failed: %s", e)
+
         pd = next((
             p for p in
             SessionPlayerModel.get_player_states(session.session_id)
@@ -1697,6 +1703,12 @@ class GameMaster(commands.Cog):
         session = sm.get_session(interaction.channel.id) if sm else None
         if not session:
             return await interaction.response.send_message("❌ No session.", ephemeral=True)
+
+        if not interaction.response.is_done():
+            try:
+                await interaction.response.defer()
+            except discord.errors.HTTPException as e:
+                logger.debug("Deferred interaction failed: %s", e)
 
         # pull current player data
         pd = next(p for p in SessionPlayerModel.get_player_states(session.session_id)
@@ -1950,7 +1962,11 @@ class GameMaster(commands.Cog):
         # New Game button in hub → create session
         if cid == "setup_new_game":
             # ACK the button silently (no ephemeral, no new message)
-            await interaction.response.defer()
+            if not interaction.response.is_done():
+                try:
+                    await interaction.response.defer()
+                except discord.errors.HTTPException as e:
+                    logger.debug("Deferred interaction failed: %s", e)
             await self.create_session(interaction, max_slots=6)
             return
         # ─── “End My Turn” on death (multiplayer) ───────────────────
