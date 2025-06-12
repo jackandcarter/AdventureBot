@@ -1328,6 +1328,15 @@ class BattleSystem(commands.Cog):
         session = mgr.get_session(interaction.channel.id) if mgr else None
 
         if cid == "battle_victory_continue":
+            if not interaction.response.is_done():
+                try:
+                    await interaction.response.defer()
+                except discord.errors.HTTPException as e:
+                    logger.debug(
+                        "Deferred interaction failed (already acknowledged): %s",
+                        e,
+                    )
+
             if session:
                 conn = self.db_connect()
                 with conn.cursor(dictionary=True) as cur:
