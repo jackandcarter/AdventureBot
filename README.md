@@ -18,7 +18,19 @@ pip install discord.py mysql-connector-python
 
 ## Configuration
 
-Edit `config.json` in the project root and provide your own credentials. A typical configuration looks like:
+Create a `config.json` file in the project root and provide your own credentials. An example configuration is available in
+`config.example.json`. Environment variables will override values found in
+`config.json`:
+
+- `DISCORD_TOKEN`
+- `MYSQL_HOST`
+- `MYSQL_USER`
+- `MYSQL_PASSWORD`
+- `MYSQL_DATABASE`
+
+If a variable is not provided, the loader falls back to the value in `config.json`.
+
+A typical configuration looks like:
 
 ```json
 {
@@ -52,7 +64,6 @@ python bot.py
 ```
 
 Slash commands such as `/adventuresetup` will then be available in your server.
-=======
 
 ## Game Channel Setup
 
@@ -60,20 +71,4 @@ Ensure there is a channel named "Adventurebot" in the server you intend on using
 
 using the /adventuresetup command in the game's hub channel will create the hub embed in order to start interaction with the bot in discord.
 
-## Configuration
-
-Create a `config.json` file in the project root or provide the settings via
-environment variables. An example configuration is available in
-`config.example.json`.
-
-Environment variables will override values found in `config.json`:
-
-- `DISCORD_TOKEN`
-- `MYSQL_HOST`
-- `MYSQL_USER`
-- `MYSQL_PASSWORD`
-- `MYSQL_DATABASE`
-
-If a variable is not provided, the loader falls back to the value in
-`config.json`.
 
