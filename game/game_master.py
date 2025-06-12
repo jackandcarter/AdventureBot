@@ -883,7 +883,14 @@ class GameMaster(commands.Cog):
             return await interaction.response.send_message("❌ No active session.", ephemeral=True)
 
         if not interaction.response.is_done():
-            await interaction.response.defer_update()
+            # Acknowledge the interaction without editing immediately
+            # `defer_update` is unavailable in some discord.py versions
+            defer_fn = getattr(interaction.response, "defer_update", None)
+            if callable(defer_fn):
+                await defer_fn()
+            else:
+                # Fall back to regular defer which behaves similarly
+                await interaction.response.defer()
 
         # 1) player’s current position
         conn = self.db_connect()
@@ -1096,7 +1103,11 @@ class GameMaster(commands.Cog):
             return await interaction.followup.send("❌ No active session.", ephemeral=True)
 
         if not interaction.response.is_done():
-            await interaction.response.defer_update()
+            defer_fn = getattr(interaction.response, "defer_update", None)
+            if callable(defer_fn):
+                await defer_fn()
+            else:
+                await interaction.response.defer()
 
         try:
             conn = await self.adb_connect()
@@ -1285,7 +1296,11 @@ class GameMaster(commands.Cog):
             return await interaction.followup.send("❌ No session.", ephemeral=True)
 
         if not interaction.response.is_done():
-            await interaction.response.defer_update()
+            defer_fn = getattr(interaction.response, "defer_update", None)
+            if callable(defer_fn):
+                await defer_fn()
+            else:
+                await interaction.response.defer()
 
         # Current position
         conn = self.db_connect()
@@ -1388,7 +1403,11 @@ class GameMaster(commands.Cog):
             return await interaction.followup.send("⚔️ You can’t look around during battle!", ephemeral=True)
 
         if not interaction.response.is_done():
-            await interaction.response.defer_update()
+            defer_fn = getattr(interaction.response, "defer_update", None)
+            if callable(defer_fn):
+                await defer_fn()
+            else:
+                await interaction.response.defer()
 
         # 1) fetch current floor, x, y
         conn = self.db_connect()
@@ -1812,7 +1831,11 @@ class GameMaster(commands.Cog):
             )
 
         if not interaction.response.is_done():
-            await interaction.response.defer_update()
+            defer_fn = getattr(interaction.response, "defer_update", None)
+            if callable(defer_fn):
+                await defer_fn()
+            else:
+                await interaction.response.defer()
 
         conn = self.db_connect()
         with conn.cursor(dictionary=True) as cur:
@@ -1867,7 +1890,11 @@ class GameMaster(commands.Cog):
             )
 
         if not interaction.response.is_done():
-            await interaction.response.defer_update()
+            defer_fn = getattr(interaction.response, "defer_update", None)
+            if callable(defer_fn):
+                await defer_fn()
+            else:
+                await interaction.response.defer()
 
         # 1) Persist the full session state JSON
         from models.session_models import SessionModel
@@ -2102,7 +2129,11 @@ class GameMaster(commands.Cog):
 
             if cid.startswith("setup_"):
                 # e.g. “setup_4” → 4‑player session
-                await interaction.response.defer_update()
+                defer_fn = getattr(interaction.response, "defer_update", None)
+                if callable(defer_fn):
+                    await defer_fn()
+                else:
+                    await interaction.response.defer()
                 parts = cid.split("_",1)
                 try:
                     slots = int(parts[1])
