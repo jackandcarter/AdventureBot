@@ -211,9 +211,13 @@ class SessionManager(commands.Cog):
             return await interaction.response.send_message(
                 "⚠️ You’ve already joined this session!", ephemeral=True
             )
+
         try:
-                session.add_player(user.id)
+                SessionPlayerModel.add_player(
+                    session_id, user.id, user.display_name
+                )
                 SessionModel.increment_player_count(session_id)
+                session.add_player(user.id)
                 session.players = SessionPlayerModel.get_players(session_id)
                 logger.info("User %s added to session %s.", user.id, session_id)
 
