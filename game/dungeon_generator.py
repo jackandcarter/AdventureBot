@@ -32,6 +32,7 @@ class DungeonGenerator(commands.Cog):
     DEFAULT_STRAIGHT_BIAS = 0.6
     DEFAULT_STAIR_BIAS = 0.7
     MINIBOSS_PER_FLOOR = 2
+    MAX_MAZE_ATTEMPTS = 50  # attempts when searching for a long enough path
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -507,25 +508,52 @@ class DungeonGenerator(commands.Cog):
         prev_floor_id: Optional[int] = None,
         loop_chance: float = DEFAULT_LOOP_CHANCE,
         straight_bias: float = DEFAULT_STRAIGHT_BIAS,
-    ) -> List[Tuple[int, int, int, str, Dict[str, Tuple[int, int]]]]:
-        """Return a list of (floor_id,x,y,room_type,exits) tuples."""
-        # 1) maze + loops
-        adj = self._carve_perfect_maze(width, height, straight_bias)
-        self._add_random_loops(adj, loop_chance)
+    ) -> Tuple[
+        List[Tuple[int, int, int, str, Dict[str, Tuple[int, int]]]],
+        Tuple[int, int],
+    ]:
+        """Return room tuples and the final exit coordinate."""
 
-        # 2) BFS distance map
-        dist: Dict[Tuple[int, int], int] = {(start_x, start_y): 0}
-        dq = deque([(start_x, start_y)])
-        while dq:
-            cx, cy = dq.popleft()
-            for nb in adj[(cx, cy)]:
-                if nb not in dist:
-                    dist[nb] = dist[(cx, cy)] + 1
-                    dq.append(nb)
+        final_exit = (end_x, end_y)
+        attempts = 0
+        path: List[Tuple[int, int]] = []
 
-        # 3) guaranteed path start→exit
-        path = self._bfs_path(adj, (start_x, start_y), (end_x, end_y))
-        interior = path[1:-1]
+        while attempts < self.MAX_MAZE_ATTEMPTS:
+            # 1) maze + loops
+            adj = self._carve_perfect_maze(width, height, straight_bias)
+            self._add_random_loops(adj, loop_chance)
+
+            # 2) BFS distance map
+            dist: Dict[Tuple[int, int], int] = {(start_x, start_y): 0}
+            dq = deque([(start_x, start_y)])
+            while dq:
+                cx, cy = dq.popleft()
+                for nb in adj[(cx, cy)]:
+                    if nb not in dist:
+                        dist[nb] = dist[(cx, cy)] + 1
+                        dq.append(nb)
+
+            # 3) guaranteed path start→exit
+            path = self._bfs_path(adj, (start_x, start_y), final_exit)
+            if len(path) >= min_rooms:
+                break
+
+            # choose farther exit if needed
+            farthest = max(dist, key=dist.get)
+            candidates = [farthest] + [c for c, d in sorted(dist.items(), key=lambda x: x[1], reverse=True)]
+            chosen: Optional[Tuple[int, int]] = None
+            for cand in candidates:
+                cand_path = self._bfs_path(adj, (start_x, start_y), cand)
+                if len(cand_path) >= min_rooms:
+                    chosen = cand
+                    path = cand_path
+                    break
+            if chosen:
+                final_exit = chosen
+                break
+
+            attempts += 1
+        interior = path[1:-1] if path else []
 
         # 4) boss/exit coordinates
         boss_coord = path[-2] if is_last_floor and len(path) >= 2 else None
@@ -624,7 +652,7 @@ class DungeonGenerator(commands.Cog):
                 room_types[coord] = rtype
                 out.append((floor_id, x, y, rtype, exits))
 
-        return out
+        return out, final_exit
 
     # ─────────────────────────────────────────────── Persist state
     def save_dungeon_to_session(
@@ -712,7 +740,7 @@ class DungeonGenerator(commands.Cog):
                 conn.commit()
                 basement_floor_id = cur.lastrowid
 
-            basement_defs = await loop.run_in_executor(
+            basement_defs, _ = await loop.run_in_executor(
                 None,
                 functools.partial(
                     self.generate_rooms_for_floor,
@@ -832,7 +860,7 @@ class DungeonGenerator(commands.Cog):
         random.shuffle(miniboss_pool)
         mb_index = 0
 
-        first_defs = await loop.run_in_executor(
+        first_defs, (exit_x, exit_y) = await loop.run_in_executor(
             None,
             functools.partial(
                 self.generate_rooms_for_floor,
@@ -1165,7 +1193,7 @@ class DungeonGenerator(commands.Cog):
                     conn.commit()
                     floor_id = cur.lastrowid
 
-                defs = await loop.run_in_executor(
+                defs, (exit_x, exit_y) = await loop.run_in_executor(
                     None,
                     functools.partial(
                         self.generate_rooms_for_floor,
