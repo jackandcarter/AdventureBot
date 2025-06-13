@@ -500,14 +500,14 @@ class DungeonGenerator(commands.Cog):
         is_last_floor: bool,
         start_x: int,
         start_y: int,
-        end_x: int,
-        end_y: int,
-        difficulty: str,
-        floor_number: int,
+        end_x: Optional[int] = None,
+        end_y: Optional[int] = None,
+        difficulty: str = "",
+        floor_number: int = 1,
         prev_floor_id: Optional[int] = None,
         loop_chance: float = DEFAULT_LOOP_CHANCE,
         straight_bias: float = DEFAULT_STRAIGHT_BIAS,
-    ) -> List[Tuple[int, int, int, str, Dict[str, Tuple[int, int]]]]:
+    ) -> Tuple[List[Tuple[int, int, int, str, Dict[str, Tuple[int, int]]]], int, int]:
         """Return a list of (floor_id,x,y,room_type,exits) tuples."""
         # 1) maze + loops
         adj = self._carve_perfect_maze(width, height, straight_bias)
@@ -523,8 +523,19 @@ class DungeonGenerator(commands.Cog):
                     dist[nb] = dist[(cx, cy)] + 1
                     dq.append(nb)
 
+        if end_x is None or end_y is None:
+            farthest = sorted(dist.items(), key=lambda kv: kv[1], reverse=True)
+            exit_x, exit_y = farthest[0][0]
+            if dist[(exit_x, exit_y)] < self.MIN_STAIR_DISTANCE:
+                for coord, d in farthest[1:]:
+                    if d >= self.MIN_STAIR_DISTANCE:
+                        exit_x, exit_y = coord
+                        break
+        else:
+            exit_x, exit_y = end_x, end_y
+
         # 3) guaranteed path start→exit
-        path = self._bfs_path(adj, (start_x, start_y), (end_x, end_y))
+        path = self._bfs_path(adj, (start_x, start_y), (exit_x, exit_y))
         interior = path[1:-1]
 
         # 4) boss/exit coordinates
@@ -624,7 +635,7 @@ class DungeonGenerator(commands.Cog):
                 room_types[coord] = rtype
                 out.append((floor_id, x, y, rtype, exits))
 
-        return out
+        return out, exit_x, exit_y
 
     # ─────────────────────────────────────────────── Persist state
     def save_dungeon_to_session(
@@ -712,7 +723,7 @@ class DungeonGenerator(commands.Cog):
                 conn.commit()
                 basement_floor_id = cur.lastrowid
 
-            basement_defs = await loop.run_in_executor(
+            basement_defs, _, _ = await loop.run_in_executor(
                 None,
                 functools.partial(
                     self.generate_rooms_for_floor,
@@ -832,7 +843,7 @@ class DungeonGenerator(commands.Cog):
         random.shuffle(miniboss_pool)
         mb_index = 0
 
-        first_defs = await loop.run_in_executor(
+        first_defs, _, _ = await loop.run_in_executor(
             None,
             functools.partial(
                 self.generate_rooms_for_floor,
@@ -1136,16 +1147,6 @@ class DungeonGenerator(commands.Cog):
 
             for floor_number in range(2, total_floors + 1):
                 is_goal = floor_number == total_floors
-                exit_x, exit_y = self._choose_far_coordinate(
-                    width, height, self.MIN_STAIR_DISTANCE, stair_bias
-                )
-                while (
-                    abs(exit_x - current_entry[0]) + abs(exit_y - current_entry[1])
-                    < self.MIN_STAIR_DISTANCE
-                ):
-                    exit_x, exit_y = self._choose_far_coordinate(
-                        width, height, self.MIN_STAIR_DISTANCE, stair_bias
-                    )
 
                 with conn.cursor() as cur:
                     cur.execute(
@@ -1165,7 +1166,7 @@ class DungeonGenerator(commands.Cog):
                     conn.commit()
                     floor_id = cur.lastrowid
 
-                defs = await loop.run_in_executor(
+                defs, exit_x, exit_y = await loop.run_in_executor(
                     None,
                     functools.partial(
                         self.generate_rooms_for_floor,
@@ -1179,8 +1180,8 @@ class DungeonGenerator(commands.Cog):
                         is_goal,
                         current_entry[0],
                         current_entry[1],
-                        exit_x,
-                        exit_y,
+                        None,
+                        None,
                         difficulty_name,
                         floor_number,
                         prev_floor_id,
