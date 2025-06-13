@@ -32,7 +32,9 @@ class DungeonGenerator(commands.Cog):
     DEFAULT_STRAIGHT_BIAS = 0.6
     DEFAULT_STAIR_BIAS = 0.7
     MINIBOSS_PER_FLOOR = 2
+    MIN_SHOP_DISTANCE = 10  # minimum Manhattan distance between shop rooms
     MAX_MAZE_ATTEMPTS = 50  # attempts when searching for a long enough path
+
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -573,13 +575,16 @@ class DungeonGenerator(commands.Cog):
                 idx = int(
                     min(max(base + random.uniform(-half_seg, half_seg), 0), n - 1)
                 )
-                coord = sorted_by_dist[idx]
-                if coord in used:
-                    for offset in range(1, n):
-                        cand = sorted_by_dist[(idx + offset) % n]
-                        if cand not in used:
-                            coord = cand
-                            break
+                coord = None
+                for offset in range(n):
+                    cand = sorted_by_dist[(idx + offset) % n]
+                    if cand in used:
+                        continue
+                    if all(abs(cand[0] - u[0]) + abs(cand[1] - u[1]) >= self.MIN_SHOP_DISTANCE for u in used):
+                        coord = cand
+                        break
+                if coord is None:
+                    continue
                 shop_positions.append(coord)
                 used.add(coord)
 
