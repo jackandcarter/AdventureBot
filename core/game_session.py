@@ -9,6 +9,9 @@ from typing import List, Optional, Dict, Any
 
 
 class GameSession:
+    """In-memory representation of a single game session."""
+
+    # pylint: disable=too-many-instance-attributes, too-many-arguments
     def __init__(
         self,
         session_id: int,
@@ -24,6 +27,7 @@ class GameSession:
         game_log: Optional[List[str]] = None,
         game_state: Optional[Dict[str, Any]] = None
     ):
+        """Initialize session metadata and state containers."""
         # ── identity & persistence ────────────────────────────────────────
         self.session_id: int = session_id
         self.guild_id: int    = guild_id
@@ -61,6 +65,7 @@ class GameSession:
         self.status_effects: Dict[int, List[Dict[str, Any]]] = {}
 
     def add_player(self, player_id: int) -> None:
+        """Add a player to the session."""
         if player_id in self.players or len(self.players) >= 6:
             raise Exception("Cannot add player.")
         self.players.append(player_id)
@@ -69,6 +74,7 @@ class GameSession:
             self.current_turn = player_id
 
     def remove_player(self, player_id: int) -> None:
+        """Remove a player from the session."""
         if player_id not in self.players:
             raise Exception("Player not in session.")
         self.players.remove(player_id)
@@ -77,6 +83,7 @@ class GameSession:
             self.advance_turn()
 
     def advance_turn(self) -> Optional[int]:
+        """Advance to the next player's turn."""
         if not self.players:
             self.current_turn = None
             return None
@@ -88,26 +95,32 @@ class GameSession:
         return self.current_turn
 
     def append_log(self, message: str) -> None:
+        """Append a line to the session log."""
         self.game_log.append(message)
         if len(self.game_log) > 10:
             self.game_log = self.game_log[-10:]
 
     def set_battle_state(self, info: Dict[str, Any]) -> None:
+        """Store active battle information."""
         self.battle_state = info
 
     def clear_battle_state(self) -> None:
+        """Reset battle-related state."""
         self.battle_state = None
         self.current_enemy = None
 
     def update_ability_cooldown(self, player_id: int, ability_id: int, cd: float) -> None:
+        """Set the cooldown timer for a player's ability."""
         self.ability_cooldowns.setdefault(player_id, {})[ability_id] = cd
 
     def reduce_all_cooldowns(self, amount: float) -> None:
-        for pid, cds in self.ability_cooldowns.items():
+        """Reduce all tracked cooldowns by a given amount."""
+        for _, cds in self.ability_cooldowns.items():
             for aid in list(cds):
                 cds[aid] = max(cds[aid] - amount, 0.0)
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialize the session to a dictionary."""
         return {
             "session_id": self.session_id,
             "guild_id": self.guild_id,
@@ -132,6 +145,7 @@ class GameSession:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "GameSession":
+        """Create a session instance from serialized data."""
         gs = cls(
             session_id    = data["session_id"],
             guild_id      = data["guild_id"],
@@ -156,6 +170,7 @@ class GameSession:
         return gs
 
     def __repr__(self) -> str:
+        """Return a concise textual representation for debugging."""
         return (
             f"<GameSession id={self.session_id}"
             f" owner={self.owner_id}"
