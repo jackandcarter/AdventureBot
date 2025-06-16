@@ -841,6 +841,8 @@ TABLES = {
             player_class     VARCHAR(50),
             gil              INT DEFAULT 0,
             enemies_defeated INT DEFAULT 0,
+            rooms_visited    INT DEFAULT 0,
+            difficulty       VARCHAR(50),
             play_time        INT DEFAULT 0,
             completed_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )

@@ -131,7 +131,8 @@ def get_high_scores_embed(high_scores_data):
                 value=(
                     f"Rooms: {entry.get('rooms_visited', 'N/A')}\n"
                     f"Enemies: {entry.get('enemies_defeated', 'N/A')}\n"
-                    f"Gil: {entry.get('gil', 'N/A')}"
+                    f"Gil: {entry.get('gil', 'N/A')}\n"
+                    f"Difficulty: {entry.get('difficulty', 'N/A')}"
                 ),
                 inline=False
             )
