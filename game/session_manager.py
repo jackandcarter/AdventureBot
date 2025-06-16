@@ -5,6 +5,9 @@ from typing import Optional, Tuple, Dict, List, Any
 import mysql.connector
 import json
 import asyncio
+from datetime import datetime
+
+from game import high_score
 
 from models.session_models import SessionModel, SessionPlayerModel
 from core.game_session import GameSession  # New GameSession object
@@ -259,6 +262,67 @@ class SessionManager(commands.Cog):
             self.sessions_by_thread.pop(int(session.thread_id), None)
             logger.info("Session %s removed from memory.", session_id)
 
+    def record_high_score(self, session_id: int) -> None:
+        """Gather final stats for all players and record a high score entry."""
+        try:
+            conn = self.db_connect()
+            cur = conn.cursor(dictionary=True)
+
+            cur.execute(
+                "SELECT guild_id, difficulty, created_at FROM sessions WHERE session_id=%s",
+                (session_id,)
+            )
+            sess = cur.fetchone()
+            if not sess:
+                return
+
+            cur.execute(
+                """
+                SELECT p.username, p.level, p.gil, p.discovered_rooms,
+                       p.kill_count AS enemies_defeated, c.class_name
+                  FROM players p
+             LEFT JOIN classes c ON p.class_id = c.class_id
+                 WHERE p.session_id = %s
+                """,
+                (session_id,),
+            )
+            players = cur.fetchall() or []
+
+            play_time = 0
+            if sess.get("created_at"):
+                play_time = int((datetime.utcnow() - sess["created_at"]).total_seconds())
+
+            for p in players:
+                try:
+                    rooms = len(json.loads(p.get("discovered_rooms") or "[]"))
+                except Exception:
+                    rooms = 0
+
+                data = {
+                    "player_name": p.get("username"),
+                    "guild_id": sess.get("guild_id"),
+                    "player_level": p.get("level"),
+                    "player_class": p.get("class_name"),
+                    "gil": p.get("gil", 0),
+                    "enemies_defeated": p.get("enemies_defeated", 0),
+                    "play_time": play_time,
+                    "rooms_visited": rooms,
+                    "difficulty": sess.get("difficulty"),
+                }
+                high_score.record_score(data)
+
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("record_high_score failed for session %s: %s", session_id, e, exc_info=True)
+        finally:
+            try:
+                cur.close()
+            except Exception:
+                pass
+            try:
+                conn.close()
+            except Exception:
+                pass
+
     async def terminate_session(self, session_id: int, reason: str) -> None:
         logger.debug("terminate_session called for %s: %s", session_id, reason)
         try:
@@ -272,6 +336,7 @@ class SessionManager(commands.Cog):
         except Exception as e:
             logger.error("Error ending session %s: %s", session_id, e, exc_info=True)
         finally:
+            self.record_high_score(session_id)
             self.delete_session_state(session_id)
 
     def get_session(self, thread_id: int) -> Optional[GameSession]:
