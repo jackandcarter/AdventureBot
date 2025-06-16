@@ -10,6 +10,7 @@ import discord
 from discord.ext import commands
 
 from models.database import Database  # project DB wrapper
+from models.session_models import SessionPlayerModel
 
 logger = logging.getLogger("TreasureChest")
 logger.setLevel(logging.DEBUG)
@@ -92,6 +93,8 @@ def _apply_chest_rewards(
                 "UPDATE players SET gil=%s, inventory=%s WHERE player_id=%s AND session_id=%s",
                 (gil, json.dumps(inv), player_id, session_id),
             )
+            if gil:
+                SessionPlayerModel.add_gil_earned(session_id, player_id, gil)
         conn.commit()
     finally:
         conn.close()

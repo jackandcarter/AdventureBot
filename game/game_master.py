@@ -1198,6 +1198,7 @@ class GameMaster(commands.Cog):
             session.session_id,
             (new_floor, nx, ny)
         )
+        SessionPlayerModel.increment_rooms_visited(session.session_id, interaction.user.id)
         self.append_game_log(session.session_id, f"<@{interaction.user.id}> moved {direction}.")
 
         # ── 6. fetch the room we actually landed in ──────────────────
@@ -1392,6 +1393,7 @@ class GameMaster(commands.Cog):
             session.session_id,
             ( dest_floor_id, dest_x, dest_y )
         )
+        SessionPlayerModel.increment_rooms_visited(session.session_id, interaction.user.id)
         # Fetch the destination room
         conn = self.db_connect()
         with conn.cursor(dictionary=True) as cur:

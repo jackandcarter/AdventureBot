@@ -279,8 +279,8 @@ class SessionPlayerModel:
                    gil, experience, level,
                    coord_x, coord_y, current_floor_id,
                    inventory, discovered_rooms, status_effects,
-                   is_dead)
-            VALUES (%s,%s,%s, 0,0,1, 0,0,1, %s,%s,%s, 0)
+                   is_dead, enemies_defeated, rooms_visited, gil_earned)
+            VALUES (%s,%s,%s, 0,0,1, 0,0,1, %s,%s,%s, 0, 0, 0, 0)
             ON DUPLICATE KEY UPDATE username = VALUES(username)
             """, (
                 player_id, username, session_id,
@@ -389,6 +389,60 @@ class SessionPlayerModel:
             inv.pop(key)
         SessionPlayerModel.update_inventory(session_id, player_id, inv)
         return True
+
+    # ── stats tracking helpers ─────────────────────────────────────────
+    @staticmethod
+    def increment_enemies_defeated(session_id: int, player_id: int, amt: int = 1) -> None:
+        conn = Database().get_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE players SET enemies_defeated = enemies_defeated + %s "
+                "WHERE session_id=%s AND player_id=%s",
+                (amt, session_id, player_id),
+            )
+            conn.commit()
+        except Exception:
+            logger.exception("Error incrementing enemies defeated")
+        finally:
+            cur.close()
+            conn.close()
+
+    @staticmethod
+    def increment_rooms_visited(session_id: int, player_id: int, amt: int = 1) -> None:
+        conn = Database().get_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE players SET rooms_visited = rooms_visited + %s "
+                "WHERE session_id=%s AND player_id=%s",
+                (amt, session_id, player_id),
+            )
+            conn.commit()
+        except Exception:
+            logger.exception("Error incrementing rooms visited")
+        finally:
+            cur.close()
+            conn.close()
+
+    @staticmethod
+    def add_gil_earned(session_id: int, player_id: int, amt: int) -> None:
+        if amt <= 0:
+            return
+        conn = Database().get_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE players SET gil_earned = gil_earned + %s "
+                "WHERE session_id=%s AND player_id=%s",
+                (amt, session_id, player_id),
+            )
+            conn.commit()
+        except Exception:
+            logger.exception("Error incrementing gil earned")
+        finally:
+            cur.close()
+            conn.close()
 
     # ── death / faint helpers ────────────────────────────────────────────
     def set_player_dead(session_id: int, player_id: int) -> None:
