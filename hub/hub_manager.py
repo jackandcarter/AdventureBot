@@ -250,11 +250,12 @@ class HubManager(commands.Cog):
 
         if cid == "hub_high_scores":
             sm = interaction.client.get_cog("SessionManager")
-            high_scores = await sm.get_high_scores() if sm else []
-            new_embed = hub_embed.get_high_scores_embed(high_scores)
+            sort_by = "play_time"
+            high_scores = await sm.get_high_scores(sort_by=sort_by) if sm else []
+            new_embed = hub_embed.get_high_scores_embed(high_scores, sort_by=sort_by)
             return await interaction.response.edit_message(
                 embed=new_embed,
-                view=None
+                view=HighScoresView(sort_by=sort_by)
             )
 
         if cid == "hub_back":
@@ -289,6 +290,46 @@ class HubView(discord.ui.View):
         self.add_item(discord.ui.Button(
             label="High Scores", style=discord.ButtonStyle.secondary,
             custom_id="hub_high_scores"
+        ))
+
+
+class SortSelect(discord.ui.Select):
+    def __init__(self, current_sort: str):
+        options = [
+            discord.SelectOption(label="Play Time", value="play_time"),
+            discord.SelectOption(label="Enemies Defeated", value="enemies_defeated"),
+            discord.SelectOption(label="Gil", value="gil"),
+            discord.SelectOption(label="Level", value="player_level"),
+        ]
+        for opt in options:
+            if opt.value == current_sort:
+                opt.default = True
+        super().__init__(
+            placeholder="Sort By...",
+            options=options,
+            custom_id="high_scores_sort",
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        view: HighScoresView = self.view  # type: ignore
+        sort_by = self.values[0]
+        sm = interaction.client.get_cog("SessionManager")
+        scores = await sm.get_high_scores(sort_by=sort_by) if sm else []
+        embed = hub_embed.get_high_scores_embed(scores, sort_by=sort_by)
+        await interaction.response.edit_message(
+            embed=embed,
+            view=HighScoresView(sort_by=sort_by)
+        )
+
+
+class HighScoresView(discord.ui.View):
+    def __init__(self, sort_by: str = "play_time"):
+        super().__init__(timeout=None)
+        self.add_item(SortSelect(current_sort=sort_by))
+        self.add_item(discord.ui.Button(
+            label="Back",
+            style=discord.ButtonStyle.secondary,
+            custom_id="hub_back",
         ))
 
 

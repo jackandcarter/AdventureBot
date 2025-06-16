@@ -112,15 +112,20 @@ def get_tutorial_page_count() -> int:
         cursor.close()
         conn.close()
 
-def get_high_scores_embed(high_scores_data):
-    """
-    Constructs an embed to display high scores.
-    Expects high_scores_data as a list of dictionaries containing score info.
-    """
+def get_high_scores_embed(high_scores_data, sort_by: str = "play_time"):
+    """Construct an embed to display high scores sorted as specified."""
+    sort_labels = {
+        "play_time": "Play Time",
+        "enemies_defeated": "Enemies Defeated",
+        "gil": "Gil",
+        "player_level": "Level",
+    }
+    sort_label = sort_labels.get(sort_by, sort_by)
+
     embed = discord.Embed(
         title="High Scores",
         description="Top players and session stats:",
-        color=discord.Color.gold()
+        color=discord.Color.gold(),
     )
     if not high_scores_data:
         embed.add_field(name="No scores available", value="Be the first to set a record!", inline=False)
@@ -135,5 +140,7 @@ def get_high_scores_embed(high_scores_data):
                 ),
                 inline=False
             )
-    embed.set_footer(text="Press 'Back' to return to the main menu.")
+    embed.set_footer(
+        text=f"Sorted by {sort_label}. Press 'Back' to return to the main menu."
+    )
     return embed
