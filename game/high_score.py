@@ -35,6 +35,17 @@ def record_score(data: Dict[str, Any]) -> bool:
         sql = f"INSERT INTO high_scores ({columns}) VALUES ({placeholders})"
         cursor.execute(sql, values)
         conn.commit()
+
+        cursor.execute(
+            "SELECT score_id FROM high_scores ORDER BY play_time ASC, enemies_defeated DESC"
+        )
+        ids = [row[0] for row in cursor.fetchall()]
+        if len(ids) > 20:
+            extras = ids[20:]
+            placeholders_del = ",".join(["%s"] * len(extras))
+            del_sql = f"DELETE FROM high_scores WHERE score_id IN ({placeholders_del})"
+            cursor.execute(del_sql, tuple(extras))
+            conn.commit()
         return True
     except Exception as e:  # pylint: disable=broad-except
         logger.error("Error recording score: %s", e, exc_info=True)
