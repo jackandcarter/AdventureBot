@@ -8,12 +8,19 @@ AdventureBot is a Discord bot that powers a turn‑based dungeon adventure. It u
 - **Python** 3.10+
 - **MySQL** server
 - A Discord application with a bot token and the necessary intent permissions
-- Python packages `discord.py` and `mysql-connector-python`
+
+## Installation
 
 Install the dependencies with:
 
 ```bash
-pip install discord.py mysql-connector-python
+pip install -r requirements.txt
+```
+
+Enable the required Discord intents for your application and initialize the database:
+
+```bash
+python database/database_setup.py
 ```
 
 ## Configuration
@@ -68,7 +75,3 @@ Slash commands such as `/adventuresetup` will then be available in your server.
 ## Game Channel Setup
 
 Ensure there is a channel named "Adventurebot" in the server you intend on using the bot with and give the bot needed permission if necessary.
-
-using the /adventuresetup command in the game's hub channel will create the hub embed in order to start interaction with the bot in discord.
-
-
