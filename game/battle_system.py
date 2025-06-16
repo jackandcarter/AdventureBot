@@ -391,6 +391,7 @@ class BattleSystem(commands.Cog):
         xp = enemy.get("xp_reward", 0)
         if xp and gm:
             await gm.award_experience(session.current_turn, session.session_id, xp)
+        SessionPlayerModel.increment_enemies_defeated(session.session_id, session.current_turn)
 
         conn = self.db_connect()
         cursor = conn.cursor(dictionary=True)
@@ -1289,6 +1290,8 @@ class BattleSystem(commands.Cog):
                 "UPDATE players SET gil = %s, inventory = %s WHERE player_id = %s AND session_id = %s",
                 (new_gil, json.dumps(inv), pid, sid),
             )
+            if gil:
+                SessionPlayerModel.add_gil_earned(sid, pid, gil)
             conn.commit()
 
         cursor.close(); conn.close()
@@ -1513,6 +1516,7 @@ class BattleSystem(commands.Cog):
         )
         conn.commit()
         cur.close(); conn.close()
+        SessionPlayerModel.add_gil_earned(session_id, player_id, amount)
 
     # ─── New: fetch current & max HP for DoT/HoT ─────────────────────────
     def _get_player_hp(self, player_id: int, session_id: int) -> int:
