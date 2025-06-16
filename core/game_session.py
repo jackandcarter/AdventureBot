@@ -1,8 +1,8 @@
-"""
-core/game_session.py
+"""Game session utilities.
 
-Encapsulates an in‑memory representation of a game session,
-including players, turn order, dungeon state, battle state, cooldowns, and trance state.
+This module defines :class:`GameSession`, a container class used by the
+AdventureBot runtime to track players, turns, dungeon state and various
+temporary battle attributes while a game is in progress.
 """
 
 from typing import List, Optional, Dict, Any
@@ -27,7 +27,19 @@ class GameSession:
         game_log: Optional[List[str]] = None,
         game_state: Optional[Dict[str, Any]] = None
     ):
-        """Initialize session metadata and state containers."""
+        """Initialize session metadata and state containers.
+
+        Parameters
+        ----------
+        session_id:
+            Unique identifier used for persistence.
+        guild_id:
+            Discord guild identifier this session belongs to.
+        thread_id:
+            Discord thread identifier where gameplay occurs.
+        owner_id:
+            Player that created the session.
+        """
         # ── identity & persistence ────────────────────────────────────────
         self.session_id: int = session_id
         self.guild_id: int    = guild_id
@@ -65,7 +77,14 @@ class GameSession:
         self.status_effects: Dict[int, List[Dict[str, Any]]] = {}
 
     def add_player(self, player_id: int) -> None:
-        """Add a player to the session."""
+        """Add a player to the session.
+
+        Raises
+        ------
+        Exception
+            If the player is already in the session or the maximum
+            number of participants has been reached.
+        """
         if player_id in self.players or len(self.players) >= 6:
             raise Exception("Cannot add player.")
         self.players.append(player_id)
@@ -74,7 +93,13 @@ class GameSession:
             self.current_turn = player_id
 
     def remove_player(self, player_id: int) -> None:
-        """Remove a player from the session."""
+        """Remove a player from the session.
+
+        Raises
+        ------
+        Exception
+            If the player is not currently part of the session.
+        """
         if player_id not in self.players:
             raise Exception("Player not in session.")
         self.players.remove(player_id)
@@ -83,7 +108,14 @@ class GameSession:
             self.advance_turn()
 
     def advance_turn(self) -> Optional[int]:
-        """Advance to the next player's turn."""
+        """Advance to the next player's turn.
+
+        Returns
+        -------
+        Optional[int]
+            The player ID whose turn is now active, or ``None`` if the
+            session has no players.
+        """
         if not self.players:
             self.current_turn = None
             return None
@@ -95,17 +127,20 @@ class GameSession:
         return self.current_turn
 
     def append_log(self, message: str) -> None:
-        """Append a line to the session log."""
+        """Append a line to the session log.
+
+        Only the ten most recent log lines are retained.
+        """
         self.game_log.append(message)
         if len(self.game_log) > 10:
             self.game_log = self.game_log[-10:]
 
     def set_battle_state(self, info: Dict[str, Any]) -> None:
-        """Store active battle information."""
+        """Store active battle information for the current encounter."""
         self.battle_state = info
 
     def clear_battle_state(self) -> None:
-        """Reset battle-related state."""
+        """Reset all stored data about the current battle."""
         self.battle_state = None
         self.current_enemy = None
 
@@ -114,13 +149,16 @@ class GameSession:
         self.ability_cooldowns.setdefault(player_id, {})[ability_id] = cd
 
     def reduce_all_cooldowns(self, amount: float) -> None:
-        """Reduce all tracked cooldowns by a given amount."""
+        """Reduce all tracked cooldowns by a given amount.
+
+        Cooldowns will never drop below zero.
+        """
         for _, cds in self.ability_cooldowns.items():
             for aid in list(cds):
                 cds[aid] = max(cds[aid] - amount, 0.0)
 
     def to_dict(self) -> Dict[str, Any]:
-        """Serialize the session to a dictionary."""
+        """Serialize the session to a dictionary for persistence."""
         return {
             "session_id": self.session_id,
             "guild_id": self.guild_id,
@@ -145,7 +183,7 @@ class GameSession:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "GameSession":
-        """Create a session instance from serialized data."""
+        """Create a :class:`GameSession` instance from serialized data."""
         gs = cls(
             session_id    = data["session_id"],
             guild_id      = data["guild_id"],
@@ -170,7 +208,7 @@ class GameSession:
         return gs
 
     def __repr__(self) -> str:
-        """Return a concise textual representation for debugging."""
+        """Return a concise textual representation of this session."""
         return (
             f"<GameSession id={self.session_id}"
             f" owner={self.owner_id}"
