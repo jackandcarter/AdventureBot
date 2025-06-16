@@ -128,7 +128,11 @@ def get_high_scores_embed(high_scores_data):
         for entry in high_scores_data:
             embed.add_field(
                 name=f"{entry.get('player_name', 'Unknown')} ({entry.get('player_class', 'N/A')})",
-                value=f"Rooms: {entry.get('rooms', 'N/A')}\nEnemies: {entry.get('enemies', 'N/A')}\nGil: {entry.get('gil', 'N/A')}",
+                value=(
+                    f"Rooms: {entry.get('rooms_visited', 'N/A')}\n"
+                    f"Enemies: {entry.get('enemies_defeated', 'N/A')}\n"
+                    f"Gil: {entry.get('gil', 'N/A')}"
+                ),
                 inline=False
             )
     embed.set_footer(text="Press 'Back' to return to the main menu.")
