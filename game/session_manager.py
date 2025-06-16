@@ -8,6 +8,7 @@ import asyncio
 
 from models.session_models import SessionModel, SessionPlayerModel
 from core.game_session import GameSession  # New GameSession object
+from game import high_score
 
 logger = logging.getLogger("SessionManager")
 logger.setLevel(logging.DEBUG)
@@ -414,6 +415,14 @@ class SessionManager(commands.Cog):
         else:
             # when not in battle, fall back to the normal room refresh
             await self.refresh_current_state(interaction)
+
+    async def get_high_scores(self, limit: int = 20, sort_by: str = "play_time"):
+        """Retrieve high score rows sorted accordingly."""
+        try:
+            return high_score.fetch_scores(limit, sort_by)
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("Error fetching high scores: %s", e, exc_info=True)
+            return []
 
     @commands.command(
         name="cleanup_sessions",
