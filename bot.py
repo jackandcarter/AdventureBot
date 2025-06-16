@@ -1,4 +1,8 @@
-"""Discord bot entry point for AdventureBot."""
+"""AdventureBot Discord entry point.
+
+This module boots the bot, loads configuration and extensions and
+starts the Discord client used for gameplay.
+"""
 
 # pylint: disable=import-error
 
@@ -33,13 +37,16 @@ logging.getLogger("discord.http").setLevel(logging.WARNING)
 #   CONFIG LOADING
 # ---------------------
 def get_bot_root():
-    """Return the absolute path to the directory containing this script (bot.py)."""
+    """Return the absolute path to the directory containing this script."""
     return os.path.dirname(os.path.abspath(__file__))
 
 CONFIG_PATH = os.path.join(get_bot_root(), 'config.json')
 
 def load_config():
-    """Load bot configuration from disk."""
+    """Load bot configuration from disk.
+
+    Exits the program if the configuration file cannot be read.
+    """
     try:
         with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
             config_data = json.load(f)
@@ -57,7 +64,11 @@ DB_CONFIG = config.get('mysql', {})
 #   DATABASE SETUP
 # ---------------------
 def run_database_setup():
-    """Run the database setup helper script."""
+    """Run the database setup helper script.
+
+    Ensures all database tables exist before the bot begins processing
+    events. The bot exits if the setup script cannot be executed.
+    """
     bot_root = get_bot_root()
     db_setup_path = os.path.join(bot_root, 'database', 'database_setup.py')
     if not os.path.exists(db_setup_path):
@@ -86,7 +97,7 @@ bot = commands.Bot(command_prefix="/", intents=intents)
 
 @bot.event
 async def on_ready():
-    """Log startup and sync application commands."""
+    """Handle the :code:`on_ready` event and sync slash commands."""
     logger.info(
         "\U0001f916 %s is online and ready! Connected to %s server(s).",
         bot.user.name,
@@ -109,14 +120,21 @@ async def on_ready():
 
 @bot.event
 async def on_shard_connect(shard_id):
-    """Log when a new shard connects."""
+    """Log when a new Discord shard establishes a connection."""
     logger.debug("Shard %s connected.", shard_id)
 
 # ---------------------
 #   DYNAMIC COG LOADING
 # ---------------------
 def discover_cogs(root_dirs):
-    """Return a list of cog modules found in the given directories."""
+    """Return a list of cog modules found in the given directories.
+
+    Parameters
+    ----------
+    root_dirs: list[str]
+        Directories relative to the bot root that should be scanned for
+        extensions.
+    """
     cogs = []
     bot_root = get_bot_root()
     for directory in root_dirs:
@@ -151,7 +169,7 @@ logger.info("Discovered cog modules: %s", modules)
 #   MAIN BOT START
 # ---------------------
 async def main():
-    """Entry point for running the bot."""
+    """Start the bot and load all discovered extensions."""
     run_database_setup()
 
     if not TOKEN:
