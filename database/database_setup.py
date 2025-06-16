@@ -841,7 +841,9 @@ TABLES = {
             player_class     VARCHAR(50),
             gil              INT DEFAULT 0,
             enemies_defeated INT DEFAULT 0,
+            rooms_visited    INT DEFAULT 0,
             play_time        INT DEFAULT 0,
+            difficulty       VARCHAR(50),
             completed_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     '''
@@ -1176,6 +1178,19 @@ def insert_hub_embeds(cur):
     )
     logger.info("Inserted hub_embeds.")
 
+
+def ensure_high_scores_columns(cur) -> None:
+    """Add missing columns to the ``high_scores`` table if necessary."""
+    cur.execute("SHOW COLUMNS FROM high_scores LIKE 'rooms_visited'")
+    if not cur.fetchone():
+        logger.info("Adding missing column: rooms_visited")
+        cur.execute("ALTER TABLE high_scores ADD rooms_visited INT DEFAULT 0")
+
+    cur.execute("SHOW COLUMNS FROM high_scores LIKE 'difficulty'")
+    if not cur.fetchone():
+        logger.info("Adding missing column: difficulty")
+        cur.execute("ALTER TABLE high_scores ADD difficulty VARCHAR(50)")
+
 # ═══════════════════════════════════════════════════════════════════════════
 #  MAIN
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1188,6 +1203,9 @@ def main() -> None:
                 for tbl in TABLE_ORDER:
                     cur.execute(TABLES[tbl])
                     logger.debug("Table `%s` ready.", tbl)
+
+                # ensure new optional columns exist
+                ensure_high_scores_columns(cur)
 
                 # ── seed data (order matters) ──────────────────────────────────
                 insert_difficulties(cur)
