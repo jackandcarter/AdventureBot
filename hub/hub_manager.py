@@ -249,8 +249,8 @@ class HubManager(commands.Cog):
             )
 
         if cid == "hub_high_scores":
-            from sessions import session_manager  # adjust as needed
-            high_scores = await session_manager.get_high_scores()
+            sm = interaction.client.get_cog("SessionManager")
+            high_scores = await sm.get_high_scores() if sm else []
             new_embed = hub_embed.get_high_scores_embed(high_scores)
             return await interaction.response.edit_message(
                 embed=new_embed,
