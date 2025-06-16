@@ -280,7 +280,7 @@ class SessionManager(commands.Cog):
             cur.execute(
                 """
                 SELECT p.username, p.level, p.gil, p.discovered_rooms,
-                       p.kill_count AS enemies_defeated, c.class_name
+                       p.enemies_defeated, c.class_name
                   FROM players p
              LEFT JOIN classes c ON p.class_id = c.class_id
                  WHERE p.session_id = %s
