@@ -75,3 +75,10 @@ Slash commands such as `/adventuresetup` will then be available in your server.
 ## Game Channel Setup
 
 Ensure there is a channel named "Adventurebot" in the server you intend on using the bot with and give the bot needed permission if necessary.
+
+## High Scores
+
+Scores are recorded automatically when a session ends. The bot inserts player stats such as play time, enemies defeated, rooms visited and gil into the `high_scores` table.
+Ensure this table exists by running `python database/database_setup.py` during setup.
+
+From the hub, press the **High Scores** button to view the leaderboard. Entries are sorted by play time (ascending) and then enemies defeated, but you can also sort programmatically by `enemies_defeated`, `gil` or `player_level` when using the API.
