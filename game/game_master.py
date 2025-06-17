@@ -22,6 +22,7 @@ from models.session_models import (
     SessionPlayerModel,
     ClassModel,
 )
+from hub import hub_embed
 
 from .treasure_chest import TreasureChestCog
 
@@ -1301,6 +1302,9 @@ class GameMaster(commands.Cog):
         if not saved:
             # Unsaved sessions: mark ended in DB and remove from memory
             await sm.terminate_session(session.session_id, "Quit by user")
+            scores = await sm.get_high_scores()
+            embed = hub_embed.get_high_scores_embed(scores)
+            await interaction.channel.send(embed=embed)
         else:
             # Saved sessions: only remove from memory, leave DB intact
             sm.delete_session_state(session.session_id)
@@ -2062,6 +2066,12 @@ class GameMaster(commands.Cog):
             if pid in session.players:
                 session.players.remove(pid)
                 sm.update_session_players(interaction.channel.id, session.players)
+
+            qualified = sm.record_player_high_score(sid, pid) if sm else False
+            if qualified:
+                scores = await sm.get_high_scores() if sm else []
+                embed = hub_embed.get_high_scores_embed(scores)
+                await interaction.channel.send(embed=embed)
 
             # if nobody left → end session & delete thread
             if not session.players:

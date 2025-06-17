@@ -37,7 +37,7 @@ def record_score(data: Dict[str, Any]) -> bool:
         conn.commit()
 
         cursor.execute(
-            "SELECT score_id FROM high_scores ORDER BY play_time ASC, enemies_defeated DESC"
+            "SELECT score_id FROM high_scores ORDER BY score_value DESC"
         )
         ids = [row[0] for row in cursor.fetchall()]
         if len(ids) > 20:
@@ -55,7 +55,7 @@ def record_score(data: Dict[str, Any]) -> bool:
         conn.close()
 
 
-def fetch_scores(limit: int = 20, sort_by: str = "play_time") -> List[Dict[str, Any]]:
+def fetch_scores(limit: int = 20, sort_by: str = "score_value") -> List[Dict[str, Any]]:
     """Fetch high score rows.
 
     Parameters
@@ -63,8 +63,8 @@ def fetch_scores(limit: int = 20, sort_by: str = "play_time") -> List[Dict[str, 
     limit: int, optional
         Maximum number of rows to return. Default ``20``.
     sort_by: str, optional
-        Column to sort by. Defaults to ``"play_time"`` which sorts ascending and
-        falls back to ``enemies_defeated`` descending.
+        Column to sort by. Defaults to ``"score_value"`` which sorts by the
+        computed RPG score. Other fields sort descending by value.
 
     Returns
     -------
@@ -72,14 +72,15 @@ def fetch_scores(limit: int = 20, sort_by: str = "play_time") -> List[Dict[str, 
         List of score rows. Returns an empty list if any error occurs.
     """
     valid_columns = {
-        "play_time",
+        "score_value",
         "enemies_defeated",
+        "bosses_defeated",
         "gil",
         "player_level",
         "rooms_visited",
     }
-    order_clause = "play_time ASC, enemies_defeated DESC"
-    if sort_by in valid_columns and sort_by != "play_time":
+    order_clause = "score_value DESC"
+    if sort_by in valid_columns and sort_by != "score_value":
         order_clause = f"{sort_by} DESC"
 
     db = Database()

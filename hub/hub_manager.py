@@ -250,7 +250,7 @@ class HubManager(commands.Cog):
 
         if cid == "hub_high_scores":
             sm = interaction.client.get_cog("SessionManager")
-            sort_by = "play_time"
+            sort_by = "score_value"
             high_scores = await sm.get_high_scores(sort_by=sort_by) if sm else []
             new_embed = hub_embed.get_high_scores_embed(high_scores, sort_by=sort_by)
             return await interaction.response.edit_message(
@@ -296,7 +296,8 @@ class HubView(discord.ui.View):
 class SortSelect(discord.ui.Select):
     def __init__(self, current_sort: str):
         options = [
-            discord.SelectOption(label="Play Time", value="play_time"),
+            discord.SelectOption(label="Score", value="score_value"),
+            discord.SelectOption(label="Bosses Defeated", value="bosses_defeated"),
             discord.SelectOption(label="Enemies Defeated", value="enemies_defeated"),
             discord.SelectOption(label="Rooms Visited", value="rooms_visited"),
             discord.SelectOption(label="Gil", value="gil"),
@@ -324,7 +325,7 @@ class SortSelect(discord.ui.Select):
 
 
 class HighScoresView(discord.ui.View):
-    def __init__(self, sort_by: str = "play_time"):
+    def __init__(self, sort_by: str = "score_value"):
         super().__init__(timeout=None)
         self.add_item(SortSelect(current_sort=sort_by))
         self.add_item(discord.ui.Button(

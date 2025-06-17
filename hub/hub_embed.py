@@ -112,11 +112,12 @@ def get_tutorial_page_count() -> int:
         cursor.close()
         conn.close()
 
-def get_high_scores_embed(high_scores_data, sort_by: str = "play_time"):
+def get_high_scores_embed(high_scores_data, sort_by: str = "score_value"):
     """Construct an embed to display high scores sorted as specified."""
     sort_labels = {
-        "play_time": "Play Time",
+        "score_value": "Score",
         "enemies_defeated": "Enemies Defeated",
+        "bosses_defeated": "Bosses Defeated",
         "gil": "Gil",
         "player_level": "Level",
         "rooms_visited": "Rooms Visited",
@@ -135,8 +136,10 @@ def get_high_scores_embed(high_scores_data, sort_by: str = "play_time"):
             embed.add_field(
                 name=f"{entry.get('player_name', 'Unknown')} ({entry.get('player_class', 'N/A')})",
                 value=(
-                    f"Rooms: {entry.get('rooms_visited', 'N/A')}\n"
+                    f"Score: {entry.get('score_value', 'N/A')}\n"
+                    f"Bosses: {entry.get('bosses_defeated', 'N/A')}\n"
                     f"Enemies: {entry.get('enemies_defeated', 'N/A')}\n"
+                    f"Rooms: {entry.get('rooms_visited', 'N/A')}\n"
                     f"Gil: {entry.get('gil', 'N/A')}"
                 ),
                 inline=False

@@ -409,6 +409,23 @@ class SessionPlayerModel:
             conn.close()
 
     @staticmethod
+    def increment_bosses_defeated(session_id: int, player_id: int, amt: int = 1) -> None:
+        conn = Database().get_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE players SET bosses_defeated = bosses_defeated + %s "
+                "WHERE session_id=%s AND player_id=%s",
+                (amt, session_id, player_id),
+            )
+            conn.commit()
+        except Exception:
+            logger.exception("Error incrementing bosses defeated")
+        finally:
+            cur.close()
+            conn.close()
+
+    @staticmethod
     def increment_rooms_visited(session_id: int, player_id: int, amt: int = 1) -> None:
         conn = Database().get_connection()
         try:
