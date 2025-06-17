@@ -23,6 +23,7 @@ from models.session_models import (
     ClassModel,
 )
 from hub import hub_embed
+from game import high_score
 
 from .treasure_chest import TreasureChestCog
 
@@ -55,6 +56,23 @@ def _build_queue_view() -> discord.ui.View:
         custom_id="start_game"
     ))
     return v
+
+
+class HighScoreConfirmView(discord.ui.View):
+    """Simple Yes/No prompt used when a player qualifies for the leaderboard."""
+
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(
+            discord.ui.Button(
+                label="Yes", style=discord.ButtonStyle.success, custom_id="high_score_yes"
+            )
+        )
+        self.add_item(
+            discord.ui.Button(
+                label="No", style=discord.ButtonStyle.secondary, custom_id="high_score_no"
+            )
+        )
 
 
 def build_queue_embed(owner: discord.Member, session_id: int) -> discord.Embed:
@@ -2059,6 +2077,20 @@ class GameMaster(commands.Cog):
                     pass
                 del session.last_death_msg_id
 
+            data = sm.compute_player_score_data(sid, pid) if sm else None
+            qualifies = False
+            if data:
+                top = await sm.get_high_scores(guild_id=data.get("guild_id")) if sm else []
+                min_score = top[-1]["score_value"] if len(top) >= 20 else -1
+                qualifies = len(top) < 20 or data["score_value"] >= min_score
+
+            if qualifies and data:
+                embed = hub_embed.get_high_score_prompt_embed(data)
+                view = HighScoreConfirmView()
+                msg = await interaction.channel.send(embed=embed, view=view)
+                session.pending_high_score[pid] = {"data": data, "message_id": msg.id}
+                return
+
             # drop them from the session
             if pid in session.players:
                 session.players.remove(pid)
@@ -2080,6 +2112,56 @@ class GameMaster(commands.Cog):
                 return
 
             # otherwise next alive player's view
+            await sm.refresh_current_state(interaction)
+            return
+
+        if cid in ("high_score_yes", "high_score_no"):
+            sm = self.bot.get_cog("SessionManager")
+            session = sm.get_session(interaction.channel.id)
+            pid = interaction.user.id
+
+            pending = session.pending_high_score.get(pid) if session else None
+            if not pending:
+                return await interaction.response.send_message(
+                    "Not your prompt", ephemeral=True
+                )
+
+            data = pending.get("data")
+            msg_id = pending.get("message_id")
+            if msg_id:
+                try:
+                    m = await interaction.channel.fetch_message(msg_id)
+                    await m.delete()
+                except Exception:
+                    pass
+            session.pending_high_score.pop(pid, None)
+
+            if cid == "high_score_yes":
+                high_score.record_score(data)
+                await interaction.response.send_message(
+                    "✅ Score recorded!", ephemeral=True
+                )
+                scores = await sm.get_high_scores(guild_id=data.get("guild_id")) if sm else []
+                if scores:
+                    embed = hub_embed.get_high_scores_embed(scores)
+                    await interaction.channel.send(embed=embed)
+            else:
+                await interaction.response.send_message(
+                    "Score discarded.", ephemeral=True
+                )
+
+            if pid in session.players:
+                session.players.remove(pid)
+                sm.update_session_players(interaction.channel.id, session.players)
+
+            if not session.players:
+                await sm.terminate_session(sid := session.session_id, "All players have left or died")
+                try:
+                    await interaction.channel.delete()
+                except Exception:
+                    pass
+                return
+
             await sm.refresh_current_state(interaction)
             return
 
