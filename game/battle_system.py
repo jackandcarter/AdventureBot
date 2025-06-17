@@ -426,8 +426,13 @@ class BattleSystem(commands.Cog):
                 session.game_state = new_room
 
         # ─── Completely tear down combat state ─────────────────────────
-        # 1) Clear out any lingering player‐side DoT/status effects
-        if session.battle_state:
+        # 1) Persist any remaining player effects so they continue after battle
+        if session.battle_state and session.battle_state.get("player_effects"):
+            SessionPlayerModel.update_status_effects(
+                session.session_id,
+                session.current_turn,
+                session.battle_state["player_effects"],
+            )
             session.battle_state.pop("player_effects", None)
             session.battle_state.pop("enemy_effects", None)
 
@@ -1083,6 +1088,14 @@ class BattleSystem(commands.Cog):
                 f"{enemy['enemy_name']} inflicts **{se['effect_name']}** on you for {se['remaining']} turns."
             )
 
+        # Persist immediately so effects aren't lost if the battle ends before the next tick
+        if result.status_effects:
+            SessionPlayerModel.update_status_effects(
+                session.session_id,
+                pid,
+                session.battle_state["player_effects"],
+            )
+
         # 7) unified logging for each result type
         if result.type == "miss":
             session.game_log.append(
@@ -1314,6 +1327,12 @@ class BattleSystem(commands.Cog):
         session = mgr.get_session(interaction.channel.id)
         if not session:
             return await interaction.response.send_message("❌ No active session found.", ephemeral=True)
+        if session.battle_state and session.battle_state.get("player_effects"):
+            SessionPlayerModel.update_status_effects(
+                session.session_id,
+                session.current_turn,
+                session.battle_state["player_effects"],
+            )
         session.clear_battle_state()
         session.game_log.append("You fled the battle!")
         await mgr.refresh_current_state(interaction)
