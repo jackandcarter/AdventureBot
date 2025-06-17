@@ -789,6 +789,14 @@ class BattleSystem(commands.Cog):
                 "❌ That ability is on cooldown.", ephemeral=True
             )
 
+        challenge = session.game_state.get("illusion_challenge")
+        if challenge and challenge.get("type") == "elemental_crystal":
+            session.ability_cooldowns.setdefault(pid, {})[ability_id] = ability_meta.get("cooldown", 0)
+            gm = self.bot.get_cog("GameMaster")
+            if gm:
+                await gm.handle_illusion_crystal_skill(interaction, ability_meta)
+            return
+
         # 2) If it’s an enemy‑target skill but we’re not in a battle, block it
         in_battle = bool(session.current_enemy)
         if ability_meta["target_type"] == "enemy" and not in_battle:
