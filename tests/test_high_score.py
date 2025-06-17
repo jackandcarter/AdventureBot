@@ -28,25 +28,39 @@ class FakeCursor:
             self.conn.rows.append(row)
             self.result = None
         elif sql.startswith("SELECT score_id FROM high_scores"):
-            sorted_rows = sorted(
-                self.conn.rows,
-                key=lambda r: r['score_value'],
-                reverse=True
-            )
-            self.result = [(r['score_id'],) for r in sorted_rows]
+            rows = self.conn.rows
+            if "WHERE guild_id=%s" in sql:
+                guild_id = params[0]
+                rows = [r for r in rows if r['guild_id'] == guild_id]
+            rows = sorted(rows, key=lambda r: r['score_value'], reverse=True)
+            self.result = [(r['score_id'],) for r in rows]
         elif sql.startswith("DELETE FROM high_scores"):
-            ids = set(params)
-            self.conn.rows = [r for r in self.conn.rows if r['score_id'] not in ids]
+            guild_id = None
+            if "AND guild_id=%s" in sql:
+                guild_id = params[-1]
+                ids = set(params[:-1])
+            else:
+                ids = set(params)
+            self.conn.rows = [
+                r for r in self.conn.rows
+                if not (r['score_id'] in ids and (guild_id is None or r['guild_id'] == guild_id))
+            ]
             self.result = None
         elif sql.startswith("SELECT * FROM high_scores"):
+            rows = self.conn.rows
             order_clause = sql.split("ORDER BY",1)[1].split("LIMIT",1)[0].strip()
+            if "WHERE guild_id=%s" in sql:
+                guild_id = params[0]
+                rows = [r for r in rows if r['guild_id'] == guild_id]
+                limit = params[1]
+            else:
+                limit = params[0]
             if order_clause == "score_value DESC":
-                sorted_rows = sorted(self.conn.rows, key=lambda r: r['score_value'], reverse=True)
+                sorted_rows = sorted(rows, key=lambda r: r['score_value'], reverse=True)
             else:
                 col, direction = order_clause.split()
                 rev = direction.upper() == 'DESC'
-                sorted_rows = sorted(self.conn.rows, key=lambda r: r[col], reverse=rev)
-            limit = params[0]
+                sorted_rows = sorted(rows, key=lambda r: r[col], reverse=rev)
             self.result = [r.copy() for r in sorted_rows[:limit]]
         else:
             raise ValueError(f"Unhandled SQL: {sql}")
@@ -136,3 +150,48 @@ def test_fetch_scores_rooms_visited_sort(monkeypatch):
     scores = high_score.fetch_scores(limit=5, sort_by="rooms_visited")
     rooms_list = [s["rooms_visited"] for s in scores]
     assert rooms_list == sorted(rooms_list, reverse=True)
+
+
+def test_per_guild_pruning_and_fetch(monkeypatch):
+    conn = FakeConnection()
+
+    def fake_get_connection(self):
+        return conn
+
+    monkeypatch.setattr(Database, "get_connection", fake_get_connection)
+
+    base = {
+        "player_name": "P",
+        "guild_id": 1,
+        "player_level": 1,
+        "player_class": "Rogue",
+        "gil": 0,
+        "enemies_defeated": 0,
+        "bosses_defeated": 0,
+        "score_value": 0,
+    }
+
+    # Populate two guilds with 20 scores each
+    for g in (1, 2):
+        for i in range(20):
+            data = base.copy()
+            data["player_name"] = f"G{g}P{i}"
+            data["guild_id"] = g
+            data["score_value"] = i
+            assert high_score.record_score(data)
+
+    # Add a low score to guild 1 and ensure it is pruned
+    low = base.copy()
+    low["player_name"] = "Low"
+    low["guild_id"] = 1
+    low["score_value"] = -5
+    assert high_score.record_score(low)
+
+    g1_scores = high_score.fetch_scores(limit=25, guild_id=1)
+    g2_scores = high_score.fetch_scores(limit=25, guild_id=2)
+
+    assert len(g1_scores) == 20
+    assert len(g2_scores) == 20
+    assert all(r["guild_id"] == 1 for r in g1_scores)
+    assert all(r["guild_id"] == 2 for r in g2_scores)
+    assert all(r["player_name"] != "Low" for r in g1_scores)

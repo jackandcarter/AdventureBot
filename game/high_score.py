@@ -37,14 +37,19 @@ def record_score(data: Dict[str, Any]) -> bool:
         conn.commit()
 
         cursor.execute(
-            "SELECT score_id FROM high_scores ORDER BY score_value DESC"
+            "SELECT score_id FROM high_scores WHERE guild_id=%s "
+            "ORDER BY score_value DESC",
+            (data.get("guild_id"),),
         )
         ids = [row[0] for row in cursor.fetchall()]
         if len(ids) > 20:
             extras = ids[20:]
             placeholders_del = ",".join(["%s"] * len(extras))
-            del_sql = f"DELETE FROM high_scores WHERE score_id IN ({placeholders_del})"
-            cursor.execute(del_sql, tuple(extras))
+            del_sql = (
+                f"DELETE FROM high_scores WHERE score_id IN ({placeholders_del}) "
+                "AND guild_id=%s"
+            )
+            cursor.execute(del_sql, tuple(extras) + (data.get("guild_id"),))
             conn.commit()
         return True
     except Exception as e:  # pylint: disable=broad-except
@@ -55,7 +60,9 @@ def record_score(data: Dict[str, Any]) -> bool:
         conn.close()
 
 
-def fetch_scores(limit: int = 20, sort_by: str = "score_value") -> List[Dict[str, Any]]:
+def fetch_scores(
+    limit: int = 20, sort_by: str = "score_value", guild_id: int | None = None
+) -> List[Dict[str, Any]]:
     """Fetch high score rows.
 
     Parameters
@@ -87,9 +94,14 @@ def fetch_scores(limit: int = 20, sort_by: str = "score_value") -> List[Dict[str
     conn = db.get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.execute(
-            f"SELECT * FROM high_scores ORDER BY {order_clause} LIMIT %s", (limit,)
-        )
+        sql = "SELECT * FROM high_scores"
+        params: List[Any] = []
+        if guild_id is not None:
+            sql += " WHERE guild_id=%s"
+            params.append(guild_id)
+        sql += f" ORDER BY {order_clause} LIMIT %s"
+        params.append(limit)
+        cursor.execute(sql, tuple(params))
         return cursor.fetchall()
     except Exception as e:  # pylint: disable=broad-except
         logger.error("Error fetching high scores: %s", e, exc_info=True)
