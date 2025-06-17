@@ -1820,10 +1820,11 @@ class GameMaster(commands.Cog):
                 "❌ No session.", ephemeral=True
             )
 
-        # 1️⃣ Tick all world HoT/DoT on the outgoing player
+        # 1️⃣ Identify outgoing player and prep the engine.  We no longer
+        # tick effects here so they only trigger once when a player's new
+        # turn begins.
         prev_pid = session.current_turn
         engine   = StatusEffectEngine(session, self.append_game_log)
-        await engine.tick_world(prev_pid)
 
 
         # ───────────────────────────────────────────────────────
@@ -1847,10 +1848,9 @@ class GameMaster(commands.Cog):
         # 2️⃣ Advance to the next alive player
         await self.advance_turn(interaction, interaction.channel.id)
 
-        # 3️⃣ Tick world HoT/DoT on the incoming player (only if the turn actually changed)
+        # 3️⃣ Tick world HoT/DoT on the player whose turn it now is
         new_pid = session.current_turn
-        if new_pid != prev_pid:
-            await engine.tick_world(new_pid)
+        await engine.tick_world(new_pid)
 
         # 4️⃣ Finally redraw that player’s view
         await sm.refresh_current_state(interaction)
