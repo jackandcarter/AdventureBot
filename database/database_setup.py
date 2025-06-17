@@ -172,9 +172,15 @@ MERGED_ROOM_TEMPLATES: List[Tuple] = [
     (16, 'illusion',      'Illusion Chamber',   'The room shimmers mysteriously...',                                                               'https://the-demiurge.com/DemiDevUnit/images/rooms/roomtypeillusion.png',        None,'2025-03-30 21:40:47'),
     (17, 'locked',        'Locked Door',        'A heavy locked door. You need a key.',                                                            'https://the-demiurge.com/DemiDevUnit/images/rooms/locked.png',                  None,'2025-04-19 13:55:00'),
     (18, 'chest_unlocked','Unlocked Chest',     'The chest lies open, its contents revealed.', 'https://your.cdn/path/chest_unlocked.png', None, '2025-04-23 18:00:00'),
-    (19, 'illusion_enemy_count', 'Illusion Chamber', 'Shifting shadows form the shapes of countless foes.', 'https://the-demiurge.com/DemiDevUnit/images/rooms/roomtypeillusion.png', None, '2025-04-24 12:00:00'),
-    (20, 'illusion_inner_room',  'Illusion Chamber', 'Several doors materialise from thin air, each beckoning.', 'https://the-demiurge.com/DemiDevUnit/images/rooms/roomtypeillusion.png', None, '2025-04-24 12:00:00'),
-    (21, 'illusion_elemental',  'Illusion Chamber', 'Glowing elemental crystals illuminate the chamber.', 'https://the-demiurge.com/DemiDevUnit/images/rooms/roomtypeillusion.png', None, '2025-04-24 12:00:00')
+    (19, 'illusion', 'Illusion Chamber', 'Shifting shadows form the shapes of countless foes.',
+        'https://the-demiurge.com/DemiDevUnit/images/rooms/roomtypeillusion.png',
+        None, '2025-04-24 12:00:00'),
+    (20, 'illusion',  'Illusion Chamber', 'Several doors materialise from thin air, each beckoning.',
+        'https://the-demiurge.com/DemiDevUnit/images/rooms/roomtypeillusion.png',
+        None, '2025-04-24 12:00:00'),
+    (21, 'illusion',  'Illusion Chamber', 'Glowing elemental crystals illuminate the chamber.',
+        'https://the-demiurge.com/DemiDevUnit/images/rooms/roomtypeillusion.png',
+        None, '2025-04-24 12:00:00')
 ]
 
 # --- items --------------------------------------------------------------------
