@@ -279,7 +279,7 @@ class SessionManager(commands.Cog):
             cur.execute(
                 """
                 SELECT p.username, p.level, p.gil, p.discovered_rooms,
-                       p.enemies_defeated, c.class_name
+                       p.enemies_defeated, p.rooms_visited, c.class_name
                   FROM players p
              LEFT JOIN classes c ON p.class_id = c.class_id
                  WHERE p.session_id = %s
@@ -293,10 +293,7 @@ class SessionManager(commands.Cog):
                 play_time = int((datetime.utcnow() - sess["created_at"]).total_seconds())
 
             for p in players:
-                try:
-                    rooms = len(json.loads(p.get("discovered_rooms") or "[]"))
-                except Exception:
-                    rooms = 0
+                rooms = p.get("rooms_visited", 0)
 
                 data = {
                     "player_name": p.get("username"),
