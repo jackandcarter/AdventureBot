@@ -254,15 +254,27 @@ class AbilityEngine:
             except json.JSONDecodeError:
                 effect_data = {}
 
-            # stat‑scaled base damage from JSON
-            if result is None and ("base_damage" in effect_data or "damage" in effect_data):
-                base = effect_data.get("base_damage", effect_data.get("damage", 0))
-                stat = effect_data.get("scaling_stat", "attack_power")
-                factor = effect_data.get("scaling_factor", 1.0)
-                dmg = self.jrpg_damage(user, target, base, stat, factor)
-                dmg = self._apply_elemental_multiplier(dmg, target, ability)
-                logs.append(f"{name} deals {dmg} damage.")
-                result = AbilityResult(type="damage", amount=dmg, logs=logs)
+            # stat‑scaled base damage from JSON or elemental helpers
+            dmg_keys = [
+                "base_damage",
+                "damage",
+                "fire_damage",
+                "ice_damage",
+                "lightning_damage",
+                "non_elemental_damage",
+                "holy_damage",
+                "jump_attack",
+            ]
+            if result is None:
+                found_key = next((k for k in dmg_keys if k in effect_data), None)
+                if found_key:
+                    base = effect_data[found_key]
+                    stat = effect_data.get("scaling_stat", "attack_power")
+                    factor = effect_data.get("scaling_factor", 1.0)
+                    dmg = self.jrpg_damage(user, target, base, stat, factor)
+                    dmg = self._apply_elemental_multiplier(dmg, target, ability)
+                    logs.append(f"{name} deals {dmg} damage.")
+                    result = AbilityResult(type="damage", amount=dmg, logs=logs)
 
             # lucky_7
             if result is None and effect_data.get("lucky_7"):

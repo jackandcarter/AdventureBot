@@ -13,6 +13,7 @@ sys.modules["mysql.connector"].connection = types.SimpleNamespace(MySQLConnectio
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from utils.ability_engine import AbilityEngine
+import pytest
 
 class FakeCursor:
     def __init__(self, rows):
@@ -72,3 +73,29 @@ def test_absorb_multiplier(monkeypatch):
     user, enemy, ability = base_entities()
     result = engine.resolve(user, enemy, ability)
     assert result.amount == -10
+
+
+@pytest.mark.parametrize(
+    "key,element_id,multiplier,expected",
+    [
+        ("fire_damage", 1, 2, 20),
+        ("ice_damage", 2, 2, 20),
+        ("lightning_damage", 5, 2, 20),
+        ("non_elemental_damage", 4, 2, 20),
+        ("jump_attack", None, 2, 10),
+    ],
+)
+def test_damage_keys(monkeypatch, key, element_id, multiplier, expected):
+    rows = []
+    if element_id is not None:
+        rows = [{"enemy_id": 1, "element_id": element_id, "multiplier": multiplier}]
+    engine = make_engine(rows, monkeypatch)
+    user = {"attack_power": 10, "hp": 50, "max_hp": 50}
+    enemy = {"enemy_id": 1, "defense": 0, "hp": 50, "max_hp": 50}
+    ability = {
+        "ability_name": "Test",
+        "effect": json.dumps({key: 0}),
+        "element_id": element_id,
+    }
+    result = engine.resolve(user, enemy, ability)
+    assert result.amount == expected
