@@ -565,7 +565,11 @@ class EmbedManager(commands.Cog):
         "battle":   lambda self, i, d: self.send_battle_menu(i, d.get("enemy_name"), d.get("enemy_hp"), d.get("enemy_max_hp")),
         "death":    lambda self, i, d: self.send_death_embed(i, d["description"], d.get("image_url"), d["view"]),
         "boss":     lambda self, i, d: self.send_boss_embed(i, d.get("boss_info"), d.get("battle_log",_ZWSP)),
-        "illusion": lambda self, i, d: self.send_illusion_embed(i, d.get("room_info")),
+        "illusion": lambda self, i, d: (
+            self.send_illusion_crystal_embed(i, d.get("crystals", []), d.get("index", 0))
+            if d.get("illusion_type") == "elemental_crystal"
+            else self.send_illusion_embed(i, d.get("room_info"))
+        ),
     }
 
     async def send_or_update_embed_for_state(self, interaction: discord.Interaction, state: str, data: Dict[str, Any]):
@@ -620,6 +624,41 @@ class EmbedManager(commands.Cog):
             ("Empty",    discord.ButtonStyle.secondary, "illusion_empty",    0),
         ]
         await self.send_or_update_embed(interaction, _ZWSP, _ZWSP, embed_override=embed, buttons=buttons)
+
+    async def send_illusion_crystal_embed(
+        self,
+        interaction: discord.Interaction,
+        crystals: List[Dict[str, Any]],
+        index: int = 0,
+    ) -> None:
+        """Display the elemental crystals for the illusion challenge."""
+        lines = []
+        for i, c in enumerate(crystals):
+            icon = {
+                "Fire": "🔥",
+                "Ice": "❄️",
+                "Holy": "✨",
+                "Non-Elemental": "🌟",
+                "Air": "💨",
+            }.get(c.get("element_name"), "")
+            prefix = "➡️" if i == index else "▫️"
+            lines.append(f"{prefix} Crystal {i + 1}: {icon} {c.get('element_name')}")
+        desc = "Use elemental skills to shatter each crystal in order."
+        embed = discord.Embed(
+            title="🔮 Elemental Crystals",
+            description=desc,
+            color=discord.Color.purple(),
+        )
+        if lines:
+            embed.add_field(name="Crystals", value="\n".join(lines), inline=False)
+        buttons = [("Skill", discord.ButtonStyle.primary, "combat_skill_menu", 0)]
+        await self.send_or_update_embed(
+            interaction,
+            _ZWSP,
+            _ZWSP,
+            embed_override=embed,
+            buttons=buttons,
+        )
 
 
 async def setup(bot: commands.Bot):

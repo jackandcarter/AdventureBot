@@ -376,6 +376,17 @@ class GameMaster(commands.Cog):
                 f"{room_info.get('description', 'The room shimmers mysteriously.')}\n\n"
                 "Four elemental crystals glow faintly. Only one dispels the mirage."
             )
+            conn = self.db_connect()
+            with conn.cursor(dictionary=True) as cur:
+                cur.execute("SELECT element_id, element_name FROM elements")
+                elements = cur.fetchall() or []
+            conn.close()
+            if elements:
+                crystals = random.sample(elements, k=4) if len(elements) >= 4 else random.choices(elements, k=4)
+            else:
+                crystals = []
+            session.game_state['illusion_crystal_order'] = crystals
+            session.game_state['illusion_crystal_index'] = 0
 
         session.game_state["illusion_challenge"] = {
             "type": challenge_type,
@@ -389,7 +400,17 @@ class GameMaster(commands.Cog):
             )
             return
 
-        await em.send_illusion_embed(interaction, {"description": desc, "image_url": room_info.get("image_url")})
+        if challenge_type == "elemental_crystal":
+            await em.send_illusion_crystal_embed(
+                interaction,
+                session.game_state.get("illusion_crystal_order", []),
+                session.game_state.get("illusion_crystal_index", 0),
+            )
+        else:
+            await em.send_illusion_embed(
+                interaction,
+                {"description": desc, "image_url": room_info.get("image_url")},
+            )
 
     # ────────────────────────────────────────────────────────────────────────────
     #  1. Create session → queue
@@ -2055,6 +2076,42 @@ class GameMaster(commands.Cog):
 
         await self.update_room_view(interaction, new_room, x, y)
         await self.end_player_turn(interaction)
+
+    async def handle_illusion_crystal_skill(
+        self,
+        interaction: discord.Interaction,
+        ability: Dict[str, Any],
+    ) -> None:
+        """Handle an ability cast on the elemental crystals."""
+        sm = self.bot.get_cog("SessionManager")
+        session = sm.get_session(interaction.channel.id) if sm else None
+        if not session:
+            return
+
+        crystals = session.game_state.get("illusion_crystal_order")
+        challenge = session.game_state.get("illusion_challenge")
+        idx = session.game_state.get("illusion_crystal_index", 0)
+        if not crystals or not challenge or challenge.get("type") != "elemental_crystal":
+            return
+
+        if idx >= len(crystals):
+            idx = len(crystals) - 1
+
+        current = crystals[idx]
+        if ability.get("element_id") == current.get("element_id"):
+            self.append_game_log(session.session_id, f"{interaction.user.display_name} shatters the {current['element_name']} crystal!")
+            idx += 1
+            session.game_state["illusion_crystal_index"] = idx
+            if idx >= len(crystals):
+                # completed
+                session.game_state.pop("illusion_crystal_order", None)
+                session.game_state.pop("illusion_crystal_index", None)
+                await self.handle_illusion_choice(interaction, challenge["answer"])
+                return
+
+        em = self.bot.get_cog("EmbedManager")
+        if em:
+            await em.send_illusion_crystal_embed(interaction, crystals, idx)
 
     # ────────────────────────────────────────────────────────────────────────────
     #  TURN HELPERS
