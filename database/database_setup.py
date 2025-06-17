@@ -1191,6 +1191,24 @@ def ensure_high_scores_columns(cur) -> None:
         logger.info("Adding missing column: difficulty")
         cur.execute("ALTER TABLE high_scores ADD difficulty VARCHAR(50)")
 
+
+def ensure_player_columns(cur) -> None:
+    """Add missing columns to the ``players`` table if necessary."""
+    cur.execute("SHOW COLUMNS FROM players LIKE 'enemies_defeated'")
+    if not cur.fetchone():
+        logger.info("Adding missing column: enemies_defeated")
+        cur.execute("ALTER TABLE players ADD enemies_defeated INT DEFAULT 0")
+
+    cur.execute("SHOW COLUMNS FROM players LIKE 'rooms_visited'")
+    if not cur.fetchone():
+        logger.info("Adding missing column: rooms_visited")
+        cur.execute("ALTER TABLE players ADD rooms_visited INT DEFAULT 0")
+
+    cur.execute("SHOW COLUMNS FROM players LIKE 'gil_earned'")
+    if not cur.fetchone():
+        logger.info("Adding missing column: gil_earned")
+        cur.execute("ALTER TABLE players ADD gil_earned INT DEFAULT 0")
+
 # ═══════════════════════════════════════════════════════════════════════════
 #  MAIN
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1206,6 +1224,7 @@ def main() -> None:
 
                 # ensure new optional columns exist
                 ensure_high_scores_columns(cur)
+                ensure_player_columns(cur)
 
                 # ── seed data (order matters) ──────────────────────────────────
                 insert_difficulties(cur)
