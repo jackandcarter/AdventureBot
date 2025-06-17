@@ -692,9 +692,13 @@ class GameMaster(commands.Cog):
             if bs:
                 enemy = await bs.get_enemy_by_id(room["default_enemy_id"])
                 if enemy:
-                    session.battle_state = {"enemy": enemy}
                     self.append_game_log(session.session_id, f"Encountered **{enemy['enemy_name']}**!")
-                    await bs.start_battle(interaction, session.current_turn, enemy)
+                    await bs.start_battle(
+                        interaction,
+                        session.current_turn,
+                        enemy,
+                        previous_coords=None
+                    )
                     return
 
         # 2) Only *after* you've ruled out “we’re about to fight” do you do
@@ -1078,7 +1082,6 @@ class GameMaster(commands.Cog):
                     )
 
                 if enemy:
-                    session.battle_state = {"enemy": enemy}
                     self.append_game_log(
                         session.session_id,
                         f"Encountered **{enemy['enemy_name']}**!"
@@ -1087,6 +1090,7 @@ class GameMaster(commands.Cog):
                         interaction,
                         session.current_turn,
                         enemy,
+                        previous_coords=(new_room["floor_id"], x, y)
                     )
 
         # 10) otherwise, if it’s a chest‐room, seed an instance
@@ -1238,8 +1242,6 @@ class GameMaster(commands.Cog):
                     enemy = await bs.get_enemy_for_room(session, new_floor, nx, ny)
 
                 if enemy:
-                    session.battle_state = {"enemy": enemy}
-
                     self.append_game_log(
                         session.session_id,
                         f"Encountered **{enemy['enemy_name']}**!"
@@ -1247,7 +1249,8 @@ class GameMaster(commands.Cog):
                     await bs.start_battle(
                         interaction,
                         interaction.user.id,
-                        enemy
+                        enemy,
+                        previous_coords=(floor, x, y)
                     )
                     return
 
