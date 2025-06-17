@@ -270,6 +270,10 @@ MERGED_FLOOR_ROOM_RULES: List[Tuple[str, int, str, float, int]] = [
     ("Easy",  1, "item",           0.10,  5),
     ("Easy",  1, "locked",         0.05,  2),
     ("Easy",  1, "staircase_up",   0.05,  1),
+    ("Easy",  None, "boss",        0.0,   1),
+    ("Medium", None, "boss",       0.0,   1),
+    ("Hard",  None, "boss",        0.0,   1),
+    ("Crazy Catto", None, "boss",  0.0,   1),
     # …etc for each floor / difficulty…
 ]
 
