@@ -5,7 +5,6 @@ from typing import Optional, Tuple, Dict, List, Any
 import mysql.connector
 import json
 import asyncio
-from datetime import datetime
 
 from game import high_score
 
@@ -289,9 +288,6 @@ class SessionManager(commands.Cog):
             )
             players = cur.fetchall() or []
 
-            play_time = 0
-            if sess.get("created_at"):
-                play_time = int((datetime.utcnow() - sess["created_at"]).total_seconds())
 
             for p in players:
                 rooms = p.get("rooms_visited", 0)
@@ -308,7 +304,6 @@ class SessionManager(commands.Cog):
                     "enemies_defeated": enemies,
                     "bosses_defeated": bosses,
                     "rooms_visited": rooms,
-                    "play_time": play_time,
                     "score_value": score_val,
                     "difficulty": sess.get("difficulty"),
                 }
@@ -353,9 +348,6 @@ class SessionManager(commands.Cog):
             if not p:
                 return False
 
-            play_time = 0
-            if sess.get("created_at"):
-                play_time = int((datetime.utcnow() - sess["created_at"]).total_seconds())
 
             rooms = p.get("rooms_visited", 0)
             enemies = p.get("enemies_defeated", 0)
@@ -371,7 +363,6 @@ class SessionManager(commands.Cog):
                 "enemies_defeated": enemies,
                 "bosses_defeated": bosses,
                 "rooms_visited": rooms,
-                "play_time": play_time,
                 "score_value": score_val,
                 "difficulty": sess.get("difficulty"),
             }

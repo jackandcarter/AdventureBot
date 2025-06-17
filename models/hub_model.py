@@ -59,20 +59,28 @@ class HubModel:
             conn.close()
 
     @staticmethod
-    def get_high_scores():
-        """
-        Retrieves the top 10 high scores from the 'high_scores' table,
-        ordered primarily by play_time ascending and then enemies_defeated descending.
-        Returns a list of dictionaries.
-        """
+    def get_high_scores(limit: int = 10, sort_by: str = "score_value"):
+        """Retrieve high score rows ordered by the given stat."""
         db = Database()
         conn = db.get_connection()
         cursor = conn.cursor(dictionary=True)
+        valid_columns = {
+            "score_value",
+            "enemies_defeated",
+            "bosses_defeated",
+            "gil",
+            "player_level",
+            "rooms_visited",
+        }
+        order_clause = "score_value DESC"
+        if sort_by in valid_columns and sort_by != "score_value":
+            order_clause = f"{sort_by} DESC"
         try:
-            sql = "SELECT * FROM high_scores ORDER BY play_time ASC, enemies_defeated DESC LIMIT 10"
-            cursor.execute(sql)
-            scores = cursor.fetchall()
-            return scores
+            cursor.execute(
+                f"SELECT * FROM high_scores ORDER BY {order_clause} LIMIT %s",
+                (limit,),
+            )
+            return cursor.fetchall()
         except Exception as e:
             logger.error("Error retrieving high scores: %s", e, exc_info=True)
             return []

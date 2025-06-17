@@ -844,7 +844,6 @@ TABLES = {
             bosses_defeated INT DEFAULT 0,
             rooms_visited    INT DEFAULT 0,
             score_value      INT DEFAULT 0,
-            play_time        INT DEFAULT 0,
             difficulty       VARCHAR(50),
             completed_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
