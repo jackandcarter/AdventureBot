@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import time
+import random
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import discord
@@ -264,6 +265,27 @@ class GameMaster(commands.Cog):
             logger.error("update_permanent_discovered_room: %s", e)
             return set()
 
+    def fetch_discovered_rooms(self,
+                               player_id: int,
+                               session_id: int) -> List[Tuple[int, int, int]]:
+        """Return a list of permanently discovered coordinates."""
+        try:
+            conn = self.db_connect()
+            with conn.cursor(dictionary=True) as cur:
+                cur.execute(
+                    "SELECT discovered_rooms FROM players WHERE player_id=%s AND session_id=%s",
+                    (player_id, session_id),
+                )
+                row = cur.fetchone()
+            conn.close()
+            if not row or not row.get("discovered_rooms"):
+                return []
+            raw = json.loads(row["discovered_rooms"]) or []
+            return [tuple(entry) for entry in raw if isinstance(entry, (list, tuple)) and len(entry) == 3]
+        except Exception as e:
+            logger.error("fetch_discovered_rooms: %s", e)
+            return []
+
     def _unlock_chest_room(self,
                            session_id: int,
                            floor_id:   int,
@@ -315,14 +337,59 @@ class GameMaster(commands.Cog):
         interaction: discord.Interaction,
         room_info: Dict[str, Any],
     ) -> None:
-        """Display the illusion choice embed via EmbedManager."""
+        """Display a random illusion challenge via EmbedManager."""
+        sm = self.bot.get_cog("SessionManager")
+        session = sm.get_session(interaction.channel.id) if sm else None
+        if not session:
+            return await interaction.followup.send("❌ No session.", ephemeral=True)
+
+        challenge_type = random.choice([
+            "enemy_count",
+            "inner_room",
+            "elemental_crystal",
+        ])
+
+        mapping = [
+            "illusion_enemy",
+            "illusion_treasure",
+            "illusion_vendor",
+            "illusion_empty",
+        ]
+        if challenge_type == "enemy_count":
+            n = random.randint(1, 4)
+            answer = mapping[n - 1]
+            desc = (
+                f"{room_info.get('description', 'The room shimmers mysteriously.')}\n\n"
+                f"You glimpse {n} shadowy enemies. The number may reveal the truth."
+            )
+        elif challenge_type == "inner_room":
+            idx = random.randint(0, 3)
+            answer = mapping[idx]
+            desc = (
+                f"{room_info.get('description', 'The room shimmers mysteriously.')}\n\n"
+                "Four doors materialise around you. One leads onward; the others are illusions."
+            )
+        else:  # elemental_crystal
+            idx = random.randint(0, 3)
+            answer = mapping[idx]
+            desc = (
+                f"{room_info.get('description', 'The room shimmers mysteriously.')}\n\n"
+                "Four elemental crystals glow faintly. Only one dispels the mirage."
+            )
+
+        session.game_state["illusion_challenge"] = {
+            "type": challenge_type,
+            "answer": answer,
+        }
+
         em = self.bot.get_cog("EmbedManager")
         if not em:
             await interaction.followup.send(
                 "❌ EmbedManager unavailable.", ephemeral=True
             )
             return
-        await em.send_illusion_embed(interaction, room_info)
+
+        await em.send_illusion_embed(interaction, {"description": desc, "image_url": room_info.get("image_url")})
 
     # ────────────────────────────────────────────────────────────────────────────
     #  1. Create session → queue
@@ -1861,6 +1928,47 @@ class GameMaster(commands.Cog):
         conn.close()
         if not room or room["room_type"] != "illusion":
             return await interaction.followup.send("❌ Nothing happens.", ephemeral=True)
+
+        challenge = session.game_state.pop("illusion_challenge", None)
+        if challenge and choice != challenge.get("answer"):
+            # teleport the player to a previously visited tile far away
+            visited = self.fetch_discovered_rooms(interaction.user.id, session.session_id)
+            distant = [
+                (f, cx, cy)
+                for (f, cx, cy) in visited
+                if f == floor and abs(cx - x) + abs(cy - y) >= 5
+            ]
+            if not distant:
+                distant = [(f, cx, cy) for (f, cx, cy) in visited if f == floor]
+            if distant:
+                dest_floor, dest_x, dest_y = random.choice(distant)
+                conn = self.db_connect()
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "UPDATE players SET coord_x=%s, coord_y=%s, current_floor_id=%s "
+                        "WHERE player_id=%s AND session_id=%s",
+                        (dest_x, dest_y, dest_floor, interaction.user.id, session.session_id),
+                    )
+                conn.commit(); conn.close()
+                await self.update_permanent_discovered_room(
+                    interaction.user.id,
+                    session.session_id,
+                    (dest_floor, dest_x, dest_y),
+                )
+                SessionPlayerModel.increment_rooms_visited(session.session_id, interaction.user.id)
+                conn = self.db_connect()
+                with conn.cursor(dictionary=True) as cur:
+                    cur.execute(
+                        "SELECT r.*, f.floor_number FROM rooms r JOIN floors f ON f.floor_id=r.floor_id "
+                        "WHERE r.session_id=%s AND r.floor_id=%s AND r.coord_x=%s AND r.coord_y=%s",
+                        (session.session_id, dest_floor, dest_x, dest_y),
+                    )
+                    dest_room = cur.fetchone()
+                conn.close()
+                self.append_game_log(session.session_id, f"<@{interaction.user.id}> failed the illusion challenge and was warped!")
+                await self.update_room_view(interaction, dest_room, dest_x, dest_y)
+                await self.end_player_turn(interaction)
+                return
 
         mapping = {
             "illusion_enemy": "monster",
