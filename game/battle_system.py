@@ -1290,9 +1290,9 @@ class BattleSystem(commands.Cog):
                 "UPDATE players SET gil = %s, inventory = %s WHERE player_id = %s AND session_id = %s",
                 (new_gil, json.dumps(inv), pid, sid),
             )
+            conn.commit()
             if gil:
                 SessionPlayerModel.add_gil_earned(sid, pid, gil)
-            conn.commit()
 
         cursor.close(); conn.close()
         return "\n".join(lines) if lines else "No rewards."

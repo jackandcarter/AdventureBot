@@ -602,6 +602,7 @@ class InventoryShop(commands.Cog):
                 (player["gil"] + sell_price, json.dumps(inv_dict),
                  interaction.user.id, session.session_id)
             )
+            conn.commit()
             SessionPlayerModel.add_gil_earned(session.session_id, interaction.user.id, sell_price)
             cur.execute(
                 """
