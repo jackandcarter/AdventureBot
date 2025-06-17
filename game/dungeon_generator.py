@@ -601,6 +601,7 @@ class DungeonGenerator(commands.Cog):
                 for rt, cap in remaining.items()
                 if cap > 0
                 and rt not in ("staircase_up", "staircase_down")
+                and not (boss_coord is not None and rt == "boss")
                 and not (exclude_locked and rt == "locked")
                 and not (exclude_item and rt == "item")
                 and not (exclude_shop and rt == "shop")
