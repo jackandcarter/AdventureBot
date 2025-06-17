@@ -1182,6 +1182,9 @@ class GameMaster(commands.Cog):
 
         logger.debug("Room lookup → sess=%s floor=%s x=%s y=%s", session.session_id, new_floor, nx, ny)
 
+        # Track where we came from so fleeing can return here
+        session.previous_position = (floor, x, y)
+
         # ── 5. write the movement to the DB ──────────────────────────
         conn = await self.adb_connect()
         async with conn.cursor() as cur:

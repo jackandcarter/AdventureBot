@@ -426,8 +426,13 @@ class BattleSystem(commands.Cog):
                 session.game_state = new_room
 
         # ─── Completely tear down combat state ─────────────────────────
-        # 1) Clear out any lingering player‐side DoT/status effects
-        if session.battle_state:
+        # 1) Persist any remaining player effects so they continue after battle
+        if session.battle_state and session.battle_state.get("player_effects"):
+            SessionPlayerModel.update_status_effects(
+                session.session_id,
+                session.current_turn,
+                session.battle_state["player_effects"],
+            )
             session.battle_state.pop("player_effects", None)
             session.battle_state.pop("enemy_effects", None)
 
@@ -1083,6 +1088,14 @@ class BattleSystem(commands.Cog):
                 f"{enemy['enemy_name']} inflicts **{se['effect_name']}** on you for {se['remaining']} turns."
             )
 
+        # Persist immediately so effects aren't lost if the battle ends before the next tick
+        if result.status_effects:
+            SessionPlayerModel.update_status_effects(
+                session.session_id,
+                pid,
+                session.battle_state["player_effects"],
+            )
+
         # 7) unified logging for each result type
         if result.type == "miss":
             session.game_log.append(
@@ -1309,14 +1322,54 @@ class BattleSystem(commands.Cog):
 
     async def handle_flee(self, interaction: discord.Interaction) -> None:
         mgr = self.bot.get_cog("SessionManager")
-        if not mgr or not self.embed_manager:
-            return await interaction.response.send_message("❌ SessionManager or EmbedManager not available.", ephemeral=True)
+        gm  = self.bot.get_cog("GameMaster")
+        if not mgr or not gm or not self.embed_manager:
+            return await interaction.response.send_message(
+                "❌ SessionManager or EmbedManager not available.", ephemeral=True
+            )
         session = mgr.get_session(interaction.channel.id)
         if not session:
             return await interaction.response.send_message("❌ No active session found.", ephemeral=True)
+        if session.battle_state and session.battle_state.get("player_effects"):
+            SessionPlayerModel.update_status_effects(
+                session.session_id,
+                session.current_turn,
+                session.battle_state["player_effects"],
+            )
+
+        if session.previous_position:
+            prev_floor, prev_x, prev_y = session.previous_position
+            conn = self.db_connect()
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE players SET coord_x=%s, coord_y=%s, current_floor_id=%s "
+                "WHERE player_id=%s AND session_id=%s",
+                (prev_x, prev_y, prev_floor, session.current_turn, session.session_id),
+            )
+            conn.commit()
+            cursor.close()
+
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                """
+                SELECT r.*, f.floor_number
+                  FROM rooms r
+                  JOIN floors f ON f.floor_id = r.floor_id
+                 WHERE r.session_id=%s
+                   AND r.floor_id=%s
+                   AND r.coord_x=%s AND r.coord_y=%s
+                """,
+                (session.session_id, prev_floor, prev_x, prev_y),
+            )
+            new_room = cursor.fetchone()
+            cursor.close(); conn.close()
+            if new_room:
+                session.game_state = new_room
+
         session.clear_battle_state()
+        session.previous_position = None
         session.game_log.append("You fled the battle!")
-        await mgr.refresh_current_state(interaction)
+        await gm.end_player_turn(interaction)
 
     # --------------------------------------------------------------------- #
     #                       Component interaction router                    #

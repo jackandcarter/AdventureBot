@@ -76,6 +76,12 @@ class GameSession:
         # { player_id: [ { "effect_id": int, "remaining": int }, … ] }
         self.status_effects: Dict[int, List[Dict[str, Any]]] = {}
 
+        # ── flee helper ────────────────────────────────────────────────
+        # Track the last coordinates before a battle starts so we can
+        # return the player if they successfully flee.
+        # (floor_id, x, y)
+        self.previous_position: Optional[tuple[int, int, int]] = None
+
     def add_player(self, player_id: int) -> None:
         """Add a player to the session.
 
@@ -178,7 +184,8 @@ class GameSession:
             "ability_cooldowns": self.ability_cooldowns,
             "trance_states": self.trance_states,
             "status_effects": self.status_effects,
-            "current_enemy": self.current_enemy
+            "current_enemy": self.current_enemy,
+            "previous_position": self.previous_position
         }
 
     @classmethod
@@ -205,6 +212,7 @@ class GameSession:
         gs.trance_states     = data.get("trance_states", {})
         gs.status_effects    = data.get("status_effects", {})
         gs.current_enemy     = data.get("current_enemy")
+        gs.previous_position = data.get("previous_position")
         return gs
 
     def __repr__(self) -> str:
