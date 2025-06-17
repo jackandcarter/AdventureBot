@@ -1361,7 +1361,7 @@ class BattleSystem(commands.Cog):
         session.clear_battle_state()
 
         if prev:
-            px, py, pfloor = prev
+            pfloor, px, py = prev
             conn = self.db_connect()
             with conn.cursor() as cur:
                 cur.execute(
