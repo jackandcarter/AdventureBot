@@ -310,6 +310,20 @@ class GameMaster(commands.Cog):
             cur.close()
             conn.close()
 
+    async def start_illusion_challenge(
+        self,
+        interaction: discord.Interaction,
+        room_info: Dict[str, Any],
+    ) -> None:
+        """Display the illusion choice embed via EmbedManager."""
+        em = self.bot.get_cog("EmbedManager")
+        if not em:
+            await interaction.followup.send(
+                "❌ EmbedManager unavailable.", ephemeral=True
+            )
+            return
+        await em.send_illusion_embed(interaction, room_info)
+
     # ────────────────────────────────────────────────────────────────────────────
     #  1. Create session → queue
     # ────────────────────────────────────────────────────────────────────────────
@@ -706,6 +720,11 @@ class GameMaster(commands.Cog):
             return
 
         rtype = room["room_type"]
+
+        # ── Illusion room special case ─────────────────────────────
+        if rtype == "illusion":
+            await self.start_illusion_challenge(interaction, room)
+            return
 
         # 1) IMMEDIATELY trigger ANY battle (monster, miniboss or boss)
         if rtype in ("monster","miniboss","boss") and room.get("default_enemy_id"):
@@ -1277,7 +1296,8 @@ class GameMaster(commands.Cog):
 
         # ── 8. normal room (safe, item, staircase, etc) ───────────────
         await self.update_room_view(interaction, landed, nx, ny)
-        await self.end_player_turn(interaction)
+        if landed.get("room_type") != "illusion":
+            await self.end_player_turn(interaction)
         
 
     # ──────────────────────────────────────────────────────────
@@ -1800,6 +1820,133 @@ class GameMaster(commands.Cog):
                                           view_override=view)
         else:
             await interaction.followup.send(embed=e, view=view, ephemeral=True)
+
+    async def handle_illusion_choice(self, interaction: discord.Interaction, choice: str) -> None:
+        """Resolve an illusion room based on the player's choice."""
+        sm = self.bot.get_cog("SessionManager")
+        session = sm.get_session(interaction.channel.id) if sm else None
+        if not session:
+            return await interaction.response.send_message("❌ No session.", ephemeral=True)
+
+        if not interaction.response.is_done():
+            defer_fn = getattr(interaction.response, "defer_update", None)
+            if callable(defer_fn):
+                await defer_fn()
+            else:
+                await interaction.response.defer()
+
+        # current player position
+        conn = self.db_connect()
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute(
+                "SELECT coord_x, coord_y, current_floor_id FROM players "
+                "WHERE player_id=%s AND session_id=%s",
+                (interaction.user.id, session.session_id),
+            )
+            pos = cur.fetchone()
+        conn.close()
+        if not pos:
+            return await interaction.followup.send("❌ Position error.", ephemeral=True)
+        x, y, floor = pos["coord_x"], pos["coord_y"], pos["current_floor_id"]
+
+        # fetch current room
+        conn = self.db_connect()
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute(
+                "SELECT room_id, room_type FROM rooms "
+                "WHERE session_id=%s AND floor_id=%s AND coord_x=%s AND coord_y=%s",
+                (session.session_id, floor, x, y),
+            )
+            room = cur.fetchone()
+        conn.close()
+        if not room or room["room_type"] != "illusion":
+            return await interaction.followup.send("❌ Nothing happens.", ephemeral=True)
+
+        mapping = {
+            "illusion_enemy": "monster",
+            "illusion_treasure": "item",
+            "illusion_vendor": "shop",
+            "illusion_empty": "safe",
+        }
+        new_type = mapping.get(choice)
+        if not new_type:
+            return
+
+        conn = self.db_connect()
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute(
+                "SELECT description, image_url, default_enemy_id FROM room_templates "
+                "WHERE room_type=%s ORDER BY RAND() LIMIT 1",
+                (new_type,),
+            )
+            tpl = cur.fetchone() or {}
+
+            vendor_id = None
+            if new_type == "shop":
+                dg = self.bot.get_cog("DungeonGenerator")
+                if dg:
+                    gvid = dg.fetch_random_vendor()
+                    if gvid:
+                        vendor_id = dg.create_session_vendor_instance(session.session_id, gvid)
+
+            cur.execute(
+                "UPDATE rooms SET room_type=%s, description=%s, image_url=%s, "
+                "default_enemy_id=%s, vendor_id=%s WHERE room_id=%s",
+                (
+                    new_type,
+                    tpl.get("description"),
+                    tpl.get("image_url"),
+                    tpl.get("default_enemy_id"),
+                    vendor_id,
+                    room["room_id"],
+                ),
+            )
+        conn.commit()
+        conn.close()
+
+        # additional setup for chest rooms
+        if new_type == "item":
+            dg = self.bot.get_cog("DungeonGenerator")
+            if dg:
+                key_defs = dg.fetch_random_treasure_chest("key")
+                all_defs = dg.fetch_random_treasure_chest()
+                choice_def = key_defs or all_defs
+                chest = dg.weighted_choice(choice_def)
+                if chest:
+                    dg.create_treasure_chest_instance(session.session_id, room["room_id"], chest["chest_id"])
+
+        # start battle immediately for enemy choice
+        if new_type == "monster":
+            bs = self.bot.get_cog("BattleSystem")
+            enemy = None
+            if bs:
+                if tpl.get("default_enemy_id"):
+                    enemy = await bs.get_enemy_by_id(tpl["default_enemy_id"])
+                else:
+                    enemy = await bs.get_enemy_for_room(session, floor, x, y)
+            if enemy and bs:
+                self.append_game_log(session.session_id, f"Encountered **{enemy['enemy_name']}**!")
+                await bs.start_battle(
+                    interaction,
+                    interaction.user.id,
+                    enemy,
+                    previous_coords=(floor, x, y),
+                )
+                return
+
+        # Otherwise just refresh the room view and end turn
+        conn = self.db_connect()
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute(
+                "SELECT r.*, f.floor_number FROM rooms r JOIN floors f ON f.floor_id=r.floor_id "
+                "WHERE r.room_id=%s",
+                (room["room_id"],),
+            )
+            new_room = cur.fetchone()
+        conn.close()
+
+        await self.update_room_view(interaction, new_room, x, y)
+        await self.end_player_turn(interaction)
 
     # ────────────────────────────────────────────────────────────────────────────
     #  TURN HELPERS
@@ -2325,6 +2472,9 @@ class GameMaster(commands.Cog):
                 if shop:
                     vid = int(cid.split("_")[2])
                     return await shop.display_shop_menu(interaction, vid)
+
+            if cid in {"illusion_enemy", "illusion_treasure", "illusion_vendor", "illusion_empty"}:
+                return await self.handle_illusion_choice(interaction, cid)
 
             if cid == "end_game":
                 sm = self.bot.get_cog("SessionManager")
