@@ -11,7 +11,6 @@ from game import high_score
 
 from models.session_models import SessionModel, SessionPlayerModel
 from core.game_session import GameSession  # New GameSession object
-from game import high_score
 
 logger = logging.getLogger("SessionManager")
 logger.setLevel(logging.DEBUG)
