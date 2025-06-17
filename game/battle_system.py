@@ -570,6 +570,10 @@ class BattleSystem(commands.Cog):
         if not session:
             return
 
+        # If battle state is missing (e.g. player fled and old buttons were pressed)
+        if not session.battle_state:
+            return await mgr.refresh_current_state(interaction)
+
         conn = self.db_connect()
         cursor = conn.cursor(dictionary=True)
         cursor.execute(
@@ -1353,12 +1357,8 @@ class BattleSystem(commands.Cog):
                     session.battle_state["player_effects"],
                 )
 
-        enemy_id = session.current_enemy.get("enemy_id") if session.current_enemy else None
-
+        # fully exit battle state
         session.clear_battle_state()
-
-        if enemy_id:
-            session.current_enemy = await self.get_enemy_by_id(enemy_id)
 
         if prev:
             px, py, pfloor = prev
