@@ -1302,9 +1302,6 @@ class GameMaster(commands.Cog):
         if not saved:
             # Unsaved sessions: mark ended in DB and remove from memory
             await sm.terminate_session(session.session_id, "Quit by user")
-            scores = await sm.get_high_scores()
-            embed = hub_embed.get_high_scores_embed(scores)
-            await interaction.channel.send(embed=embed)
         else:
             # Saved sessions: only remove from memory, leave DB intact
             sm.delete_session_state(session.session_id)
