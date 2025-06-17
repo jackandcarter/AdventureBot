@@ -7,6 +7,7 @@ import json
 import logging
 import os
 from typing import List, Tuple
+import re
 
 import mysql.connector
 from mysql.connector import Error
@@ -1190,50 +1191,33 @@ def insert_hub_embeds(cur):
     logger.info("Inserted hub_embeds.")
 
 
-def ensure_high_scores_columns(cur) -> None:
-    """Add missing columns to the ``high_scores`` table if necessary."""
-    cur.execute("SHOW COLUMNS FROM high_scores LIKE 'rooms_visited'")
-    if not cur.fetchone():
-        logger.info("Adding missing column: rooms_visited")
-        cur.execute("ALTER TABLE high_scores ADD rooms_visited INT DEFAULT 0")
-
-    cur.execute("SHOW COLUMNS FROM high_scores LIKE 'bosses_defeated'")
-    if not cur.fetchone():
-        logger.info("Adding missing column: bosses_defeated")
-        cur.execute("ALTER TABLE high_scores ADD bosses_defeated INT DEFAULT 0")
-
-    cur.execute("SHOW COLUMNS FROM high_scores LIKE 'score_value'")
-    if not cur.fetchone():
-        logger.info("Adding missing column: score_value")
-        cur.execute("ALTER TABLE high_scores ADD score_value INT DEFAULT 0")
-
-    cur.execute("SHOW COLUMNS FROM high_scores LIKE 'difficulty'")
-    if not cur.fetchone():
-        logger.info("Adding missing column: difficulty")
-        cur.execute("ALTER TABLE high_scores ADD difficulty VARCHAR(50)")
+def _parse_columns(create_sql: str) -> list[tuple[str, str]]:
+    """Extract column definitions from a ``CREATE TABLE`` statement."""
+    inside = create_sql.split("(", 1)[1].rsplit(")", 1)[0]
+    columns = []
+    for line in inside.splitlines():
+        line = line.strip().rstrip(",")
+        if not line or line.upper().startswith(("PRIMARY KEY", "FOREIGN KEY")):
+            continue
+        m = re.match(r"`?([A-Za-z_][A-Za-z0-9_]*)`?\s+(.*)", line)
+        if m:
+            columns.append((m.group(1), m.group(2)))
+    return columns
 
 
-def ensure_player_columns(cur) -> None:
-    """Add missing columns to the ``players`` table if necessary."""
-    cur.execute("SHOW COLUMNS FROM players LIKE 'enemies_defeated'")
-    if not cur.fetchone():
-        logger.info("Adding missing column: enemies_defeated")
-        cur.execute("ALTER TABLE players ADD enemies_defeated INT DEFAULT 0")
+def ensure_table_columns(cur, table_name: str, create_sql: str) -> None:
+    """Add any missing columns for ``table_name`` using ``create_sql``."""
+    for col_name, definition in _parse_columns(create_sql):
+        cur.execute(f"SHOW COLUMNS FROM {table_name} LIKE %s", (col_name,))
+        if not cur.fetchone():
+            logger.info("Adding missing column: %s.%s", table_name, col_name)
+            cur.execute(f"ALTER TABLE {table_name} ADD {col_name} {definition}")
 
-    cur.execute("SHOW COLUMNS FROM players LIKE 'rooms_visited'")
-    if not cur.fetchone():
-        logger.info("Adding missing column: rooms_visited")
-        cur.execute("ALTER TABLE players ADD rooms_visited INT DEFAULT 0")
 
-    cur.execute("SHOW COLUMNS FROM players LIKE 'gil_earned'")
-    if not cur.fetchone():
-        logger.info("Adding missing column: gil_earned")
-        cur.execute("ALTER TABLE players ADD gil_earned INT DEFAULT 0")
-
-    cur.execute("SHOW COLUMNS FROM players LIKE 'bosses_defeated'")
-    if not cur.fetchone():
-        logger.info("Adding missing column: bosses_defeated")
-        cur.execute("ALTER TABLE players ADD bosses_defeated INT DEFAULT 0")
+def ensure_all_columns(cur) -> None:
+    """Ensure every table has all expected columns."""
+    for tbl in TABLE_ORDER:
+        ensure_table_columns(cur, tbl, TABLES[tbl])
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  MAIN
@@ -1248,9 +1232,8 @@ def main() -> None:
                     cur.execute(TABLES[tbl])
                     logger.debug("Table `%s` ready.", tbl)
 
-                # ensure new optional columns exist
-                ensure_high_scores_columns(cur)
-                ensure_player_columns(cur)
+                # ensure all columns exist
+                ensure_all_columns(cur)
 
                 # ── seed data (order matters) ──────────────────────────────────
                 insert_difficulties(cur)
