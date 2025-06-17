@@ -321,6 +321,67 @@ class SessionManager(commands.Cog):
             except Exception:
                 pass
 
+    def compute_player_score_data(
+        self, session_id: int, player_id: int
+    ) -> Optional[Dict[str, Any]]:
+        """Return a mapping of score fields for one player or ``None``."""
+        try:
+            conn = self.db_connect()
+            cur = conn.cursor(dictionary=True)
+
+            cur.execute(
+                "SELECT guild_id, difficulty, created_at FROM sessions WHERE session_id=%s",
+                (session_id,),
+            )
+            sess = cur.fetchone()
+            if not sess:
+                return None
+
+            cur.execute(
+                """
+                SELECT p.username, p.level, p.gil, p.enemies_defeated, p.bosses_defeated,
+                       p.rooms_visited, c.class_name
+                  FROM players p
+             LEFT JOIN classes c ON p.class_id = c.class_id
+                 WHERE p.session_id=%s AND p.player_id=%s
+                """,
+                (session_id, player_id),
+            )
+            p = cur.fetchone()
+            if not p:
+                return None
+
+            rooms = p.get("rooms_visited", 0)
+            enemies = p.get("enemies_defeated", 0)
+            bosses = p.get("bosses_defeated", 0)
+            score_val = enemies + bosses * 5 + rooms
+
+            data = {
+                "player_name": p.get("username"),
+                "guild_id": sess.get("guild_id"),
+                "player_level": p.get("level"),
+                "player_class": p.get("class_name"),
+                "gil": p.get("gil", 0),
+                "enemies_defeated": enemies,
+                "bosses_defeated": bosses,
+                "rooms_visited": rooms,
+                "score_value": score_val,
+                "difficulty": sess.get("difficulty"),
+            }
+            return data
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("compute_player_score_data failed: %s", e, exc_info=True)
+            return None
+        finally:
+            try:
+                cur.close()
+            except Exception:
+                pass
+            try:
+                conn.close()
+            except Exception:
+                pass
+
     def record_player_high_score(self, session_id: int, player_id: int) -> bool:
         """Record a single player's score and return True if it made the top 20."""
         try:

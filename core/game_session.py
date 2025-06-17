@@ -75,6 +75,9 @@ class GameSession:
         # ── status effects ───────────────────────────────────────────────
         # { player_id: [ { "effect_id": int, "remaining": int }, … ] }
         self.status_effects: Dict[int, List[Dict[str, Any]]] = {}
+        # ── pending high score data ──────────────────────────────────────
+        # { player_id: {"data": {...}, "message_id": int} }
+        self.pending_high_score: Dict[int, Dict[str, Any]] = {}
 
     def add_player(self, player_id: int) -> None:
         """Add a player to the session.

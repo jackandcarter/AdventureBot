@@ -148,3 +148,25 @@ def get_high_scores_embed(high_scores_data, sort_by: str = "score_value"):
         text=f"Sorted by {sort_label}. Press 'Back' to return to the main menu."
     )
     return embed
+
+
+def get_high_score_prompt_embed(data: dict) -> discord.Embed:
+    """Return an embed summarising a player's stats for confirmation."""
+    embed = discord.Embed(
+        title="New High Score!",
+        description="Record your stats on the leaderboard?",
+        color=discord.Color.gold(),
+    )
+    embed.add_field(
+        name=f"{data.get('player_name')} ({data.get('player_class')})",
+        value=(
+            f"Score: {data.get('score_value')}\n"
+            f"Bosses: {data.get('bosses_defeated')}\n"
+            f"Enemies: {data.get('enemies_defeated')}\n"
+            f"Rooms: {data.get('rooms_visited')}\n"
+            f"Gil: {data.get('gil')}"
+        ),
+        inline=False,
+    )
+    embed.set_footer(text="Submit this score to the top 20?")
+    return embed
