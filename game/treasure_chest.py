@@ -93,9 +93,9 @@ def _apply_chest_rewards(
                 "UPDATE players SET gil=%s, inventory=%s WHERE player_id=%s AND session_id=%s",
                 (gil, json.dumps(inv), player_id, session_id),
             )
+            conn.commit()
             if gil:
                 SessionPlayerModel.add_gil_earned(session_id, player_id, gil)
-        conn.commit()
     finally:
         conn.close()
 
