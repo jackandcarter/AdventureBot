@@ -72,6 +72,11 @@ class BattleSystem(commands.Cog):
         }
         out["target"] = raw.get("target", "self")
         return out
+
+    def is_elemental_challenge(self, session: Any) -> bool:
+        """Return ``True`` if an elemental crystal challenge is active."""
+        ch = session.game_state.get("illusion_challenge") if session else None
+        return isinstance(ch, dict) and ch.get("type") == "elemental_crystal"
     # --------------------------------------------------------------------- #
     #                     Room / Template utilities                         #
     # --------------------------------------------------------------------- #
@@ -654,7 +659,7 @@ class BattleSystem(commands.Cog):
             return await interaction.response.send_message("❌ No active session.", ephemeral=True)
 
         pid = session.current_turn
-        in_battle = bool(session.battle_state)
+        in_battle = bool(session.battle_state) or self.is_elemental_challenge(session)
 
         # fetch class & level
         from models.session_models import SessionPlayerModel
@@ -790,7 +795,7 @@ class BattleSystem(commands.Cog):
             )
 
         # 2) If it’s an enemy‑target skill but we’re not in a battle, block it
-        in_battle = bool(session.current_enemy)
+        in_battle = bool(session.current_enemy) or self.is_elemental_challenge(session)
         if ability_meta["target_type"] == "enemy" and not in_battle:
             return await interaction.response.send_message(
                 "❌ That ability can only be used in battle.", ephemeral=True
@@ -804,7 +809,7 @@ class BattleSystem(commands.Cog):
             session.battle_state.setdefault("enemy_effects", [])
 
         pid = session.current_turn
-        enemy = session.current_enemy if in_battle else None
+        enemy = session.current_enemy if session.current_enemy else None
 
 
         # 2) fetch player stats
