@@ -298,6 +298,7 @@ class SortSelect(discord.ui.Select):
         options = [
             discord.SelectOption(label="Play Time", value="play_time"),
             discord.SelectOption(label="Enemies Defeated", value="enemies_defeated"),
+            discord.SelectOption(label="Rooms Visited", value="rooms_visited"),
             discord.SelectOption(label="Gil", value="gil"),
             discord.SelectOption(label="Level", value="player_level"),
         ]

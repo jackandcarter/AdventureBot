@@ -99,3 +99,32 @@ def test_record_score_prunes_to_20(monkeypatch):
     names = [s["player_name"] for s in scores]
     assert len(names) == 20
     assert "Worst" not in names
+
+
+def test_fetch_scores_rooms_visited_sort(monkeypatch):
+    conn = FakeConnection()
+
+    def fake_get_connection(self):
+        return conn
+
+    monkeypatch.setattr(Database, "get_connection", fake_get_connection)
+
+    base = {
+        "player_name": "P",
+        "guild_id": 1,
+        "player_level": 1,
+        "player_class": "Mage",
+        "gil": 0,
+        "enemies_defeated": 0,
+    }
+
+    for i in range(5):
+        data = base.copy()
+        data["player_name"] = f"P{i}"
+        data["play_time"] = i
+        data["rooms_visited"] = i
+        assert high_score.record_score(data)
+
+    scores = high_score.fetch_scores(limit=5, sort_by="rooms_visited")
+    rooms_list = [s["rooms_visited"] for s in scores]
+    assert rooms_list == sorted(rooms_list, reverse=True)

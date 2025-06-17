@@ -119,6 +119,7 @@ def get_high_scores_embed(high_scores_data, sort_by: str = "play_time"):
         "enemies_defeated": "Enemies Defeated",
         "gil": "Gil",
         "player_level": "Level",
+        "rooms_visited": "Rooms Visited",
     }
     sort_label = sort_labels.get(sort_by, sort_by)
 

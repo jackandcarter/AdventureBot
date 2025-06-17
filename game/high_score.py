@@ -71,7 +71,13 @@ def fetch_scores(limit: int = 20, sort_by: str = "play_time") -> List[Dict[str, 
     list[dict]
         List of score rows. Returns an empty list if any error occurs.
     """
-    valid_columns = {"play_time", "enemies_defeated", "gil", "player_level"}
+    valid_columns = {
+        "play_time",
+        "enemies_defeated",
+        "gil",
+        "player_level",
+        "rooms_visited",
+    }
     order_clause = "play_time ASC, enemies_defeated DESC"
     if sort_by in valid_columns and sort_by != "play_time":
         order_clause = f"{sort_by} DESC"
