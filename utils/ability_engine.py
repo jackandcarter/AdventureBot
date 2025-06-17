@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 class AbilityResult:
     """
     A normalized result from using an ability.
-    type: 'damage'|'heal'|'miss'|'dot'|'hot'|'set_hp'|'pilfer'|'mug'
+    type: 'damage'|'heal'|'miss'|'dot'|'hot'|'set_hp'|'pilfer'|'mug'|'scan'
     amount: numeric for damage/heal/set_hp/pilfer/mug
     dot: dict with keys 'damage_per_turn' or 'heal_per_turn', 'remaining_turns', 'effect_name'
     logs: list of strings for the battle log
@@ -57,6 +57,24 @@ class AbilityEngine:
             except (TypeError, ValueError):
                 return 1.0
         return 1.0
+
+    def fetch_enemy_resistance_rows(self, enemy_id: int) -> List[Dict[str, Any]]:
+        """Return all elemental relations for the given enemy."""
+        conn = self.db_connect()
+        cur = conn.cursor(dictionary=True)
+        cur.execute(
+            """
+            SELECT e.element_name, er.element_id, er.relation, er.multiplier
+            FROM enemy_resistances er
+            JOIN elements e ON er.element_id = e.element_id
+            WHERE er.enemy_id = %s
+            """,
+            (enemy_id,),
+        )
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        return rows or []
 
     def _apply_elemental_multiplier(
         self, dmg: int, target: Dict[str, Any], ability: Dict[str, Any]
@@ -355,6 +373,19 @@ class AbilityEngine:
                         "target":      ability.get("target_type", "self"),
                     }]
                 )
+
+            # scan
+            elif result is None and effect_data.get("scan"):
+                ename = target.get("enemy_name", "Enemy")
+                hp_line = f"{ename} HP: {target.get('hp', 0)}/{target.get('max_hp', 0)}"
+                logs.append(hp_line)
+                rows = self.fetch_enemy_resistance_rows(target.get("enemy_id"))
+                weaknesses = [r["element_name"] for r in rows if r.get("relation") == "weak"]
+                if weaknesses:
+                    logs.append("Weaknesses: " + ", ".join(weaknesses))
+                else:
+                    logs.append("Weaknesses: None")
+                result = AbilityResult(type="scan", logs=logs)
 
             # pilfer_gil
             elif result is None and effect_data.get("pilfer_gil"):

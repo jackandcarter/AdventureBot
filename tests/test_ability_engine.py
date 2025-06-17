@@ -99,3 +99,27 @@ def test_damage_keys(monkeypatch, key, element_id, multiplier, expected):
     }
     result = engine.resolve(user, enemy, ability)
     assert result.amount == expected
+
+
+def test_scan(monkeypatch):
+    engine = make_engine([], monkeypatch)
+    monkeypatch.setattr(
+        AbilityEngine,
+        "fetch_enemy_resistance_rows",
+        lambda self, eid: [
+            {"element_name": "Fire", "relation": "weak"},
+            {"element_name": "Ice", "relation": "resist"},
+        ],
+    )
+    user = {"attack_power": 10, "hp": 50, "max_hp": 50}
+    enemy = {
+        "enemy_id": 1,
+        "enemy_name": "Goblin",
+        "defense": 0,
+        "hp": 30,
+        "max_hp": 40,
+    }
+    ability = {"ability_name": "Scan", "effect": json.dumps({"scan": True})}
+    result = engine.resolve(user, enemy, ability)
+    assert any("30/40" in line for line in result.logs)
+    assert any("Fire" in line for line in result.logs)
