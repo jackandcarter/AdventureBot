@@ -61,16 +61,18 @@ def _build_queue_view() -> discord.ui.View:
 class HighScoreConfirmView(discord.ui.View):
     """Simple Yes/No prompt used when a player qualifies for the leaderboard."""
 
-    def __init__(self):
+    def __init__(self, player_id: int):
         super().__init__(timeout=None)
         self.add_item(
             discord.ui.Button(
-                label="Yes", style=discord.ButtonStyle.success, custom_id="high_score_yes"
+                label="Yes", style=discord.ButtonStyle.success,
+                custom_id=f"hs_yes_{player_id}"
             )
         )
         self.add_item(
             discord.ui.Button(
-                label="No", style=discord.ButtonStyle.secondary, custom_id="high_score_no"
+                label="No", style=discord.ButtonStyle.secondary,
+                custom_id=f"hs_no_{player_id}"
             )
         )
 
@@ -2086,7 +2088,7 @@ class GameMaster(commands.Cog):
 
             if qualifies and data:
                 embed = hub_embed.get_high_score_prompt_embed(data)
-                view = HighScoreConfirmView()
+                view = HighScoreConfirmView(pid)
                 msg = await interaction.channel.send(embed=embed, view=view)
                 session.pending_high_score[pid] = {"data": data, "message_id": msg.id}
                 return
@@ -2115,12 +2117,18 @@ class GameMaster(commands.Cog):
             await sm.refresh_current_state(interaction)
             return
 
-        if cid in ("high_score_yes", "high_score_no"):
+        hs_match = re.match(r"hs_(yes|no)_(\d+)", cid)
+        if hs_match:
+            action = hs_match.group(1)
+            target_pid = int(hs_match.group(2))
+            if interaction.user.id != target_pid:
+                return await interaction.response.send_message(
+                    "Not your prompt", ephemeral=True
+                )
             sm = self.bot.get_cog("SessionManager")
             session = sm.get_session(interaction.channel.id)
-            pid = interaction.user.id
 
-            pending = session.pending_high_score.get(pid) if session else None
+            pending = session.pending_high_score.get(target_pid) if session else None
             if not pending:
                 return await interaction.response.send_message(
                     "Not your prompt", ephemeral=True
@@ -2134,9 +2142,9 @@ class GameMaster(commands.Cog):
                     await m.delete()
                 except Exception:
                     pass
-            session.pending_high_score.pop(pid, None)
+            session.pending_high_score.pop(target_pid, None)
 
-            if cid == "high_score_yes":
+            if action == "yes":
                 high_score.record_score(data)
                 await interaction.response.send_message(
                     "✅ Score recorded!", ephemeral=True
@@ -2150,8 +2158,8 @@ class GameMaster(commands.Cog):
                     "Score discarded.", ephemeral=True
                 )
 
-            if pid in session.players:
-                session.players.remove(pid)
+            if target_pid in session.players:
+                session.players.remove(target_pid)
                 sm.update_session_players(interaction.channel.id, session.players)
 
             if not session.players:
