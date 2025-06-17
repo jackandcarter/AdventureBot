@@ -841,7 +841,9 @@ TABLES = {
             player_class     VARCHAR(50),
             gil              INT DEFAULT 0,
             enemies_defeated INT DEFAULT 0,
+            bosses_defeated INT DEFAULT 0,
             rooms_visited    INT DEFAULT 0,
+            score_value      INT DEFAULT 0,
             play_time        INT DEFAULT 0,
             difficulty       VARCHAR(50),
             completed_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -1186,6 +1188,16 @@ def ensure_high_scores_columns(cur) -> None:
         logger.info("Adding missing column: rooms_visited")
         cur.execute("ALTER TABLE high_scores ADD rooms_visited INT DEFAULT 0")
 
+    cur.execute("SHOW COLUMNS FROM high_scores LIKE 'bosses_defeated'")
+    if not cur.fetchone():
+        logger.info("Adding missing column: bosses_defeated")
+        cur.execute("ALTER TABLE high_scores ADD bosses_defeated INT DEFAULT 0")
+
+    cur.execute("SHOW COLUMNS FROM high_scores LIKE 'score_value'")
+    if not cur.fetchone():
+        logger.info("Adding missing column: score_value")
+        cur.execute("ALTER TABLE high_scores ADD score_value INT DEFAULT 0")
+
     cur.execute("SHOW COLUMNS FROM high_scores LIKE 'difficulty'")
     if not cur.fetchone():
         logger.info("Adding missing column: difficulty")
@@ -1208,6 +1220,11 @@ def ensure_player_columns(cur) -> None:
     if not cur.fetchone():
         logger.info("Adding missing column: gil_earned")
         cur.execute("ALTER TABLE players ADD gil_earned INT DEFAULT 0")
+
+    cur.execute("SHOW COLUMNS FROM players LIKE 'bosses_defeated'")
+    if not cur.fetchone():
+        logger.info("Adding missing column: bosses_defeated")
+        cur.execute("ALTER TABLE players ADD bosses_defeated INT DEFAULT 0")
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  MAIN

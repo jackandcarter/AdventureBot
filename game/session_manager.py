@@ -279,7 +279,8 @@ class SessionManager(commands.Cog):
             cur.execute(
                 """
                 SELECT p.username, p.level, p.gil, p.discovered_rooms,
-                       p.enemies_defeated, p.rooms_visited, c.class_name
+                       p.enemies_defeated, p.bosses_defeated,
+                       p.rooms_visited, c.class_name
                   FROM players p
              LEFT JOIN classes c ON p.class_id = c.class_id
                  WHERE p.session_id = %s
@@ -294,6 +295,9 @@ class SessionManager(commands.Cog):
 
             for p in players:
                 rooms = p.get("rooms_visited", 0)
+                enemies = p.get("enemies_defeated", 0)
+                bosses = p.get("bosses_defeated", 0)
+                score_val = enemies + bosses * 5 + rooms
 
                 data = {
                     "player_name": p.get("username"),
@@ -301,15 +305,86 @@ class SessionManager(commands.Cog):
                     "player_level": p.get("level"),
                     "player_class": p.get("class_name"),
                     "gil": p.get("gil", 0),
-                    "enemies_defeated": p.get("enemies_defeated", 0),
-                    "play_time": play_time,
+                    "enemies_defeated": enemies,
+                    "bosses_defeated": bosses,
                     "rooms_visited": rooms,
+                    "play_time": play_time,
+                    "score_value": score_val,
                     "difficulty": sess.get("difficulty"),
                 }
                 high_score.record_score(data)
 
         except Exception as e:  # pylint: disable=broad-except
             logger.error("record_high_score failed for session %s: %s", session_id, e, exc_info=True)
+        finally:
+            try:
+                cur.close()
+            except Exception:
+                pass
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    def record_player_high_score(self, session_id: int, player_id: int) -> bool:
+        """Record a single player's score and return True if it made the top 20."""
+        try:
+            conn = self.db_connect()
+            cur = conn.cursor(dictionary=True)
+            cur.execute(
+                "SELECT guild_id, difficulty, created_at FROM sessions WHERE session_id=%s",
+                (session_id,),
+            )
+            sess = cur.fetchone()
+            if not sess:
+                return False
+
+            cur.execute(
+                """
+                SELECT p.username, p.level, p.gil, p.enemies_defeated, p.bosses_defeated,
+                       p.rooms_visited, c.class_name
+                  FROM players p
+             LEFT JOIN classes c ON p.class_id = c.class_id
+                 WHERE p.session_id=%s AND p.player_id=%s
+                """,
+                (session_id, player_id),
+            )
+            p = cur.fetchone()
+            if not p:
+                return False
+
+            play_time = 0
+            if sess.get("created_at"):
+                play_time = int((datetime.utcnow() - sess["created_at"]).total_seconds())
+
+            rooms = p.get("rooms_visited", 0)
+            enemies = p.get("enemies_defeated", 0)
+            bosses = p.get("bosses_defeated", 0)
+            score_val = enemies + bosses * 5 + rooms
+
+            data = {
+                "player_name": p.get("username"),
+                "guild_id": sess.get("guild_id"),
+                "player_level": p.get("level"),
+                "player_class": p.get("class_name"),
+                "gil": p.get("gil", 0),
+                "enemies_defeated": enemies,
+                "bosses_defeated": bosses,
+                "rooms_visited": rooms,
+                "play_time": play_time,
+                "score_value": score_val,
+                "difficulty": sess.get("difficulty"),
+            }
+            high_score.record_score(data)
+
+            top_scores = high_score.fetch_scores(sort_by="score_value")
+            if not top_scores:
+                return False
+            min_score = top_scores[-1].get("score_value", 0) if len(top_scores) >= 20 else -1
+            return score_val >= min_score
+        except Exception as e:  # pylint: disable=broad-except
+            logger.error("record_player_high_score failed: %s", e, exc_info=True)
+            return False
         finally:
             try:
                 cur.close()
@@ -483,7 +558,7 @@ class SessionManager(commands.Cog):
             # when not in battle, fall back to the normal room refresh
             await self.refresh_current_state(interaction)
 
-    async def get_high_scores(self, limit: int = 20, sort_by: str = "play_time"):
+    async def get_high_scores(self, limit: int = 20, sort_by: str = "score_value"):
         """Retrieve high score rows sorted accordingly."""
         try:
             return high_score.fetch_scores(limit, sort_by)

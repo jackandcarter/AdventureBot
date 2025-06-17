@@ -392,6 +392,8 @@ class BattleSystem(commands.Cog):
         if xp and gm:
             await gm.award_experience(session.current_turn, session.session_id, xp)
         SessionPlayerModel.increment_enemies_defeated(session.session_id, session.current_turn)
+        if enemy.get("role") in ("boss", "miniboss"):
+            SessionPlayerModel.increment_bosses_defeated(session.session_id, session.current_turn)
 
         conn = self.db_connect()
         cursor = conn.cursor(dictionary=True)

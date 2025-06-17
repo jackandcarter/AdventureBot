@@ -1,6 +1,12 @@
 import os
 import sys
+import types
 import pytest
+
+# Stub mysql module to satisfy models.database import
+sys.modules.setdefault("mysql", types.ModuleType("mysql"))
+sys.modules.setdefault("mysql.connector", types.ModuleType("connector"))
+sys.modules.setdefault("aiomysql", types.ModuleType("aiomysql"))
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -24,7 +30,8 @@ class FakeCursor:
         elif sql.startswith("SELECT score_id FROM high_scores"):
             sorted_rows = sorted(
                 self.conn.rows,
-                key=lambda r: (r['play_time'], -r['enemies_defeated'])
+                key=lambda r: r['score_value'],
+                reverse=True
             )
             self.result = [(r['score_id'],) for r in sorted_rows]
         elif sql.startswith("DELETE FROM high_scores"):
@@ -33,11 +40,8 @@ class FakeCursor:
             self.result = None
         elif sql.startswith("SELECT * FROM high_scores"):
             order_clause = sql.split("ORDER BY",1)[1].split("LIMIT",1)[0].strip()
-            if order_clause == "play_time ASC, enemies_defeated DESC":
-                sorted_rows = sorted(
-                    self.conn.rows,
-                    key=lambda r: (r['play_time'], -r['enemies_defeated'])
-                )
+            if order_clause == "score_value DESC":
+                sorted_rows = sorted(self.conn.rows, key=lambda r: r['score_value'], reverse=True)
             else:
                 col, direction = order_clause.split()
                 rev = direction.upper() == 'DESC'
@@ -81,17 +85,19 @@ def test_record_score_prunes_to_20(monkeypatch):
         "player_class": "Warrior",
         "gil": 0,
         "enemies_defeated": 0,
+        "bosses_defeated": 0,
+        "score_value": 0,
     }
 
     for i in range(20):
         data = base_data.copy()
         data["player_name"] = f"P{i}"
-        data["play_time"] = i
+        data["score_value"] = i
         assert high_score.record_score(data)
 
     worst = base_data.copy()
     worst["player_name"] = "Worst"
-    worst["play_time"] = 9999
+    worst["score_value"] = -1
 
     assert high_score.record_score(worst)
 
@@ -116,12 +122,14 @@ def test_fetch_scores_rooms_visited_sort(monkeypatch):
         "player_class": "Mage",
         "gil": 0,
         "enemies_defeated": 0,
+        "bosses_defeated": 0,
+        "score_value": 0,
     }
 
     for i in range(5):
         data = base.copy()
         data["player_name"] = f"P{i}"
-        data["play_time"] = i
+        data["score_value"] = i
         data["rooms_visited"] = i
         assert high_score.record_score(data)
 
