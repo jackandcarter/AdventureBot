@@ -368,7 +368,9 @@ class SessionManager(commands.Cog):
             }
             high_score.record_score(data)
 
-            top_scores = high_score.fetch_scores(sort_by="score_value")
+            top_scores = high_score.fetch_scores(
+                sort_by="score_value", guild_id=sess.get("guild_id")
+            )
             if not top_scores:
                 return False
             min_score = top_scores[-1].get("score_value", 0) if len(top_scores) >= 20 else -1
@@ -549,10 +551,12 @@ class SessionManager(commands.Cog):
             # when not in battle, fall back to the normal room refresh
             await self.refresh_current_state(interaction)
 
-    async def get_high_scores(self, limit: int = 20, sort_by: str = "score_value"):
+    async def get_high_scores(
+        self, limit: int = 20, sort_by: str = "score_value", guild_id: int | None = None
+    ):
         """Retrieve high score rows sorted accordingly."""
         try:
-            return high_score.fetch_scores(limit, sort_by)
+            return high_score.fetch_scores(limit, sort_by, guild_id=guild_id)
         except Exception as e:  # pylint: disable=broad-except
             logger.error("Error fetching high scores: %s", e, exc_info=True)
             return []
