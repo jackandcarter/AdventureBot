@@ -451,6 +451,12 @@ class SessionManager(commands.Cog):
 
 
     async def return_to_current_view(self, interaction: discord.Interaction) -> None:
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer()
+        except discord.errors.HTTPException as e:
+            logger.debug("Deferred interaction failed: %s", e)
+
         session = self.get_session(interaction.channel.id)
         if not session:
             if not interaction.response.is_done():
