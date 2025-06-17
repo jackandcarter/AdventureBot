@@ -37,6 +37,38 @@ class AbilityEngine:
         self.db_connect = db_connect
         self.variance = damage_variance
 
+    # ------------------------------------------------------------------
+    # Elemental resistances
+    # ------------------------------------------------------------------
+    def fetch_enemy_resistance(self, enemy_id: int, element_id: int) -> float:
+        """Return the elemental damage multiplier for ``enemy_id`` and ``element_id``."""
+        conn = self.db_connect()
+        cur = conn.cursor(dictionary=True)
+        cur.execute(
+            "SELECT multiplier FROM enemy_resistances WHERE enemy_id=%s AND element_id=%s",
+            (enemy_id, element_id),
+        )
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        if row and row.get("multiplier") is not None:
+            try:
+                return float(row["multiplier"])
+            except (TypeError, ValueError):
+                return 1.0
+        return 1.0
+
+    def _apply_elemental_multiplier(
+        self, dmg: int, target: Dict[str, Any], ability: Dict[str, Any]
+    ) -> int:
+        """Apply elemental resistance/weakness multiplier if applicable."""
+        el = ability.get("element_id")
+        eid = target.get("enemy_id")
+        if el and eid:
+            factor = self.fetch_enemy_resistance(eid, el)
+            dmg = int(dmg * factor)
+        return dmg
+
     def jrpg_damage(
         self,
         attacker: Dict[str, Any],
@@ -228,6 +260,7 @@ class AbilityEngine:
                 stat = effect_data.get("scaling_stat", "attack_power")
                 factor = effect_data.get("scaling_factor", 1.0)
                 dmg = self.jrpg_damage(user, target, base, stat, factor)
+                dmg = self._apply_elemental_multiplier(dmg, target, ability)
                 logs.append(f"{name} deals {dmg} damage.")
                 result = AbilityResult(type="damage", amount=dmg, logs=logs)
 
@@ -239,6 +272,7 @@ class AbilityEngine:
                     logs.append(f"{name}: no ‘7’ in {user['hp']} → deals {dmg}.")
                 else:
                     dmg = random.choice([7, 77, 777, 7777])
+                    dmg = self._apply_elemental_multiplier(dmg, target, ability)
                     logs.append(f"{name} JACKPOT! Deals {dmg}.")
                 result = AbilityResult(type="damage", amount=dmg, logs=logs)
 
@@ -246,6 +280,7 @@ class AbilityEngine:
             elif result is None and "percent_damage" in effect_data:
                 pct = effect_data["percent_damage"]
                 dmg = int(target["hp"] * pct)
+                dmg = self._apply_elemental_multiplier(dmg, target, ability)
                 logs.append(f"{name} deals {dmg} ({int(pct*100)}%).")
                 result = AbilityResult(type="damage", amount=dmg, logs=logs)
 
@@ -326,6 +361,7 @@ class AbilityEngine:
             elif result is None and "mug" in effect_data:
                 base = effect_data["mug"].get("damage", 0)
                 dmg  = self.jrpg_damage(user, target, base, "attack_power", 1.0)
+                dmg  = self._apply_elemental_multiplier(dmg, target, ability)
                 pool = target.get("gil_pool", 0)
                 steal = 0
                 if pool > 0:
@@ -338,6 +374,7 @@ class AbilityEngine:
         # 5) Fallback physical damage
         if result is None:
             dmg = self.jrpg_damage(user, target, 0, "attack_power", 1.0)
+            dmg = self._apply_elemental_multiplier(dmg, target, ability)
             logs.append(f"{name} deals {dmg} damage.")
             result = AbilityResult(type="damage", amount=dmg, logs=logs)
 

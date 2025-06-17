@@ -213,7 +213,9 @@ MERGED_ENEMY_DROPS: List[Tuple] = [
 
 # --- enemy resistances --------------------------------------------------------
 MERGED_ENEMY_RESISTANCES: List[Tuple] = [
-    (1, 1, 0)
+    (1, 1, 'weak', 1.5),
+    (2, 3, 'absorb', -1.0),
+    (3, 2, 'resist', 0.5)
 ]
 
 # --- levels -------------------------------------------------------------------
@@ -797,11 +799,12 @@ TABLES = {
     # ---------- enemy_resistances ----------
     'enemy_resistances': '''
         CREATE TABLE IF NOT EXISTS enemy_resistances (
-            enemy_id  INT NOT NULL,
+            enemy_id   INT NOT NULL,
             element_id INT NOT NULL,
-            resistance INT NOT NULL,
+            relation   ENUM('weak','resist','absorb','immune','normal') NOT NULL DEFAULT 'normal',
+            multiplier FLOAT NOT NULL DEFAULT 1.0,
             PRIMARY KEY (enemy_id, element_id),
-            FOREIGN KEY (enemy_id) REFERENCES enemies(enemy_id)   ON DELETE CASCADE,
+            FOREIGN KEY (enemy_id)  REFERENCES enemies(enemy_id)   ON DELETE CASCADE,
             FOREIGN KEY (element_id) REFERENCES elements(element_id) ON DELETE CASCADE
         )
     ''',
@@ -1127,7 +1130,7 @@ def insert_enemy_resistances(cur):
         logger.info("enemy_resistances already populated – skipping")
         return
     cur.executemany(
-        "INSERT INTO enemy_resistances (enemy_id,element_id,resistance) VALUES (%s,%s,%s)",
+        "INSERT INTO enemy_resistances (enemy_id,element_id,relation,multiplier) VALUES (%s,%s,%s,%s)",
         MERGED_ENEMY_RESISTANCES
     )
     logger.info("Inserted enemy_resistances.")
