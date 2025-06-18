@@ -180,6 +180,9 @@ MERGED_ROOM_TEMPLATES: List[Tuple] = [
         None, '2025-04-24 12:00:00'),
     (21, 'illusion',  'Illusion Chamber', 'Glowing elemental crystals illuminate the chamber.',
         'https://the-demiurge.com/DemiDevUnit/images/rooms/roomtypeillusion.png',
+        None, '2025-04-24 12:00:00'),
+    (22, 'illusion',  'Empty Illusion Chamber', 'The illusions fade away leaving only an empty space.',
+        'https://the-demiurge.com/DemiDevUnit/images/rooms/illusion_empty.png',
         None, '2025-04-24 12:00:00')
 ]
 
