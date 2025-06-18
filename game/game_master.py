@@ -2129,6 +2129,83 @@ class GameMaster(commands.Cog):
         if em:
             await em.send_illusion_crystal_embed(interaction, crystals, idx)
 
+    async def handle_illusion_leave_room(self, interaction: discord.Interaction) -> None:
+        """Teleport the player away from the illusion room, abandoning the challenge."""
+        sm = self.bot.get_cog("SessionManager")
+        session = sm.get_session(interaction.channel.id) if sm else None
+        if not session:
+            return await interaction.response.send_message("❌ No session.", ephemeral=True)
+
+        if not interaction.response.is_done():
+            defer_fn = getattr(interaction.response, "defer_update", None)
+            if callable(defer_fn):
+                await defer_fn()
+            else:
+                await interaction.response.defer()
+
+        # remove any ongoing challenge data
+        session.game_state.pop("illusion_challenge", None)
+        session.game_state.pop("illusion_crystal_order", None)
+        session.game_state.pop("illusion_crystal_index", None)
+
+        # fetch current position
+        conn = self.db_connect()
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute(
+                "SELECT coord_x, coord_y, current_floor_id FROM players "
+                "WHERE player_id=%s AND session_id=%s",
+                (interaction.user.id, session.session_id),
+            )
+            pos = cur.fetchone()
+        conn.close()
+        if not pos:
+            return await interaction.followup.send("❌ Position error.", ephemeral=True)
+
+        x, y, floor = pos["coord_x"], pos["coord_y"], pos["current_floor_id"]
+
+        visited = self.fetch_discovered_rooms(interaction.user.id, session.session_id)
+        distant = [
+            (f, cx, cy)
+            for (f, cx, cy) in visited
+            if f == floor and abs(cx - x) + abs(cy - y) >= 5
+        ]
+        if not distant:
+            distant = [(f, cx, cy) for (f, cx, cy) in visited if f == floor]
+        if not distant:
+            return await interaction.followup.send("❌ No valid destination.", ephemeral=True)
+
+        dest_floor, dest_x, dest_y = random.choice(distant)
+        conn = self.db_connect()
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE players SET coord_x=%s, coord_y=%s, current_floor_id=%s "
+                "WHERE player_id=%s AND session_id=%s",
+                (dest_x, dest_y, dest_floor, interaction.user.id, session.session_id),
+            )
+        conn.commit(); conn.close()
+
+        await self.update_permanent_discovered_room(
+            interaction.user.id,
+            session.session_id,
+            (dest_floor, dest_x, dest_y),
+        )
+        SessionPlayerModel.increment_rooms_visited(session.session_id, interaction.user.id)
+
+        conn = self.db_connect()
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute(
+                "SELECT r.*, f.floor_number FROM rooms r JOIN floors f ON f.floor_id=r.floor_id "
+                "WHERE r.session_id=%s AND r.floor_id=%s AND r.coord_x=%s AND r.coord_y=%s",
+                (session.session_id, dest_floor, dest_x, dest_y),
+            )
+            dest_room = cur.fetchone()
+        conn.close()
+
+        self.append_game_log(session.session_id, f"<@{interaction.user.id}> has been teleported by illusion room magics.")
+
+        await self.update_room_view(interaction, dest_room, dest_x, dest_y)
+        await self.end_player_turn(interaction)
+
     # ────────────────────────────────────────────────────────────────────────────
     #  TURN HELPERS
     # ────────────────────────────────────────────────────────────────────────────
@@ -2653,6 +2730,9 @@ class GameMaster(commands.Cog):
                 if shop:
                     vid = int(cid.split("_")[2])
                     return await shop.display_shop_menu(interaction, vid)
+
+            if cid == "illusion_leave_room":
+                return await self.handle_illusion_leave_room(interaction)
 
             if cid in {"illusion_enemy", "illusion_treasure", "illusion_vendor", "illusion_empty"}:
                 return await self.handle_illusion_choice(interaction, cid)
