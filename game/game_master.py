@@ -2200,50 +2200,8 @@ class GameMaster(commands.Cog):
             # wrong element → illusions dissipate
             session.game_state.pop("illusion_crystal_order", None)
             session.game_state.pop("illusion_crystal_index", None)
-
-            conn = self.db_connect()
-            with conn.cursor(dictionary=True) as cur:
-                cur.execute(
-                    "SELECT coord_x, coord_y, current_floor_id FROM players WHERE player_id=%s AND session_id=%s",
-                    (interaction.user.id, session.session_id),
-                )
-                pos = cur.fetchone()
-            conn.close()
-            if pos:
-                x, y, floor = pos["coord_x"], pos["coord_y"], pos["current_floor_id"]
-
-                conn = self.db_connect()
-                with conn.cursor(dictionary=True) as cur:
-                    cur.execute(
-                        "SELECT description, image_url FROM room_templates WHERE template_id=%s",
-                        (22,),
-                    )
-                    tpl = cur.fetchone() or {}
-                    cur.execute(
-                        "UPDATE rooms SET description=%s, image_url=%s, default_enemy_id=NULL WHERE session_id=%s AND floor_id=%s AND coord_x=%s AND coord_y=%s",
-                        (
-                            tpl.get("description"),
-                            tpl.get("image_url"),
-                            session.session_id,
-                            floor,
-                            x,
-                            y,
-                        ),
-                    )
-                conn.commit(); conn.close()
-
-                conn = self.db_connect()
-                with conn.cursor(dictionary=True) as cur:
-                    cur.execute(
-                        "SELECT r.*, f.floor_number FROM rooms r JOIN floors f ON f.floor_id=r.floor_id WHERE r.session_id=%s AND r.floor_id=%s AND r.coord_x=%s AND r.coord_y=%s",
-                        (session.session_id, floor, x, y),
-                    )
-                    new_room = cur.fetchone()
-                conn.close()
-
-                await self.update_room_view(interaction, new_room, x, y)
-                await self.end_player_turn(interaction)
-                return
+            await self.handle_illusion_choice(interaction, "invalid")
+            return
 
         em = self.bot.get_cog("EmbedManager")
         if em:
