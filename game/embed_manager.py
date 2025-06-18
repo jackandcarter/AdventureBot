@@ -628,28 +628,18 @@ class EmbedManager(commands.Cog):
         crystals: List[Dict[str, Any]],
         index: int = 0,
     ) -> None:
-        """Display the elemental crystals for the illusion challenge."""
-        lines = []
-        for i, c in enumerate(crystals):
-            icon = {
-                "Fire": "🔥",
-                "Ice": "❄️",
-                "Holy": "✨",
-                "Non-Elemental": "🌟",
-                "Air": "💨",
-            }.get(c.get("element_name"), "")
-            prefix = "➡️" if i == index else "▫️"
-            lines.append(f"{prefix} Crystal {i + 1}: {icon} {c.get('element_name')}")
+        """Display a single elemental crystal for the illusion challenge."""
         current = crystals[index] if 0 <= index < len(crystals) else {}
         embed = discord.Embed(
-            title=f"🔮 {current.get('name', 'Elemental Crystals')}",
-            description=current.get("description", "Use elemental skills to shatter each crystal in order."),
+            title=f"🔮 {current.get('name', 'Elemental Crystal')}",
+            description=current.get(
+                "description", "Use an elemental skill to attune the crystal."
+            ),
             color=discord.Color.purple(),
         )
         if img := current.get("image_url"):
             embed.set_image(url=f"{img}?t={int(time.time())}")
-        if lines:
-            embed.add_field(name="Crystals", value="\n".join(lines), inline=False)
+        embed.set_footer(text=f"Crystal {index + 1} of {len(crystals)}")
         # Build two rows of actions. Row 0 mirrors the standard in-room actions
         # (Look Around, Skill, Use, Character, Menu) with an additional option
         # to abandon the illusion room.

@@ -793,6 +793,8 @@ class DungeonGenerator(commands.Cog):
                 tmpl = self.fetch_random_template(rtype) or {}
                 desc = tmpl.get("description", "A mysterious room…")
                 img = tmpl.get("image_url")
+                if rtype == "illusion" and inner_id is None:
+                    inner_id = tmpl.get("template_id")
                 if def_en is None:
                     def_en = tmpl.get("default_enemy_id")
 
@@ -943,6 +945,8 @@ class DungeonGenerator(commands.Cog):
             tmpl = self.fetch_random_template(rtype) or {}
             desc = tmpl.get("description", "A mysterious room…")
             img = tmpl.get("image_url")
+            if rtype == "illusion" and inner_id is None:
+                inner_id = tmpl.get("template_id")
 
             if rtype == "boss":
                 role = "boss"
@@ -1246,6 +1250,8 @@ class DungeonGenerator(commands.Cog):
                     tmpl = self.fetch_random_template(rtype) or {}
                     desc = tmpl.get("description") or "A mysterious room..."
                     img = tmpl.get("image_url")
+                    if rtype == "illusion" and inner_id is None:
+                        inner_id = tmpl.get("template_id")
 
                     if rtype in ("miniboss", "boss", "monster"):
                         role = (
