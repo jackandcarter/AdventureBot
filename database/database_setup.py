@@ -1230,7 +1230,7 @@ def _parse_columns(create_sql: str) -> list[tuple[str, str]]:
     columns = []
     for line in inside.splitlines():
         line = line.strip().rstrip(",")
-        if not line or line.upper().startswith(("PRIMARY KEY", "FOREIGN KEY")):
+        if not line or line.upper().startswith(("PRIMARY KEY", "FOREIGN KEY", "REFERENCES")):
             continue
         m = re.match(r"`?([A-Za-z_][A-Za-z0-9_]*)`?\s+(.*)", line)
         if m:

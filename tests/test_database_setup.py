@@ -102,3 +102,19 @@ def test_main_creates_crystal_templates(monkeypatch):
     database_setup.main()
 
     assert any("CREATE TABLE" in q and "crystal_templates" in q for q in log)
+
+
+def test_parse_columns_skips_fk_reference_lines():
+    sql = """
+    CREATE TABLE test (
+        id INT,
+        item_id INT,
+        FOREIGN KEY (item_id)
+            REFERENCES items(item_id)
+    );
+    """
+    cols = database_setup._parse_columns(sql)
+    assert cols == [
+        ("id", "INT"),
+        ("item_id", "INT"),
+    ]
