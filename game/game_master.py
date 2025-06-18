@@ -372,19 +372,35 @@ class GameMaster(commands.Cog):
         else:  # elemental_crystal
             idx = random.randint(0, 3)
             answer = mapping[idx]
-            desc = (
-                f"{room_info.get('description', 'The room shimmers mysteriously.')}\n\n"
-                "Four elemental crystals glow faintly. Only one dispels the mirage."
-            )
             conn = self.db_connect()
             with conn.cursor(dictionary=True) as cur:
-                cur.execute("SELECT element_id, element_name FROM elements")
-                elements = cur.fetchall() or []
+                cur.execute(
+                    """
+                    SELECT ct.element_id, e.element_name, ct.name, ct.description,
+                           ct.image_url
+                    FROM crystal_templates ct
+                    JOIN elements e ON ct.element_id = e.element_id
+                    """
+                )
+                templates = cur.fetchall() or []
             conn.close()
-            if elements:
-                crystals = random.sample(elements, k=4) if len(elements) >= 4 else random.choices(elements, k=4)
+
+            n = random.randint(2, 6)
+            if templates:
+                crystals = (
+                    random.sample(templates, k=n)
+                    if len(templates) >= n
+                    else random.choices(templates, k=n)
+                )
             else:
                 crystals = []
+
+            desc = (
+                f"{room_info.get('description', 'The room shimmers mysteriously.')}\n\n"
+                f"{len(crystals)} elemental crystals glow faintly. "
+                "Only one dispels the mirage."
+            )
+
             session.game_state['illusion_crystal_order'] = crystals
             session.game_state['illusion_crystal_index'] = 0
 
