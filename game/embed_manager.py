@@ -651,7 +651,17 @@ class EmbedManager(commands.Cog):
         )
         if lines:
             embed.add_field(name="Crystals", value="\n".join(lines), inline=False)
-        buttons = [("Skill", discord.ButtonStyle.primary, "combat_skill_menu", 0)]
+        # Build two rows of actions. Row 0 mirrors the standard in-room actions
+        # (Look Around, Skill, Use, Character, Menu) with an additional option
+        # to abandon the illusion room.
+        buttons = [
+            ("Use",        discord.ButtonStyle.success,   "action_use",         0),
+            ("Skill",      discord.ButtonStyle.primary,   "combat_skill_menu",  0),
+            ("Character",  discord.ButtonStyle.danger,    "action_character",   0),
+            ("Look Around",discord.ButtonStyle.secondary, "action_look_around", 0),
+            ("Menu",       discord.ButtonStyle.secondary, "action_menu",        0),
+            ("Leave Room", discord.ButtonStyle.secondary, "illusion_leave_room",1),
+        ]
         await self.send_or_update_embed(
             interaction,
             _ZWSP,
