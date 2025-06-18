@@ -312,7 +312,27 @@ MERGED_NPC_VENDOR_ITEMS: List[Tuple] = [
 
 # --- hub embeds/buttons -------------------------------------------------------
 MERGED_HUB_EMBEDS: List[Tuple] = [
-    (1, 'main', '', 'Welcome to AdventureBot, a classic turn based dungeon crawler...', 'https://the-demiurge.com/DemiDevUnit/images/embed.png', 'AdventureBot v3.0.2 is now Live!', None, '2025-03-31 03:43:19')
+    (1, 'main', '', 'Welcome to AdventureBot, a classic turn based dungeon crawler...', 'https://the-demiurge.com/DemiDevUnit/images/embed.png', 'AdventureBot v3.0.2 is now Live!', None, '2025-03-31 03:43:19'),
+    (
+        2,
+        'tutorial',
+        'Starting A Game',
+        '\nSimply click the **New Game** button to create a new game thread.\n\nThis will add you to the **Queue** system inside the thread, along with anyone else who wants to join.\n\n- Only the players who join the game session will see the private thread and be added to it automatically.\n\n- Up to 6 players can join via the LFG post in the Game Channel by clicking the Join button. \n\n- Additional players will be shown in the **Queue List** in the thread.\n\nWhen the creator is ready they may click **Start Game** to lock in the emount of players playing.\n\n\n',
+        'https://cdn.discordapp.com/attachments/1362832151485354065/1373622234865733652/Screenshot_2025-05-18_at_6.14.47_AM.png?ex=682b14e5&is=6829c365&hm=b91a3c24ed88f1f493db9a8f61473923e316e284782ab15bd565f6a82ac25966&',
+        'Coming Soon...',
+        1,
+        '2025-04-15 02:50:10',
+    ),
+    (
+        3,
+        'tutorial',
+        'Choose Class and Difficulty',
+        'Once the Session Creator clicks the Start Game button they can choose their class and difficulty level.\n\n- Selecting **Easy** will generate up to 2 floors with a rare chance to spawn a basement floor. In this mode most harder enemeis are removed from generation.\n\n- Choosing **Medium** difficulty will generate up to 4 floors with at least 2 and a rare chance to spawn a basement. In this mode harder enemies spawn along side easy ones during generation.\n\n- Selecting **Hard** is exactly what you think it is. With up to 4 floors and higher spawn chances on more difficult enemies and less vendor shops and item drops.\n\n- **Crazy Catto** is the most difficult of challenges and well... you\'d be a crazy catto to try it.',
+        'https://cdn.discordapp.com/attachments/1362832151485354065/1373622403455778848/Screenshot_2025-05-18_at_6.19.11_AM.png?ex=682b150d&is=6829c38d&hm=045419693ca1ecd758f7ecf5c7208ca4da321622636b908da9e15c99f97dde61&',
+        'Coming Soon...',
+        2,
+        '2025-04-17 03:45:05',
+    ),
 ]
 MERGED_HUB_BUTTONS: List[Tuple] = []
 
