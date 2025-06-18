@@ -643,12 +643,14 @@ class EmbedManager(commands.Cog):
             }.get(c.get("element_name"), "")
             prefix = "➡️" if i == index else "▫️"
             lines.append(f"{prefix} Crystal {i + 1}: {icon} {c.get('element_name')}")
-        desc = "Use elemental skills to shatter each crystal in order."
+        current = crystals[index] if 0 <= index < len(crystals) else {}
         embed = discord.Embed(
-            title="🔮 Elemental Crystals",
-            description=desc,
+            title=f"🔮 {current.get('name', 'Elemental Crystals')}",
+            description=current.get("description", "Use elemental skills to shatter each crystal in order."),
             color=discord.Color.purple(),
         )
+        if img := current.get("image_url"):
+            embed.set_image(url=f"{img}?t={int(time.time())}")
         if lines:
             embed.add_field(name="Crystals", value="\n".join(lines), inline=False)
         # Build two rows of actions. Row 0 mirrors the standard in-room actions

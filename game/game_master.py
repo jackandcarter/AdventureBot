@@ -2112,6 +2112,9 @@ class GameMaster(commands.Cog):
             idx = len(crystals) - 1
 
         current = crystals[idx]
+        if ability.get("element_id") is None:
+            await interaction.followup.send("The crystal has no reaction.", ephemeral=True)
+            return
         if ability.get("element_id") == current.get("element_id"):
             self.append_game_log(session.session_id, f"{interaction.user.display_name} shatters the {current['element_name']} crystal!")
             idx += 1
