@@ -397,6 +397,44 @@ class AbilityEngine:
                     }]
                 )
 
+            # speed_up (Haste)
+            elif result is None and "speed_up" in effect_data:
+                amount = effect_data["speed_up"]
+                duration = effect_data.get("duration", 1)
+                se_name = effect_data.get("status_name", name)
+                logs.append(
+                    f"{name} increases speed by {amount} for {duration} turn(s)."
+                )
+                result = AbilityResult(
+                    type="status",
+                    logs=logs,
+                    status_effects=[{
+                        "effect_name": se_name,
+                        "remaining": duration,
+                        "speed_up": amount,
+                        "target": ability.get("target_type", "self"),
+                    }]
+                )
+
+            # speed_down (Slow)
+            elif result is None and "speed_down" in effect_data:
+                amount = effect_data["speed_down"]
+                duration = effect_data.get("duration", 1)
+                se_name = effect_data.get("status_name", name)
+                logs.append(
+                    f"{name} decreases speed by {amount} for {duration} turn(s)."
+                )
+                result = AbilityResult(
+                    type="status",
+                    logs=logs,
+                    status_effects=[{
+                        "effect_name": se_name,
+                        "remaining": duration,
+                        "speed_down": amount,
+                        "target": ability.get("target_type", "enemy"),
+                    }]
+                )
+
             # scan
             elif result is None and effect_data.get("scan"):
                 ename = target.get("enemy_name", "Enemy")

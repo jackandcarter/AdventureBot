@@ -129,3 +129,41 @@ def test_scan(monkeypatch):
     result = engine.resolve(user, enemy, ability)
     assert any("30/40" in line for line in result.logs)
     assert any("Fire" in line for line in result.logs)
+
+
+def test_healing_over_time(monkeypatch):
+    engine = make_engine([], monkeypatch)
+    user, enemy, ability = base_entities()
+    ability["ability_name"] = "Regen"
+    ability["effect"] = json.dumps({"healing_over_time": {"percent": 0.2, "duration": 2}})
+    result = engine.resolve(user, user, ability)
+    assert result.type == "hot"
+    assert result.dot["heal_per_turn"] == 10
+    assert result.dot["remaining"] == 2
+    assert result.status_effects[0]["effect_name"] == "Regen"
+
+
+def test_speed_up(monkeypatch):
+    engine = make_engine([], monkeypatch)
+    user, enemy, ability = base_entities()
+    ability["ability_name"] = "Haste"
+    ability["effect"] = json.dumps({"speed_up": 30, "duration": 3})
+    result = engine.resolve(user, user, ability)
+    assert result.type == "status"
+    se = result.status_effects[0]
+    assert se["effect_name"] == "Haste"
+    assert se["speed_up"] == 30
+    assert se["remaining"] == 3
+
+
+def test_speed_down(monkeypatch):
+    engine = make_engine([], monkeypatch)
+    user, enemy, ability = base_entities()
+    ability["ability_name"] = "Slow"
+    ability["effect"] = json.dumps({"speed_down": 20, "duration": 1})
+    result = engine.resolve(user, enemy, ability)
+    assert result.type == "status"
+    se = result.status_effects[0]
+    assert se["effect_name"] == "Slow"
+    assert se["speed_down"] == 20
+    assert se["remaining"] == 1

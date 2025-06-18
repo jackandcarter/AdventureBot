@@ -51,7 +51,8 @@ def table_is_empty(cur, table_name: str) -> bool:
 # ═══════════════════════════════════════════════════════════════════════════
 
 # --- abilities ----------------------------------------------------------------
-[    (1, 'Cure', 'Heals a small amount of HP.', '{"heal": 50}', 1, '❤️', 'self', None, None, None, None, '2025-03-31 07:40:47', 'magic_power'),
+MERGED_ABILITIES: List[Tuple] = [
+    (1, 'Cure', 'Heals a small amount of HP.', '{"heal": 50}', 1, '❤️', 'self', None, None, None, None, '2025-03-31 07:40:47', 'magic_power'),
     (2, 'Fire', 'Deals fire damage to an enemy.', '{"base_damage": 50}', 1, '🔥', 'enemy', None, 1, None, None, '2025-03-31 07:40:47', 'magic_power'),
     (3, 'Blizzard', 'Deals ice damage to an enemy.', '{"base_damage": 50}', 1, '❄️', 'enemy', None, 2, None, None, '2025-03-31 07:40:47', 'magic_power'),
     (4, 'Holy', 'Deals holy damage to one enemy.', '{"base_damage": 100}', 1, '✨', 'enemy', None, 3, None, None, '2025-03-31 07:40:47', 'magic_power'),
@@ -83,8 +84,8 @@ def table_is_empty(cur, table_name: str) -> bool:
     (30, 'Blink', 'Raises your evasion.', '{"evasion_up": 30}', 2, '🎯🔼', 'self', None, None, 10, 5, '2025-04-03 12:43:43', 'magic_power'),
     (31, 'Demi', 'Deals damaged based on enemy health.', '{"percent_damage": 0.25}', 1, '🌀', 'enemy', None, 4, None, None, '2025-04-03 12:43:43', 'attack_power'),
     (32, 'Gravity', 'Deals Air based damage while grounding flying enemies.', '{"base_damage": 80}', 1, '🪐', 'enemy', None, None, None, None, '2025-04-03 12:43:43', 'magic_power'),
-    (33, 'Haste', 'Grants higher speed with chance of increasing turns.', None, 3, '⏱️🔼', 'self', None, None, None, None, '2025-04-03 12:43:43', 'magic_power'),
-    (34, 'Slow', 'Lowers enemy speed with chance of reducing turns.', None, 2, '⏳🔽', 'enemy', None, None, None, None, '2025-04-03 12:43:43', 'magic_power'),
+    (33, 'Haste', 'Grants higher speed with chance of increasing turns.', '{"speed_up": 30, "duration": 3}', 3, '⏱️🔼', 'self', None, None, None, None, '2025-04-03 12:43:43', 'magic_power'),
+    (34, 'Slow', 'Lowers enemy speed with chance of reducing turns.', '{"speed_down": 30, "duration": 2}', 2, '⏳🔽', 'enemy', None, None, None, None, '2025-04-03 12:43:43', 'magic_power'),
     (35, 'Poison', 'Deals a small amount of damage over time.', '{"damage_over_time": {"duration": 3, "damage_per_turn": 10}}', 3, '☠️', 'enemy', None, None, 3, 5, '2025-04-03 12:43:43', 'attack_power'),
     (36, 'Bio', 'Deals a greater amount of damage over time.', '{"damage_over_time": {"duration": 5, "damage_per_turn": 12}}', 5, '☣️', 'enemy', None, None, 8, 5, '2025-04-03 12:43:43', 'attack_power'),
     (37, 'Focus', 'Raises your magic power.', '{"magic_power_up": 30}', 1, '🔮🔼', 'self', None, None, 16, 5, '2025-04-03 12:43:43', 'attack_power'),
