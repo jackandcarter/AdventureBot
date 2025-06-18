@@ -608,20 +608,15 @@ class EmbedManager(commands.Cog):
     async def send_illusion_embed(self, interaction: discord.Interaction, room_info: Dict[str, Any]):
         embed = discord.Embed(
             title="🔮 Illusion Challenge",
-            description=(
-                f"{room_info.get('description','The room appears dark and mysterious.')}\n\n"
-                "What do you think is hidden here?\n"
-                "Choose wisely: Enemy, Treasure, Vendor, or an Empty room."
-            ),
+            description="What is hidden in this room?",
             color=discord.Color.purple(),
         )
         if room_info.get("image_url"):
             embed.set_image(url=f"{room_info['image_url']}?t={int(time.time())}")
         buttons = [
-            ("Enemy",    discord.ButtonStyle.primary,   "illusion_enemy",    0),
-            ("Treasure", discord.ButtonStyle.success,   "illusion_treasure", 0),
-            ("Vendor",   discord.ButtonStyle.primary,   "illusion_vendor",   0),
-            ("Empty",    discord.ButtonStyle.secondary, "illusion_empty",    0),
+            ("Nothing",         discord.ButtonStyle.secondary, "illusion_empty",    0),
+            ("A Fiend",         discord.ButtonStyle.primary,   "illusion_enemy",    0),
+            ("Hidden Treasure", discord.ButtonStyle.success,   "illusion_treasure", 0),
         ]
         await self.send_or_update_embed(interaction, _ZWSP, _ZWSP, embed_override=embed, buttons=buttons)
 
