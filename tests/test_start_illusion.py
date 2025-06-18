@@ -190,3 +190,38 @@ def test_start_illusion_enemy_count(monkeypatch):
     assert challenge["type"] == "enemy_count"
     assert challenge["answer"] == 2
     assert em.called_with and em.called_with[0] == "count"
+
+
+def test_wrong_element_ends_challenge(monkeypatch):
+    session = GameSession(1, 1, "1", 1)
+    sm = FakeSessionManager(session)
+    em = FakeEmbedManager()
+    bot = FakeBot(sm, em)
+    gm = GameMaster(bot)
+
+    session.game_state["illusion_challenge"] = {
+        "type": "elemental_crystal",
+        "answer": "illusion_treasure",
+    }
+    session.game_state["illusion_crystal_order"] = [
+        {"element_id": 1, "element_name": "Fire"}
+    ]
+    session.game_state["illusion_crystal_index"] = 0
+
+    called = []
+
+    async def fake_choice(interaction, choice):
+        called.append(choice)
+        session.game_state.pop("illusion_challenge", None)
+
+    monkeypatch.setattr(gm, "handle_illusion_choice", fake_choice)
+
+    interaction = FakeInteraction()
+    import asyncio
+    ability = {"element_id": 2}
+    asyncio.run(gm.handle_illusion_crystal_skill(interaction, ability))
+
+    assert "illusion_crystal_order" not in session.game_state
+    assert "illusion_crystal_index" not in session.game_state
+    assert "illusion_challenge" not in session.game_state
+    assert called == ["invalid"]
