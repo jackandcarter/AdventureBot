@@ -344,34 +344,26 @@ class GameMaster(commands.Cog):
             return await interaction.followup.send("❌ No session.", ephemeral=True)
 
         challenge_type = random.choice([
-            "enemy_count",
-            "inner_room",
+            "guess_room",
             "elemental_crystal",
         ])
 
-        mapping = [
-            "illusion_enemy",
-            "illusion_treasure",
-            "illusion_vendor",
-            "illusion_empty",
-        ]
-        if challenge_type == "enemy_count":
-            n = random.randint(1, 4)
-            answer = mapping[n - 1]
-            desc = (
-                f"{room_info.get('description', 'The room shimmers mysteriously.')}\n\n"
-                f"You glimpse {n} shadowy enemies. The number may reveal the truth."
-            )
-        elif challenge_type == "inner_room":
-            idx = random.randint(0, 3)
-            answer = mapping[idx]
-            desc = (
-                f"{room_info.get('description', 'The room shimmers mysteriously.')}\n\n"
-                "Four doors materialise around you. One leads onward; the others are illusions."
-            )
+        if challenge_type == "guess_room":
+            answer = random.choice([
+                "illusion_empty",
+                "illusion_enemy",
+                "illusion_treasure",
+            ])
         else:  # elemental_crystal
+            mapping = [
+                "illusion_enemy",
+                "illusion_treasure",
+                "illusion_vendor",
+                "illusion_empty",
+            ]
             idx = random.randint(0, 3)
             answer = mapping[idx]
+
             conn = self.db_connect()
             with conn.cursor(dictionary=True) as cur:
                 cur.execute(
@@ -421,11 +413,7 @@ class GameMaster(commands.Cog):
                 session.game_state.get("illusion_crystal_index", 0),
             )
         else:
-            await em.send_illusion_embed(
-                interaction,
-                {"description": desc, "image_url": room_info.get("image_url")},
-            )
-
+            await em.send_illusion_embed(interaction, room_info)
     # ────────────────────────────────────────────────────────────────────────────
     #  1. Create session → queue
     # ────────────────────────────────────────────────────────────────────────────
