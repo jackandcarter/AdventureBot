@@ -2724,6 +2724,12 @@ class GameMaster(commands.Cog):
         if cid == "action_use":
             inv = self.bot.get_cog("InventoryShop")
             if inv:
+                if not interaction.response.is_done():
+                    defer_fn = getattr(interaction.response, "defer_update", None)
+                    if callable(defer_fn):
+                        await defer_fn()
+                    else:
+                        await interaction.response.defer()
                 return await inv.display_use_item_menu(interaction)
         # Use-stairs
         if cid == "action_use_stairs":
