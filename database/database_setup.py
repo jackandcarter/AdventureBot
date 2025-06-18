@@ -183,6 +183,9 @@ MERGED_ROOM_TEMPLATES: List[Tuple] = [
         None, '2025-04-24 12:00:00')
 ]
 
+# --- crystal templates --------------------------------------------------------
+MERGED_CRYSTAL_TEMPLATES: List[Tuple] = []
+
 # --- items --------------------------------------------------------------------
 MERGED_ITEMS: List[Tuple] = [
     (1, 'Potion',       'Heals 50 HP.',                                                 '{"heal": 50}',                 'consumable', 1, 100, 10, 'self', 'https://example.com/icons/potion.png',        None,'2025-03-30 21:40:47'),
@@ -494,6 +497,18 @@ TABLES = {
             image_url     VARCHAR(255),
             default_enemy_id INT,
             created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''',
+    # ---------- crystal_templates ----------
+    'crystal_templates': '''
+        CREATE TABLE IF NOT EXISTS crystal_templates (
+            template_id   INT AUTO_INCREMENT PRIMARY KEY,
+            element_id    INT NOT NULL,
+            name          VARCHAR(100) NOT NULL,
+            description   TEXT,
+            image_url     VARCHAR(255),
+            created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (element_id) REFERENCES elements(element_id) ON DELETE CASCADE
         )
     ''',
     # ---------- npc_vendors ----------
@@ -883,6 +898,7 @@ TABLE_ORDER = [
     'players',
     'floors',
     'room_templates',
+    'crystal_templates',
     'npc_vendors',
     'items',
     'npc_vendor_items',
@@ -1045,6 +1061,14 @@ def insert_room_templates(cur):
         [row[1:] for row in MERGED_ROOM_TEMPLATES]
     )
     logger.info("Inserted room_templates.")
+
+def insert_crystal_templates(cur):
+    logger.info("Checking crystal_templates seed data…")
+    if not table_is_empty(cur, "crystal_templates"):
+        logger.info("crystal_templates already populated – skipping")
+        return
+    # No default crystal templates yet
+    logger.info("No crystal_templates seed data to insert.")
 
 def insert_npc_vendors(cur):
     logger.info("Checking npc_vendors seed data…")
@@ -1249,6 +1273,7 @@ def main() -> None:
                 insert_levels(cur)
                 insert_intro_steps(cur)
                 insert_room_templates(cur)
+                insert_crystal_templates(cur)
                 insert_npc_vendors(cur)
                 insert_items(cur)
                 insert_enemies_and_abilities(cur)
