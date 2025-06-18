@@ -40,23 +40,24 @@ class AbilityEngine:
     # ------------------------------------------------------------------
     # Elemental resistances
     # ------------------------------------------------------------------
-    def fetch_enemy_resistance(self, enemy_id: int, element_id: int) -> float:
-        """Return the elemental damage multiplier for ``enemy_id`` and ``element_id``."""
+    def fetch_enemy_resistance(self, enemy_id: int, element_id: int) -> tuple[float, str | None]:
+        """Return ``(multiplier, relation)`` for the given enemy/element."""
         conn = self.db_connect()
         cur = conn.cursor(dictionary=True)
         cur.execute(
-            "SELECT multiplier FROM enemy_resistances WHERE enemy_id=%s AND element_id=%s",
+            "SELECT multiplier, relation FROM enemy_resistances WHERE enemy_id=%s AND element_id=%s",
             (enemy_id, element_id),
         )
         row = cur.fetchone()
         cur.close()
         conn.close()
-        if row and row.get("multiplier") is not None:
-            try:
-                return float(row["multiplier"])
-            except (TypeError, ValueError):
-                return 1.0
-        return 1.0
+        if not row:
+            return 1.0, None
+        try:
+            mult = float(row.get("multiplier", 1.0))
+        except (TypeError, ValueError):
+            mult = 1.0
+        return mult, row.get("relation")
 
     def fetch_enemy_resistance_rows(self, enemy_id: int) -> List[Dict[str, Any]]:
         """Return all elemental relations for the given enemy."""
@@ -78,14 +79,15 @@ class AbilityEngine:
 
     def _apply_elemental_multiplier(
         self, dmg: int, target: Dict[str, Any], ability: Dict[str, Any]
-    ) -> int:
-        """Apply elemental resistance/weakness multiplier if applicable."""
+    ) -> tuple[int, str | None]:
+        """Apply elemental multiplier and return ``(damage, relation)``."""
+        relation: str | None = None
         el = ability.get("element_id")
         eid = target.get("enemy_id")
         if el and eid:
-            factor = self.fetch_enemy_resistance(eid, el)
+            factor, relation = self.fetch_enemy_resistance(eid, el)
             dmg = int(dmg * factor)
-        return dmg
+        return dmg, relation
 
     def jrpg_damage(
         self,
@@ -290,9 +292,16 @@ class AbilityEngine:
                     stat = effect_data.get("scaling_stat", "attack_power")
                     factor = effect_data.get("scaling_factor", 1.0)
                     dmg = self.jrpg_damage(user, target, base, stat, factor)
-                    dmg = self._apply_elemental_multiplier(dmg, target, ability)
-                    logs.append(f"{name} deals {dmg} damage.")
-                    result = AbilityResult(type="damage", amount=dmg, logs=logs)
+                    dmg, relation = self._apply_elemental_multiplier(dmg, target, ability)
+                    if relation == "absorb" or dmg < 0:
+                        healed = abs(dmg)
+                        logs.append(
+                            f"{target.get('enemy_name', 'The enemy')} absorbs {name} and recovers {healed} HP."
+                        )
+                        result = AbilityResult(type="heal", amount=healed, logs=logs)
+                    else:
+                        logs.append(f"{name} deals {dmg} damage.")
+                        result = AbilityResult(type="damage", amount=dmg, logs=logs)
 
             # lucky_7
             if result is None and effect_data.get("lucky_7"):
@@ -302,17 +311,31 @@ class AbilityEngine:
                     logs.append(f"{name}: no ‘7’ in {user['hp']} → deals {dmg}.")
                 else:
                     dmg = random.choice([7, 77, 777, 7777])
-                    dmg = self._apply_elemental_multiplier(dmg, target, ability)
-                    logs.append(f"{name} JACKPOT! Deals {dmg}.")
-                result = AbilityResult(type="damage", amount=dmg, logs=logs)
+                    dmg, relation = self._apply_elemental_multiplier(dmg, target, ability)
+                    if relation == "absorb" or dmg < 0:
+                        healed = abs(dmg)
+                        logs.append(
+                            f"{target.get('enemy_name', 'The enemy')} absorbs {name} and recovers {healed} HP."
+                        )
+                        result = AbilityResult(type="heal", amount=healed, logs=logs)
+                    else:
+                        logs.append(f"{name} JACKPOT! Deals {dmg}.")
+                        result = AbilityResult(type="damage", amount=dmg, logs=logs)
 
             # percent_damage
             elif result is None and "percent_damage" in effect_data:
                 pct = effect_data["percent_damage"]
                 dmg = int(target["hp"] * pct)
-                dmg = self._apply_elemental_multiplier(dmg, target, ability)
-                logs.append(f"{name} deals {dmg} ({int(pct*100)}%).")
-                result = AbilityResult(type="damage", amount=dmg, logs=logs)
+                dmg, relation = self._apply_elemental_multiplier(dmg, target, ability)
+                if relation == "absorb" or dmg < 0:
+                    healed = abs(dmg)
+                    logs.append(
+                        f"{target.get('enemy_name', 'The enemy')} absorbs {name} and recovers {healed} HP."
+                    )
+                    result = AbilityResult(type="heal", amount=healed, logs=logs)
+                else:
+                    logs.append(f"{name} deals {dmg} ({int(pct*100)}%).")
+                    result = AbilityResult(type="damage", amount=dmg, logs=logs)
 
             # damage_over_time (DoT)
             elif result is None and "damage_over_time" in effect_data:
@@ -404,22 +427,36 @@ class AbilityEngine:
             elif result is None and "mug" in effect_data:
                 base = effect_data["mug"].get("damage", 0)
                 dmg  = self.jrpg_damage(user, target, base, "attack_power", 1.0)
-                dmg  = self._apply_elemental_multiplier(dmg, target, ability)
+                dmg, relation = self._apply_elemental_multiplier(dmg, target, ability)
                 pool = target.get("gil_pool", 0)
                 steal = 0
                 if pool > 0:
                     low  = max(1, int(pool*0.1))
                     high = max(low, int(pool*0.25))
                     steal = min(pool, random.randint(low, high))
-                logs.append(f"{name} deals {dmg} and pilfers {steal} Gil!")
-                result = AbilityResult(type="mug", amount=dmg, logs=logs)
+                if relation == "absorb" or dmg < 0:
+                    healed = abs(dmg)
+                    logs.append(
+                        f"{target.get('enemy_name', 'The enemy')} absorbs {name} and recovers {healed} HP while you steal {steal} Gil!"
+                    )
+                    result = AbilityResult(type="mug", amount=-healed, logs=logs)
+                else:
+                    logs.append(f"{name} deals {dmg} and pilfers {steal} Gil!")
+                    result = AbilityResult(type="mug", amount=dmg, logs=logs)
 
         # 5) Fallback physical damage
         if result is None:
             dmg = self.jrpg_damage(user, target, 0, "attack_power", 1.0)
-            dmg = self._apply_elemental_multiplier(dmg, target, ability)
-            logs.append(f"{name} deals {dmg} damage.")
-            result = AbilityResult(type="damage", amount=dmg, logs=logs)
+            dmg, relation = self._apply_elemental_multiplier(dmg, target, ability)
+            if relation == "absorb" or dmg < 0:
+                healed = abs(dmg)
+                logs.append(
+                    f"{target.get('enemy_name', 'The enemy')} absorbs {name} and recovers {healed} HP."
+                )
+                result = AbilityResult(type="heal", amount=healed, logs=logs)
+            else:
+                logs.append(f"{name} deals {dmg} damage.")
+                result = AbilityResult(type="damage", amount=dmg, logs=logs)
 
         
         # 6) Attach any table‑driven status effects (single + many‑to‑many)
