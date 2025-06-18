@@ -343,11 +343,19 @@ class GameMaster(commands.Cog):
         if not session:
             return await interaction.followup.send("❌ No session.", ephemeral=True)
 
-        challenge_type = random.choice([
-            "guess_room",
-            "elemental_crystal",
-            "enemy_count",
-        ])
+        tpl_id = room_info.get("inner_template_id")
+        mapping = {
+            19: "enemy_count",
+            20: "guess_room",
+            21: "elemental_crystal",
+        }
+        challenge_type = mapping.get(tpl_id)
+        if not challenge_type:
+            challenge_type = random.choice([
+                "guess_room",
+                "elemental_crystal",
+                "enemy_count",
+            ])
 
         if challenge_type == "guess_room":
             if not room_info.get("image_url"):
@@ -418,14 +426,7 @@ class GameMaster(commands.Cog):
             await em.send_illusion_count_embed(interaction, room_info, options)
             return
         else:  # elemental_crystal
-            mapping = [
-                "illusion_enemy",
-                "illusion_treasure",
-                "illusion_vendor",
-                "illusion_empty",
-            ]
-            idx = random.randint(0, 3)
-            answer = mapping[idx]
+            answer = "illusion_treasure"
 
             conn = self.db_connect()
             with conn.cursor(dictionary=True) as cur:
@@ -450,8 +451,7 @@ class GameMaster(commands.Cog):
 
             desc = (
                 f"{room_info.get('description', 'The room shimmers mysteriously.')}\n\n"
-                f"{len(crystals)} elemental crystals glow faintly. "
-                "Only one dispels the mirage."
+                f"Attune {len(crystals)} elemental crystals in sequence."
             )
 
             session.game_state['illusion_crystal_order'] = crystals

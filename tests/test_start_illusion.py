@@ -129,7 +129,8 @@ def test_start_illusion_challenge_order(monkeypatch):
 
     interaction = FakeInteraction()
     import asyncio
-    asyncio.run(gm.start_illusion_challenge(interaction, {"description": ""}))
+    room = {"description": "", "inner_template_id": 21}
+    asyncio.run(gm.start_illusion_challenge(interaction, room))
     order = session.game_state.get("illusion_crystal_order", [])
     assert 2 <= len(order) <= 6
 
@@ -141,17 +142,16 @@ def test_start_illusion_guess_room(monkeypatch):
     bot = FakeBot(sm, em)
     gm = GameMaster(bot)
 
-    choices = ["guess_room", "illusion_enemy"]
-
     def fake_choice(seq):
-        return choices.pop(0)
+        return "illusion_enemy"
 
     monkeypatch.setattr(random, "choice", fake_choice)
     monkeypatch.setattr(gm, "db_connect", lambda: FakeConnection([{"image_url": "dark.png"}]))
 
     interaction = FakeInteraction()
     import asyncio
-    asyncio.run(gm.start_illusion_challenge(interaction, {"description": ""}))
+    room = {"description": "", "inner_template_id": 20}
+    asyncio.run(gm.start_illusion_challenge(interaction, room))
 
     challenge = session.game_state.get("illusion_challenge")
     assert challenge["type"] == "guess_room"
@@ -183,7 +183,8 @@ def test_start_illusion_enemy_count(monkeypatch):
 
     interaction = FakeInteraction()
     import asyncio
-    asyncio.run(gm.start_illusion_challenge(interaction, {"description": ""}))
+    room = {"description": "", "inner_template_id": 19}
+    asyncio.run(gm.start_illusion_challenge(interaction, room))
 
     challenge = session.game_state.get("illusion_challenge")
     assert challenge["type"] == "enemy_count"
