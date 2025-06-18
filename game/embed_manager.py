@@ -631,27 +631,29 @@ class EmbedManager(commands.Cog):
         crystals: List[Dict[str, Any]],
         index: int = 0,
     ) -> None:
-        """Display the elemental crystals for the illusion challenge."""
-        lines = []
-        for i, c in enumerate(crystals):
-            icon = {
-                "Fire": "🔥",
-                "Ice": "❄️",
-                "Holy": "✨",
-                "Non-Elemental": "🌟",
-                "Air": "💨",
-            }.get(c.get("element_name"), "")
-            prefix = "➡️" if i == index else "▫️"
-            lines.append(f"{prefix} Crystal {i + 1}: {icon} {c.get('element_name')}")
-        desc = "Use elemental skills to shatter each crystal in order."
+        """Display the current crystal for the illusion challenge."""
+        if crystals:
+            if index >= len(crystals):
+                index = len(crystals) - 1
+            current = crystals[index]
+        else:
+            current = {}
+        desc = current.get("description", "A mysterious crystal shimmers here.")
         embed = discord.Embed(
-            title="🔮 Elemental Crystals",
+            title=f"🔮 Crystal {index + 1}/{len(crystals) if crystals else 1}",
             description=desc,
             color=discord.Color.purple(),
         )
-        if lines:
-            embed.add_field(name="Crystals", value="\n".join(lines), inline=False)
-        buttons = [("Skill", discord.ButtonStyle.primary, "combat_skill_menu", 0)]
+        if current.get("image_url"):
+            embed.set_image(url=f"{current['image_url']}?t={int(time.time())}")
+        buttons = [
+            ("Use",        discord.ButtonStyle.success,   "action_use",        0),
+            ("Skill",      discord.ButtonStyle.primary,   "combat_skill_menu", 0),
+            ("Character",  discord.ButtonStyle.danger,    "action_character", 0),
+            ("Look Around",discord.ButtonStyle.secondary, "action_look_around",0),
+            ("Menu",       discord.ButtonStyle.secondary, "action_menu",      0),
+            ("Leave Room", discord.ButtonStyle.secondary, "illusion_leave_room",0),
+        ]
         await self.send_or_update_embed(
             interaction,
             _ZWSP,
