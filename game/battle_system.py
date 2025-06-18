@@ -1010,7 +1010,11 @@ class BattleSystem(commands.Cog):
                 else:
                     # heal the enemy (e.g. Vampire or enemy‑buff)
                     enemy["hp"] = min(enemy["hp"] + result.amount, enemy["max_hp"])
-                    session.game_log.append(f"{enemy['enemy_name']} recovers {result.amount} HP!")
+                    # avoid duplicate line if AbilityEngine already logged absorption
+                    if not any("absorbs" in line for line in result.logs):
+                        session.game_log.append(
+                            f"{enemy['enemy_name']} recovers {result.amount} HP!"
+                        )
             elif result.type == "set_hp":
                 enemy["hp"] = result.amount
             elif result.type == "dot":

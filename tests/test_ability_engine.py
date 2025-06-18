@@ -22,7 +22,10 @@ class FakeCursor:
     def execute(self, sql, params=None):
         for r in self.rows:
             if r["enemy_id"] == params[0] and r["element_id"] == params[1]:
-                self.result = {"multiplier": r["multiplier"]}
+                self.result = {
+                    "multiplier": r["multiplier"],
+                    "relation": r.get("relation", "normal"),
+                }
                 break
         else:
             self.result = None
@@ -69,10 +72,13 @@ def test_weakness_multiplier(monkeypatch):
 
 
 def test_absorb_multiplier(monkeypatch):
-    engine = make_engine([{"enemy_id": 1, "element_id": 1, "multiplier": -1}], monkeypatch)
+    engine = make_engine([
+        {"enemy_id": 1, "element_id": 1, "multiplier": -1, "relation": "absorb"}
+    ], monkeypatch)
     user, enemy, ability = base_entities()
     result = engine.resolve(user, enemy, ability)
-    assert result.amount == -10
+    assert result.type == "heal"
+    assert result.amount == 10
 
 
 @pytest.mark.parametrize(
