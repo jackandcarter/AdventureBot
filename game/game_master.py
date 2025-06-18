@@ -346,14 +346,77 @@ class GameMaster(commands.Cog):
         challenge_type = random.choice([
             "guess_room",
             "elemental_crystal",
+            "enemy_count",
         ])
 
         if challenge_type == "guess_room":
+            if not room_info.get("image_url"):
+                conn = self.db_connect()
+                with conn.cursor(dictionary=True) as cur:
+                    cur.execute(
+                        "SELECT image_url FROM room_templates WHERE template_id=%s",
+                        (16,),
+                    )
+                    tpl = cur.fetchone() or {}
+                conn.close()
+                if tpl.get("image_url"):
+                    room_info["image_url"] = tpl["image_url"]
             answer = random.choice([
                 "illusion_empty",
                 "illusion_enemy",
                 "illusion_treasure",
             ])
+        elif challenge_type == "enemy_count":
+            conn = self.db_connect()
+            with conn.cursor(dictionary=True) as cur:
+                cur.execute(
+                    "SELECT enemies_defeated FROM players WHERE player_id=%s AND session_id=%s",
+                    (interaction.user.id, session.session_id),
+                )
+                row = cur.fetchone() or {}
+                if not room_info.get("image_url"):
+                    cur.execute(
+                        "SELECT image_url FROM room_templates WHERE template_id=%s",
+                        (16,),
+                    )
+                    tpl = cur.fetchone() or {}
+                    if tpl.get("image_url"):
+                        room_info["image_url"] = tpl["image_url"]
+            conn.close()
+
+            count = row.get("enemies_defeated", 0)
+            opts = {count}
+            while len(opts) < 4:
+                val = count + random.randint(-3, 3)
+                if val < 0:
+                    continue
+                opts.add(val)
+            options = list(opts)
+            random.shuffle(options)
+
+            answer = count
+            room_answer = random.choice([
+                "illusion_empty",
+                "illusion_enemy",
+                "illusion_treasure",
+            ])
+
+            session.game_state["illusion_challenge"] = {
+                "type": challenge_type,
+                "answer": answer,
+                "options": options,
+                "room_answer": room_answer,
+            }
+
+            em = self.bot.get_cog("EmbedManager")
+            if not em:
+                await interaction.followup.send(
+                    "❌ EmbedManager unavailable.", ephemeral=True
+                )
+                return
+
+            await em.send_illusion_count_embed(interaction, room_info, options)
+            return
         else:  # elemental_crystal
             mapping = [
                 "illusion_enemy",
@@ -2078,6 +2141,27 @@ class GameMaster(commands.Cog):
         await self.update_room_view(interaction, new_room, x, y)
         await self.end_player_turn(interaction)
 
+    async def handle_illusion_count_choice(self, interaction: discord.Interaction, value: int) -> None:
+        """Handle the enemy-count illusion challenge."""
+        sm = self.bot.get_cog("SessionManager")
+        session = sm.get_session(interaction.channel.id) if sm else None
+        if not session:
+            return await interaction.response.send_message("❌ No session.", ephemeral=True)
+
+        challenge = session.game_state.get("illusion_challenge")
+        if not challenge or challenge.get("type") != "enemy_count":
+            return await interaction.response.send_message("❌ Nothing happens.", ephemeral=True)
+
+        correct = challenge.get("answer", 0)
+        room_choice = challenge.get("room_answer")
+        session.game_state.pop("illusion_challenge", None)
+
+        session.game_state["illusion_challenge"] = {"answer": room_choice}
+        if value != correct:
+            await self.handle_illusion_choice(interaction, "invalid")
+        else:
+            await self.handle_illusion_choice(interaction, room_choice)
+
     async def handle_illusion_crystal_skill(
         self,
         interaction: discord.Interaction,
@@ -2772,6 +2856,13 @@ class GameMaster(commands.Cog):
 
             if cid in {"illusion_enemy", "illusion_treasure", "illusion_vendor", "illusion_empty"}:
                 return await self.handle_illusion_choice(interaction, cid)
+
+            if cid.startswith("illusion_count_"):
+                try:
+                    val = int(cid.split("_")[2])
+                except (IndexError, ValueError):
+                    return
+                return await self.handle_illusion_count_choice(interaction, val)
 
             if cid == "end_game":
                 sm = self.bot.get_cog("SessionManager")

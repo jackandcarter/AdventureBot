@@ -568,6 +568,8 @@ class EmbedManager(commands.Cog):
         "illusion": lambda self, i, d: (
             self.send_illusion_crystal_embed(i, d.get("crystals", []), d.get("index", 0))
             if d.get("illusion_type") == "elemental_crystal"
+            else self.send_illusion_count_embed(i, d.get("room_info"), d.get("options", []))
+            if d.get("illusion_type") == "enemy_count"
             else self.send_illusion_embed(i, d.get("room_info"))
         ),
     }
@@ -658,6 +660,31 @@ class EmbedManager(commands.Cog):
             ("Look Around",discord.ButtonStyle.secondary, "action_look_around", 0),
             ("Menu",       discord.ButtonStyle.secondary, "action_menu",        0),
             ("Leave Room", discord.ButtonStyle.secondary, "illusion_leave_room",1),
+        ]
+        await self.send_or_update_embed(
+            interaction,
+            _ZWSP,
+            _ZWSP,
+            embed_override=embed,
+            buttons=buttons,
+        )
+
+    async def send_illusion_count_embed(
+        self,
+        interaction: discord.Interaction,
+        room_info: Dict[str, Any],
+        options: List[int],
+    ) -> None:
+        embed = discord.Embed(
+            title="🔮 Illusion Challenge",
+            description="How many enemies have you defeated so far?",
+            color=discord.Color.purple(),
+        )
+        if room_info.get("image_url"):
+            embed.set_image(url=f"{room_info['image_url']}?t={int(time.time())}")
+        buttons = [
+            (str(o), discord.ButtonStyle.secondary, f"illusion_count_{o}", 0)
+            for o in options
         ]
         await self.send_or_update_embed(
             interaction,

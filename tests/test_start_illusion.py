@@ -25,6 +25,14 @@ ext_mod.commands.has_guild_permissions = lambda **k: (lambda f: f)
 ext_mod.commands.has_permissions = lambda **k: (lambda f: f)
 ext_mod.commands.Context = object
 
+discord = sys.modules["discord"]
+discord.InteractionType = types.SimpleNamespace(component=1)
+discord.ui = types.SimpleNamespace(View=object, Button=object)
+discord.ui.button = lambda *a, **k: (lambda f: f)
+discord.ButtonStyle = types.SimpleNamespace(primary=1, secondary=2, success=3, danger=4, blurple=5)
+discord.Color = types.SimpleNamespace(purple=lambda: None)
+discord.Interaction = type("Interaction", (), {})
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import types as typ
@@ -35,9 +43,18 @@ from core.game_session import GameSession
 class FakeCursor:
     def __init__(self, rows):
         self.rows = rows
+        self.index = 0
     def execute(self, sql, params=None):
         pass
     def fetchall(self):
+        return self.rows
+    def fetchone(self):
+        if isinstance(self.rows, list):
+            if self.index < len(self.rows):
+                res = self.rows[self.index]
+                self.index += 1
+                return res
+            return None
         return self.rows
     def __enter__(self):
         return self
@@ -70,6 +87,9 @@ class FakeEmbedManager:
     async def send_illusion_embed(self, *a, **k):
         self.called_with = ("embed", a, k)
 
+    async def send_illusion_count_embed(self, *a, **k):
+        self.called_with = ("count", a, k)
+
 class FakeBot:
     def __init__(self, sm, em):
         self.sm = sm
@@ -85,6 +105,7 @@ class FakeInteraction:
     def __init__(self):
         self.channel = typ.SimpleNamespace(id=1)
         self.followup = FakeFollowup()
+        self.user = typ.SimpleNamespace(id=42, display_name="Hero")
 
 def test_start_illusion_challenge_order(monkeypatch):
     session = GameSession(1, 1, "1", 1)
@@ -126,6 +147,7 @@ def test_start_illusion_guess_room(monkeypatch):
         return choices.pop(0)
 
     monkeypatch.setattr(random, "choice", fake_choice)
+    monkeypatch.setattr(gm, "db_connect", lambda: FakeConnection([{"image_url": "dark.png"}]))
 
     interaction = FakeInteraction()
     import asyncio
@@ -135,3 +157,35 @@ def test_start_illusion_guess_room(monkeypatch):
     assert challenge["type"] == "guess_room"
     assert challenge["answer"] == "illusion_enemy"
     assert em.called_with and em.called_with[0] == "embed"
+
+
+def test_start_illusion_enemy_count(monkeypatch):
+    session = GameSession(1, 1, "1", 1)
+    sm = FakeSessionManager(session)
+    em = FakeEmbedManager()
+    bot = FakeBot(sm, em)
+    gm = GameMaster(bot)
+
+    choices = ["enemy_count", "illusion_treasure"]
+
+    def fake_choice(seq):
+        return choices.pop(0)
+
+    monkeypatch.setattr(random, "choice", fake_choice)
+    monkeypatch.setattr(random, "randint", lambda a, b: 1)
+
+    rows = [
+        {"enemies_defeated": 2},
+        {"image_url": "dark.png"},
+    ]
+
+    monkeypatch.setattr(gm, "db_connect", lambda: FakeConnection(rows))
+
+    interaction = FakeInteraction()
+    import asyncio
+    asyncio.run(gm.start_illusion_challenge(interaction, {"description": ""}))
+
+    challenge = session.game_state.get("illusion_challenge")
+    assert challenge["type"] == "enemy_count"
+    assert challenge["answer"] == 2
+    assert em.called_with and em.called_with[0] == "count"
