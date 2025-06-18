@@ -1360,6 +1360,14 @@ class BattleSystem(commands.Cog):
         if not session:
             return await interaction.response.send_message("❌ No active session found.", ephemeral=True)
 
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer()
+        except discord.errors.HTTPException as e:
+            logger.debug(
+                "Deferred interaction failed (already acknowledged): %s", e
+            )
+
         prev = None
         if session.battle_state:
             prev = session.battle_state.get("previous_coords")
