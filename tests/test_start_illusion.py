@@ -61,10 +61,14 @@ class FakeSessionManager:
         return self.session
 
 class FakeEmbedManager:
+    def __init__(self):
+        self.called_with = None
+
     async def send_illusion_crystal_embed(self, *a, **k):
-        pass
+        self.called_with = ("crystal", a, k)
+
     async def send_illusion_embed(self, *a, **k):
-        pass
+        self.called_with = ("embed", a, k)
 
 class FakeBot:
     def __init__(self, sm, em):
@@ -107,3 +111,27 @@ def test_start_illusion_challenge_order(monkeypatch):
     asyncio.run(gm.start_illusion_challenge(interaction, {"description": ""}))
     order = session.game_state.get("illusion_crystal_order", [])
     assert 2 <= len(order) <= 6
+
+
+def test_start_illusion_guess_room(monkeypatch):
+    session = GameSession(1, 1, "1", 1)
+    sm = FakeSessionManager(session)
+    em = FakeEmbedManager()
+    bot = FakeBot(sm, em)
+    gm = GameMaster(bot)
+
+    choices = ["guess_room", "illusion_enemy"]
+
+    def fake_choice(seq):
+        return choices.pop(0)
+
+    monkeypatch.setattr(random, "choice", fake_choice)
+
+    interaction = FakeInteraction()
+    import asyncio
+    asyncio.run(gm.start_illusion_challenge(interaction, {"description": ""}))
+
+    challenge = session.game_state.get("illusion_challenge")
+    assert challenge["type"] == "guess_room"
+    assert challenge["answer"] == "illusion_enemy"
+    assert em.called_with and em.called_with[0] == "embed"
