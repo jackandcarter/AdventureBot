@@ -51,49 +51,100 @@ def table_is_empty(cur, table_name: str) -> bool:
 # ═══════════════════════════════════════════════════════════════════════════
 
 # --- abilities ----------------------------------------------------------------
-MERGED_ABILITIES: List[Tuple] = [
-    (1,  'Cure',        'Heals a small amount of HP.',                                      '{"heal": 50}', 0, '❤️',     'self',  None, None, '2025-03-31 02:40:47'),
-    (2,  'Fire',        'Deals fire damage to one enemy.',                                  '{"fire_damage": 30}', 0, '🔥',     'enemy', None, 1, '2025-03-31 02:40:47'),
-    (3,  'Blizzard',    'Deals ice damage to one enemy.',                                   '{"ice_damage": 30}', 0, '❄️',     'enemy', None, 2, '2025-03-31 02:40:47'),
-    (4,  'Holy',        'Deals holy damage to one enemy.',                                  '{"holy_damage": 100}', 1, '✨',     'enemy', None, 3, '2025-03-31 02:40:47'),
-    (5,  'Meteor',      'Massive non‑elemental damage to enemies.',                         '{"non_elemental_damage": 120}', 2, '💫', 'enemy', None, 4, '2025-03-31 02:40:47'),
-    (6,  'Jump',        'Leap high and strike down a foe.',                                 '{"jump_attack": 1}', 5, '🏃‍♂️',   'enemy', None, None, '2025-03-31 02:40:47'),
-    (7,  'Kick',        'Deals physical damage to all enemies.',                            '{"aoe_physical": 15}', 3, '🥾',     'enemy', None, None, '2025-03-31 02:40:47'),
-    (8,  'Steal',       'Attempt to steal an item from an enemy.',                          '{"steal_chance": 50}', 0, '🦹',     'enemy', None, None, '2025-03-31 02:40:47'),
-    (9,  'Scan',        'Reveal an enemy’s HP and weaknesses.',                             '{"scan": true}', 0, '🔍',       'enemy', None, None, '2025-03-31 02:40:47'),
-    (10, 'Berserk',     'Boost attack but reduce defense.',                                 '{"attack_power": 50, "defense_down": 20}', 3, '💪🔼🛡️','self', None, None,'2025-03-31 02:40:47'),
-    (11, 'Revive',      'Revives a fainted ally with a surge of healing.',                  '{"heal": 50, "revive": true}', 0, '♻️', 'ally', None, None, '2025-03-31 02:40:47'),
-    (12, 'Thunder',     'Deals lightning damage to a single enemy.',                       '{"lightning_damage": 30}', 1, '⚡', 'enemy', None, 5, '2025-03-31 02:40:47'),
-    (13, 'Barrier',     'Raises your defense for a short time.',                            '{"defense_up": 30}', 2, '🛡️🔼',  'self', None, None, '2025-03-31 02:40:47'),
-    (14, 'Power Break', 'Lower Enemy Attack Power.',                                        '{"attack_power_down": 10}', 0, '💪🔽', 'enemy', None, None,'2025-04-03 07:43:43'),
-    (15, 'Armor Break', 'Lower Enemy Defense',                                              '{"defense_down": 30}', 0, '🛡️🔽',  'enemy', None, None,'2025-04-03 07:43:43'),
-    (16, 'Mental Break','Lowers Enemy Magic Power and Magic Defense',                       '{"magic_power_down": 30, "magic_defense_down": 30}',0,'🔮🛡️🔽','enemy',None,None,'2025-04-03 07:43:43'),
-    (17, 'Fira',        'Deals greater fire damage to one enemy.',                          '{"fire_damage": 50}', 0, '🔥',     'enemy', None, 1, '2025-04-03 07:43:43'),
-    (18, 'FIraga',      'Deals devastating fire damage to one enemy.',                      '{"fire_damage": 90}', 1, '🔥',     'enemy', None, 1, '2025-04-03 07:43:43'),
-    (19, 'Bizzara',     'Deals greater ice damage to one enemy.',                           '{"ice_damage": 50}', 0, '❄️',     'enemy', None, 2, '2025-04-03 07:43:43'),
-    (20, 'Bizzaga',     'Deals devastating ice damage to one enemy.',                       '{"ice_damage": 80}', 1, '❄️',     'enemy', None, 2, '2025-04-03 07:43:43'),
-    (21, 'Thundara',    'Deals greater lightning damage to a single enemy.',                '{"lightning_damage": 50}', 0, '⚡', 'enemy', None, 5, '2025-04-03 07:43:43'),
-    (22, 'Thundaga',    'Deals devastating lightning damage to a single enemy.',            '{"lightning_damage": 80}', 1, '⚡', 'enemy', None, 5, '2025-04-03 07:43:43'),
-    (23, 'Flare',       'A massive non‑elemental magic attack dealing significant damage.', '{"non_elemental_damage": 90}', 2,'💥','enemy',None,4,'2025-04-03 07:43:43'),
-    (24, 'Ultima',      'A massive non‑elemental magic attack dealing very high damage.',   '{"non_elemental_damage": 200}',3,'🌀','enemy',None,4,'2025-04-03 07:43:43'),
-    (25, 'Comet',       'A massive non‑elemental magic attack dealing very high damage.',   '{"non_elemental_damage": 150}',2,'☄️','enemy',None,4,'2025-04-03 07:43:43'),
-    (26, 'Cura',        'Heals a greater amount of HP.',                                    '{"heal": 100}', 0, '❤️',    'self', None, None,'2025-04-03 07:43:43'),
-    (27, 'Curaga',      'Heals a high amount of HP.',                                       '{"heal": 200}', 0, '❤️',    'self', None, None,'2025-04-03 07:43:43'),
-    (28, 'Regen',       'Heals a small amount of HP over time.',                            None, 0, '❤️🔄',   'self',  None, None,'2025-04-03 07:43:43'),
-    (29, 'Shell',       'Raises your magic defense.',                                       '{"magic_defense_up": 30}', 0,'🔮🛡️🔼','self',None,None,'2025-04-03 07:43:43'),
-    (30, 'Blink',       'Raises your evasion.',                                             '{"evasion_up": 30}', 2, '🎯🔼','self', None, None,'2025-04-03 07:43:43'),
-    (31, 'Demi',        'Deals damaged based on enemy health.',                             None, 0, '🌀',      'enemy', None, None,'2025-04-03 07:43:43'),
-    (32, 'Gravity',     'Deals Air based damage while grounding flying enemies.',           '{"non_elemental_damage": 80}', 0,'🪐','enemy',None,None,'2025-04-03 07:43:43'),
-    (33, 'Haste',       'Grants higher speed with chance of increasing turns.',             None, 3, '⏱️🔼',   'self',  None, None,'2025-04-03 07:43:43'),
-    (34, 'Slow',        'Lowers enemy speed with chance of reducing turns.',                None, 2, '⏳🔽',   'enemy', None, None,'2025-04-03 07:43:43'),
-    (35, 'Poison',      'Deals a small amount of damage over time.',                        None, 0, '☠️',     'enemy', None, None,'2025-04-03 07:43:43'),
-    (36, 'Bio',         'Deals a greater amount of damage over time.',                      None, 1, '☣️',     'enemy', None, None,'2025-04-03 07:43:43'),
-    (37, 'Focus',       'Raises your magic power.',                                         '{"magic_power_up": 30}', 0,'🔮🔼','self',None,None,'2025-04-03 07:43:43'),
-    (38, 'Fireblade',   'A Spellblade ability that fuses fire to your attacks.',            '{"fire_damage": 30}', 0,'🔥⚔️','enemy',None,1,'2025-04-03 07:51:14'),
-    (39, 'Iceblade',    'A Spellblade ability that fuses ice to your attacks.',             '{"ice_damage": 30}', 0,'❄️⚔️','enemy',None,2,'2025-04-03 07:51:14'),
-    (40, 'Thunderblade','A Spellblade ability that fuses thunder to your attacks.',         '{"lightning_damage": 30}', 0,'⚡⚔️','enemy',None,5,'2025-04-03 07:51:14')
+[    (1, 'Cure', 'Heals a small amount of HP.', '{"heal": 50}', 1, '❤️', 'self', None, None, None, None, '2025-03-31 07:40:47', 'magic_power'),
+    (2, 'Fire', 'Deals fire damage to an enemy.', '{"base_damage": 50}', 1, '🔥', 'enemy', None, 1, None, None, '2025-03-31 07:40:47', 'magic_power'),
+    (3, 'Blizzard', 'Deals ice damage to an enemy.', '{"base_damage": 50}', 1, '❄️', 'enemy', None, 2, None, None, '2025-03-31 07:40:47', 'magic_power'),
+    (4, 'Holy', 'Deals holy damage to one enemy.', '{"base_damage": 100}', 1, '✨', 'enemy', None, 3, None, None, '2025-03-31 07:40:47', 'magic_power'),
+    (5, 'Meteor', 'Massive non‑elemental damage to enemies.', '{"base_damage": 120}', 2, '💫', 'enemy', None, 4, None, None, '2025-03-31 07:40:47', 'magic_power'),
+    (6, 'Jump', 'Leap high and strike down a foe.', '{"base_damage": 50}', 5, '🏃\u200d♂️', 'enemy', None, None, None, None, '2025-03-31 07:40:47', 'attack_power'),
+    (7, 'Kick', 'Deals physical damage to all enemies.', '{"base_damage": 50}', 3, '🥾', 'enemy', None, None, None, None, '2025-03-31 07:40:47', 'attack_power'),
+    (8, 'Steal', 'Attempt to steal an item from an enemy.', '{"steal_chance": 50}', 0, '🦹', 'enemy', None, None, None, None, '2025-03-31 07:40:47', 'attack_power'),
+    (9, 'Scan', 'Reveal an enemy’s HP and weaknesses.', '{"scan": true}', 1, '🔍', 'enemy', None, None, None, None, '2025-03-31 07:40:47', 'attack_power'),
+    (10, 'Berserk', 'Boost attack but reduce defense.', '{"attack_power": 50, "defense_down": 20}', 3, '💪🔼🛡️', 'self', None, None, 15, 5, '2025-03-31 07:40:47', 'attack_power'),
+    (11, 'Revive', 'Revives a fainted ally with a surge of healing.', '{"heal": 50, "revive": true}', 1, '♻️', 'ally', None, None, None, None, '2025-03-31 07:40:47', 'magic_power'),
+    (12, 'Thunder', 'Deals lightning damage to an enemy.', '{"base_damage": 50}', 1, '⚡', 'enemy', None, 5, None, None, '2025-03-31 07:40:47', 'magic_power'),
+    (13, 'Barrier', 'Raises your defense for a short time.', '{"barrier": {"duration": 3}}', 3, '🛡️🔼', 'self', None, None, 12, 3, '2025-03-31 07:40:47', 'defense'),
+    (14, 'Power Break', 'Lower Enemy Attack Power.', '{"attack_power_down": 10}', 1, '💪🔽', 'enemy', None, None, 1, 3, '2025-04-03 12:43:43', 'attack_power'),
+    (15, 'Armor Break', 'Lower Enemy Defense', '{"defense_down": 30}', 1, '🛡️🔽', 'enemy', None, None, 2, 3, '2025-04-03 12:43:43', 'attack_power'),
+    (16, 'Mental Break', 'Lowers Enemy Magic Power and Magic Defense', '{"magic_power_down": 30, "magic_defense_down": 30}', 1, '🔮🛡️🔽', 'enemy', None, None, 14, 3, '2025-04-03 12:43:43', 'magic_power'),
+    (17, 'Fira', 'Deals greater fire damage to one enemy.', '{"base_damage": 70}', 1, '🔥', 'enemy', None, 1, None, None, '2025-04-03 12:43:43', 'magic_power'),
+    (18, 'FIraga', 'Deals devastating fire damage to one enemy.', '{"base_damage": 90}', 1, '🔥', 'enemy', None, 1, None, None, '2025-04-03 12:43:43', 'magic_power'),
+    (19, 'Bizzara', 'Deals greater ice damage to one enemy.', '{"base_damage": 70}', 1, '❄️', 'enemy', None, 2, None, None, '2025-04-03 12:43:43', 'magic_power'),
+    (20, 'Bizzaga', 'Deals devastating ice damage to one enemy.', '{"base_damage": 90}', 1, '❄️', 'enemy', None, 2, None, None, '2025-04-03 12:43:43', 'magic_power'),
+    (21, 'Thundara', 'Deals greater lightning damage to a single enemy.', '{"base_damage": 70}', 1, '⚡', 'enemy', None, 5, None, None, '2025-04-03 12:43:43', 'magic_power'),
+    (22, 'Thundaga', 'Deals devastating lightning damage to a single enemy.', '{"base_damage": 90}', 1, '⚡', 'enemy', None, 5, None, None, '2025-04-03 12:43:43', 'magic_power'),
+    (23, 'Flare', 'A massive non‑elemental magic attack dealing significant damage.', '{"base_damage": 100}', 2, '💥', 'enemy', None, 4, None, None, '2025-04-03 12:43:43', 'magic_power'),
+    (24, 'Ultima', 'A massive non‑elemental magic attack dealing very high damage.', '{"base_damage": 150}', 3, '🌀', 'enemy', None, 4, None, None, '2025-04-03 12:43:43', 'magic_power'),
+    (25, 'Comet', 'A massive non‑elemental magic attack dealing very high damage.', '{"base_damage": 125}', 2, '☄️', 'enemy', None, 4, None, None, '2025-04-03 12:43:43', 'magic_power'),
+    (26, 'Cura', 'Heals a greater amount of HP.', '{"heal": 100}', 1, '❤️', 'self', None, None, None, None, '2025-04-03 12:43:43', 'magic_power'),
+    (27, 'Curaga', 'Heals a high amount of HP.', '{"heal": 200}', 1, '❤️', 'self', None, None, None, None, '2025-04-03 12:43:43', 'magic_power'),
+    (28, 'Regen', 'Heals a small amount of HP over time.', '{"healing_over_time": {"percent": 0.2, "duration": 10}}', 1, '❤️🔄', 'self', None, None, 4, 10, '2025-04-03 12:43:43', 'magic_power'),
+    (29, 'Shell', 'Raises your magic defense.', '{"magic_defense_up": 30}', 1, '🔮🛡️🔼', 'self', None, None, 13, 5, '2025-04-03 12:43:43', 'magic_power'),
+    (30, 'Blink', 'Raises your evasion.', '{"evasion_up": 30}', 2, '🎯🔼', 'self', None, None, 10, 5, '2025-04-03 12:43:43', 'magic_power'),
+    (31, 'Demi', 'Deals damaged based on enemy health.', '{"percent_damage": 0.25}', 1, '🌀', 'enemy', None, 4, None, None, '2025-04-03 12:43:43', 'attack_power'),
+    (32, 'Gravity', 'Deals Air based damage while grounding flying enemies.', '{"base_damage": 80}', 1, '🪐', 'enemy', None, None, None, None, '2025-04-03 12:43:43', 'magic_power'),
+    (33, 'Haste', 'Grants higher speed with chance of increasing turns.', None, 3, '⏱️🔼', 'self', None, None, None, None, '2025-04-03 12:43:43', 'magic_power'),
+    (34, 'Slow', 'Lowers enemy speed with chance of reducing turns.', None, 2, '⏳🔽', 'enemy', None, None, None, None, '2025-04-03 12:43:43', 'magic_power'),
+    (35, 'Poison', 'Deals a small amount of damage over time.', '{"damage_over_time": {"duration": 3, "damage_per_turn": 10}}', 3, '☠️', 'enemy', None, None, 3, 5, '2025-04-03 12:43:43', 'attack_power'),
+    (36, 'Bio', 'Deals a greater amount of damage over time.', '{"damage_over_time": {"duration": 5, "damage_per_turn": 12}}', 5, '☣️', 'enemy', None, None, 8, 5, '2025-04-03 12:43:43', 'attack_power'),
+    (37, 'Focus', 'Raises your magic power.', '{"magic_power_up": 30}', 1, '🔮🔼', 'self', None, None, 16, 5, '2025-04-03 12:43:43', 'attack_power'),
+    (38, 'Fireblade', 'A Spellblade ability that fuses fire to your attacks.', '{"base_damage": 50}', 1, '🔥⚔️', 'enemy', None, 1, None, None, '2025-04-03 12:51:14', 'attack_power'),
+    (39, 'Iceblade', 'A Spellblade ability that fuses ice to your attacks.', '{"base_damage": 50}', 1, '❄️⚔️', 'enemy', None, 2, None, None, '2025-04-03 12:51:14', 'attack_power'),
+    (40, 'Thunderblade', 'A Spellblade ability that fuses thunder to your attacks.', '{"base_damage": 50}', 1, '⚡⚔️', 'enemy', None, 6, None, None, '2025-04-03 12:51:14', 'attack_power'),
+    (41, 'Heavy Swing', 'A heavy attack dealing medium damage.', '{"base_damage": 50}', 2, '⚔️', 'enemy', None, None, None, None, '2025-04-15 01:35:52', 'attack_power'),
+    (42, 'Climhazzard', 'A deadly physical attack dealing high damage.', '{"base_damage": 110}', 5, '⚔️', 'enemy', None, None, None, None, '2025-04-15 01:59:30', 'attack_power'),
+    (43, 'Break', 'Reduce enemy HP to 1.', '{"set_enemy_hp_to": 1}', 5, '⚔️', 'enemy', None, None, None, None, '2025-04-15 02:47:21', 'attack_power'),
+    (44, 'Demiblade', 'A Spellblade ability that reduces enemy hp by a percentage.', '{"percent_damage": 0.25}', 1, '⚔️', 'enemy', None, 4, None, None, '2025-04-27 19:16:00', 'attack_power'),
+    (45, 'Gravityblade', 'A Spellblade ability that fuses gravity magic to your attacks.', '{"base_damage": 80}', 1, '⚔️', 'enemy', None, 5, None, None, '2025-04-27 19:16:00', 'attack_power'),
+    (46, 'Silence', 'Stops enemies from using magic for a short time.', None, 1, None, 'enemy', None, None, 9, 3, '2025-04-27 19:16:00', 'attack_power'),
+    (47, 'BioBlade', 'Deals initial base damage and greater amount of damage over time.', '{"damage_over_time": {"duration": 5, "damage_per_turn": 12}, "non_elemental_damage": 20}', 1, '☣️⚔', 'any', None, None, 8, 3, '2025-05-01 12:17:43', 'attack_power'),
+    (48, 'Lucky 7', 'Deals 7, 77, 777, or 7777 damage if the player HP has a 7 in it. Otherwise deal 1 damage.', '{"lucky_7": true}', 1, '7️⃣', 'enemy', None, None, None, None, '2025-05-10 14:38:35', 'attack_power'),
+    (49, 'Excalibur', 'Summons the legendary sword to deal massive non-elemental damage.', '{"base_damage": 200}', 5, '⚔️', 'enemy', None, 4, None, None, '2025-05-10 15:12:34', 'attack_power'),
+    (50, 'Pilfer Gil', 'Steals Gil from an enemy.', '{"pilfer_gil": true}', 2, '💰', 'enemy', None, None, None, None, '2025-05-10 15:12:34', 'attack_power'),
+    (51, 'Mug', 'Deals damage while stealing Gil from the enemy.', '{"mug": {"damage": 50}}', 1, '⚔️💰', 'enemy', None, None, None, None, '2025-05-10 15:12:34', 'attack_power'),
+    (52, 'Light Shot', 'Light attack on an enemy', '{"base_damage": 50}', 1, '⚔️', 'enemy', None, None, None, None, '2025-05-10 18:26:42', 'attack_power'),
+    (53, 'Heavy Shot', 'Heavy attack on an enemy', '{"base_damage": 150}', 1, '⚔️', 'enemy', None, None, None, None, '2025-05-10 18:26:42', 'attack_power'),
+    (54, 'Cross-Slash', None, '{"base_damage": 200}', 1, '⚔️', 'enemy', None, None, None, None, '2025-05-11 03:48:29', 'attack_power'),
+    (55, 'Meteorain', None, '{"base_damage": 300}', 1, '⚔️', 'enemy', None, None, None, None, '2025-05-11 03:48:29', 'attack_power'),
+    (56, 'Finishing Touch', None, '{"base_damage": 400}', 1, '⚔️', 'enemy', None, None, None, None, '2025-05-11 03:48:29', 'attack_power'),
+    (57, 'Omnislash', None, '{"base_damage": 999}', 1, '⚔️', 'enemy', None, None, None, None, '2025-05-11 03:48:29', 'attack_power'),
+    (58, 'Stagger', None, '{"base_damage": 150}', 1, '⚔️', 'enemy', None, None, None, None, '2025-05-11 03:48:29', 'attack_power'),
+    (59, 'Bull Charge', None, '{"base_damage": 200}', 1, '⚔️', 'enemy', None, None, None, None, '2025-05-11 03:48:29', 'attack_power'),
+    (60, 'Wallop', None, '{"base_damage": 300}', 1, '⚔️', 'enemy', None, None, None, None, '2025-05-11 03:48:29', 'attack_power'),
+    (61, 'Poisontouch', None, '{"damage_over_time": {"duration": 5, "damage_per_turn": 45}}', 1, '⚔️', 'enemy', None, None, None, None, '2025-05-11 03:48:29', 'attack_power'),
+    (62, 'Grand Lethal', None, '{"base_damage": 300}', 1, '⚔️', 'enemy', None, None, None, None, '2025-05-11 03:48:29', 'attack_power'),
+    (63, 'Bandit', None, '{"mug": {"damage": 100}}', 1, '⚔️', 'enemy', None, None, None, None, '2025-05-11 03:48:29', 'attack_power'),
+    (64, 'Master Thief', None, '{"base_damage": 200}', 1, '⚔️', 'enemy', None, None, None, None, '2025-05-11 03:48:29', 'attack_power'),
+    (65, 'Confuse', None, '{"base_damage": 200}', 1, '⚔️', 'enemy', None, None, None, None, '2025-05-11 03:48:29', 'attack_power'),
+    (66, 'Lancet', None, '{"base_damage": 200}', 1, '⚔️', 'enemy', None, None, None, None, '2025-05-11 03:48:29', 'attack_power'),
+    (67, 'High Jump', None, '{"base_damage": 200}', 1, '⚔️', 'enemy', None, None, None, None, '2025-05-11 03:48:29', 'attack_power'),
+    (68, 'Eye 4 Eye', None, '{"base_damage": 300}', 1, '⚔️', 'enemy', None, None, None, None, '2025-05-11 03:48:29', 'attack_power'),
+    (69, 'Beast Killer', None, '{"base_damage": 400}', 1, '⚔️', 'enemy', None, None, None, None, '2025-05-11 03:48:29', 'attack_power'),
+    (70, 'Avalanche', None, '{"base_damage": 300}', 1, '⚔️', 'enemy', None, 2, None, None, '2025-05-11 03:48:29', 'magic_power'),
+    (71, 'Tornado', None, '{"base_damage": 300}', 1, '⚔️', 'enemy', None, 5, None, None, '2025-05-11 03:48:29', 'magic_power'),
+    (72, 'Earthquake', None, '{"base_damage": 300}', 1, '⚔️', 'enemy', None, 8, None, None, '2025-05-11 03:48:29', 'magic_power'),
+    (73, 'Meteor', None, '{"base_damage": 400}', 1, '⚔️', 'enemy', None, 4, None, None, '2025-05-11 03:48:29', 'magic_power'),
+    (74, 'UltimaBlade', None, '{"base_damage": 400}', 1, '⚔️', 'enemy', None, 4, None, None, '2025-05-11 03:48:29', 'magic_power'),
+    (75, 'MeteorBlade', None, '{"base_damage": 400}', 1, '⚔️', 'enemy', None, 4, None, None, '2025-05-11 03:48:29', 'magic_power'),
+    (76, 'HolyBlade', None, '{"base_damage": 400}', 1, '⚔️', 'enemy', None, 3, None, None, '2025-05-11 03:48:29', 'magic_power'),
+    (77, 'GravijaBlade', None, '{"base_damage": 400}', 1, '⚔️', 'enemy', None, 5, None, None, '2025-05-11 03:48:29', 'magic_power'),
+    (78, 'Bio II', None, '{"damage_over_time": {"duration": 7, "damage_per_turn": 72}}', 1, '⚔️', 'enemy', None, None, 8, 7, '2025-05-11 03:48:29', 'attack_power'),
+    (79, 'Frog', None, '{"base_damage": 0}', 1, '⚔️', 'enemy', None, None, None, None, '2025-05-11 03:48:29', 'attack_power'),
+    (80, 'Full-Cure', None, '{"heal": 9999}', 1, None, 'self', None, None, None, None, '2025-05-11 03:48:29', 'attack_power'),
+    (81, 'Reflect', None, '{"base_damage": 150}', 1, None, 'self', None, None, None, None, '2025-05-11 03:48:29', 'attack_power'),
+    (82, 'Dbl Holy', None, '{"base_damage": 400}', 1, '⚔️', 'enemy', None, 3, None, None, '2025-05-11 03:48:29', 'magic_power'),
+    (83, 'Dbl Ultima', None, '{"base_damage": 400}', 1, '⚔️', 'enemy', None, 4, None, None, '2025-05-11 03:48:29', 'magic_power'),
+    (84, 'Dbl Focus', None, '{"base_damage": 150}', 1, None, 'self', None, None, None, None, '2025-05-11 03:48:29', 'magic_power'),
+    (85, 'Dbl Cure', None, '{"heal": 500}', 1, None, 'self', None, None, None, None, '2025-05-11 03:48:29', 'magic_power'),
+    (86, 'Dbl Flare', None, '{"base_damage": 200}', 1, '⚔️', 'enemy', None, 4, None, None, '2025-05-11 03:48:29', 'magic_power'),
+    (87, 'Dbl Dia', None, '{"base_damage": 200}', 1, '⚔️', 'enemy', None, 3, None, None, '2025-05-11 03:48:29', 'magic_power'),
+    (88, 'White Wind', None, '{"healing_over_time": {"percent": 0.05, "duration": 10}}', 0, '❤️', 'self', None, None, 4, 10, '2025-05-14 01:44:27', 'magic_power'),
+    (89, 'Mighty Guard', None, '{"barrier": {"duration": 3}}', 0, '🛡️🔼', 'self', None, None, 12, 3, '2025-05-14 01:44:27', 'attack_power'),
+    (90, 'Blue Bullet', None, '{"base_damage": 100}', 0, '⚔️', 'enemy', None, None, None, None, '2025-05-14 01:45:27', 'attack_power'),
+    (91, 'Karma', 'Deals Damage based on turn amount', '{"karma": true}', 3, None, 'any', None, None, None, None, '2025-05-16 16:13:30', 'attack_power'),
+    (92, '50 Needles', 'Deals 50 damage with 100% hit rate and ignores defense.', '{"base_damage": 47}', 0, None, 'any', None, None, None, None, '2025-05-22 15:21:04', 'attack_power'),
+    (93, '1,000 Needles', 'Deals 1,000 damage with 100% hit rate and ignores defense.', '{"base_damage": 1000}', 0, None, 'any', None, None, None, None, '2025-05-22 15:21:04', 'attack_power'),
 ]
-
 # --- ability ↔ status‑effects -------------------------------------------------
 MERGED_ABILITY_STATUS_EFFECTS: List[Tuple[int, int]] = [
     (10, 1),
@@ -114,19 +165,18 @@ MERGED_CLASS_ABILITIES: List[Tuple[int, int]] = [
 
 # --- classes ------------------------------------------------------------------
 MERGED_CLASSES: List[Tuple] = [
-    (1, 'Warrior',       'A sturdy fighter with strong physical attacks.',                       300, 15,  5, 10,  5, 95,  5, 10, '', None,'2025-03-30 21:40:47'),
-    (2, 'Berserker',     'A savage fighter who channels uncontrollable fury.',                   250, 25,  0,  8,  5, 90,  5, 10, '', None,'2025-04-03 02:05:45'),
-    (3, 'Mystic Knight', 'A hybrid fighter that fuses magic to their blade.',                    250, 25, 10,  8,  5, 95,  5, 10, '', None,'2025-04-03 02:05:45'),
-    (4, 'Thief',         'A quick fighter who excels at stealing items.',                       200, 20,  5,  8,  5, 95, 10, 10, '', None,'2025-03-30 21:40:47'),
-    (5, 'Green Mage',    'A powerful mage that manipulates time and space magics.',             200,  5, 20,  8, 10, 90,  8, 10, '', None,'2025-03-30 21:40:47'),
-    (6, 'Dragoon',       'A lancer who can jump high and strike down foes.',                    200, 20,  8, 10,  8, 95,  5, 10, '', None,'2025-03-30 21:40:47'),
-    (7, 'Bard',          'A ranged attacker wielding a bow and musical influence.',             200, 20, 10,  5,  5, 95,  5, 10, '', None,'2025-04-03 02:05:45'),
-    (8, 'White Mage',    'A healer who uses holy magic to restore and protect.',                100,  5, 15,  7, 10, 95,  5, 10, '', None,'2025-04-03 02:05:45'),
-    (9, 'Black Mage',    'A mage who uses destructive elemental spells.',                       200,  5, 20,  5,  5, 95,  5, 10, '', None,'2025-04-03 02:05:45'),
-    (10,'Geomancer',     'A sorcerer using environmental/elemental attacks.',                   200, 10, 15,  5, 10, 95,  6, 10, '', None,'2025-04-03 02:05:45')
+    (1, 'Warrior', 'A sturdy fighter with strong physical attacks.', 600, 40, 10, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1364778448379318442/war.gif?ex=680c39fa&is=680ae87a&hm=80c89e0290ea5ad2432f2d9b265df190741f94309c2bca981ad1885af90671c4&', None, '2025-03-31 02:40:47'),
+    (2, 'Berserker', 'A savage fighter who channels uncontrollable fury.', 600, 45, 10, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1365296689379938355/Berserker.gif?ex=680ccb20&is=680b79a0&hm=aa06cfa2c7fb2fb30ffe9e4991d2dda0d4f9420587656a0ddc61b192372ad067&', None, '2025-04-03 07:05:45'),
+    (3, 'Mystic Knight', 'A hybrid fighter that fuses magic to their blade.', 500, 40, 15, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1365296718815432724/mystic.gif?ex=680ccb27&is=680b79a7&hm=3f8ad9a2b215496adbc6c0dfd328a9e30621c73e292c40f0fd5ebfb0025bd910&', None, '2025-04-03 07:05:45'),
+    (4, 'Thief', 'A quick fighter who excels at stealing items.', 500, 45, 10, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1365296784301363303/thief.gif?ex=680ccb37&is=680b79b7&hm=34ee2d981b968e6de51e52e85c51b3c16ed4ac71974df3ada3f305603d95b59a&', None, '2025-03-31 02:40:47'),
+    (5, 'Green Mage', 'A powerful mage that manipulates time and space magics.', 500, 20, 20, 5, 1, 99, 1, 10, '', None, '2025-03-31 02:40:47'),
+    (6, 'Dragoon', 'A lancer who can jump high and strike down foes.', 500, 40, 10, 5, 1, 99, 1, 10, '', None, '2025-03-31 02:40:47'),
+    (7, 'Bard', 'A ranged attacker wielding a bow and musical influence.', 500, 45, 20, 5, 1, 99, 1, 10, '', None, '2025-04-03 07:05:45'),
+    (8, 'White Mage', 'A healer who uses holy magic to restore and protect.', 500, 15, 20, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1365296761723158538/whitemage.gif?ex=680ccb31&is=680b79b1&hm=cd94aeb45272086aac0e5c40507390e5738ef9ee419634a7eded75bf67ea91be&', None, '2025-04-03 07:05:45'),
+    (9, 'Black Mage', 'A mage who uses destructive elemental spells.', 500, 15, 25, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1364772285873127434/blm.gif?ex=680c343d&is=680ae2bd&hm=c3ce479bfd4cd9152348f3bf1d114ce29a63c7c04ac42c7d3ad845ab6bf51eda&', None, '2025-04-03 07:05:45'),
+    (10, 'Geomancer', 'A sorcerer using environmental/elemental attacks.', 500, 15, 20, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1372019632139145237/out.gif?ex=6825405b&is=6823eedb&hm=b0c22f7902cc76c50ce038d3c74dc16559a02e5e3d4262b5173592491bce32e6&', None, '2025-04-03 07:05:45'),
+    (11, 'Gun Mage', 'A mage clad in blue armor who holds a magic-infused pistol.', 600, 30, 15, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1372162446311165983/out.gif?ex=6825c55c&is=682473dc&hm=1e03aac8f24a02d80ee1f48c84a204d43207a75b55259d5bb8c461bb7af6f35e&', None, '2025-04-03 07:05:45'),
 ]
-
-# --- elements -----------------------------------------------------------------
 MERGED_ELEMENTS: List[Tuple] = [
     (1, 'Fire',           '2025-03-30 21:40:47'),
     (2, 'Ice',            '2025-03-30 21:40:47'),
@@ -134,7 +184,6 @@ MERGED_ELEMENTS: List[Tuple] = [
     (4, 'Non-Elemental',  '2025-03-30 21:40:47'),
     (5, 'Air',            '2025-03-30 21:40:47')
 ]
-
 # --- difficulties -------------------------------------------------------------
 MERGED_DIFFICULTIES: List[Tuple] = [
     (1, 'Easy',        10, 10, 1, 1, 50, 0.20, 2, 0.10, 3,  5,'2025-03-30 21:40:47'),
@@ -269,16 +318,23 @@ MERGED_HUB_BUTTONS: List[Tuple] = []
 
 # --- status effects -----------------------------------------------------------
 MERGED_STATUS_EFFECTS: List[Tuple] = [
-    (1, 'Attack Boost', 'buff',    50, 3, 'https://example.com/icons/attack_boost.png','2025-03-30 21:40:47'),
-    (2, 'Defense Down', 'debuff',  20, 3, 'https://example.com/icons/defense_down.png','2025-03-30 21:40:47'),
-    (3, 'Poison',       'debuff',  10, 5, 'https://example.com/icons/poison.png',      '2025-03-30 21:40:47'),
-    (4, 'Heal Over Time','buff',   15, 4, 'https://example.com/icons/heal_over_time.png','2025-03-30 21:40:47'),
-    (5, 'Stun',         'debuff',   0, 1, 'https://example.com/icons/stun.png',        '2025-03-30 21:40:47'),
-    (6, 'Burn',         'debuff',  10, 3, 'https://example.com/icons/burn.png',        '2025-03-30 21:40:47'),
-    (7, 'Freeze',       'debuff',   0, 2, 'https://example.com/icons/freeze.png',      '2025-03-30 21:40:47'),
+    (1, 'Attack Up', 'buff', '⚔️🔼', '2025-03-31 02:40:47', 0, 0),
+    (2, 'Defense Down', 'debuff', '🛡️🔽', '2025-03-31 02:40:47', 0, 0),
+    (3, 'Poisoned', 'debuff', '☣️', '2025-03-31 02:40:47', 0, 0),
+    (4, 'Regen', 'buff', '❤️🔄', '2025-03-31 02:40:47', 0, 0),
+    (5, 'Stun', 'debuff', '🌀', '2025-03-31 02:40:47', 0, 0),
+    (6, 'Burn', 'debuff', '🔥', '2025-03-31 02:40:47', 0, 0),
+    (7, 'Freeze', 'debuff', '❄️', '2025-03-31 02:40:47', 0, 0),
+    (8, 'Bio', 'debuff', '☣️', '2025-05-23 00:10:16', 0, 0),
+    (9, 'Silence', 'debuff', None, '2025-05-24 21:24:50', 0, 0),
+    (10, 'Evasion Up', 'buff', None, '2025-05-24 21:25:42', 0, 0),
+    (11, 'Blind', 'debuff', None, '2025-05-24 21:25:42', 0, 0),
+    (12, 'Defense Up', 'buff', '🛡️🔼', '2025-05-24 21:28:44', 0, 0),
+    (13, 'Mag.Def Up', 'buff', '🔮🛡️🔼', '2025-05-24 21:28:44', 0, 0),
+    (14, 'Mag.Def Down', 'debuff', '🔮🛡️🔽', '2025-05-24 21:33:23', 0, 0),
+    (15, 'Berserk', 'neutral', None, '2025-05-24 21:34:39', 0, 0),
+    (16, 'Magic Up', 'buff', '🔮🔼', '2025-05-24 21:36:05', 0, 0),
 ]
-
-
 # --- floor → room placement rules seed data -------------------------------------------------
 # (difficulty_name, floor_number, room_type, chance, max_per_floor)
 MERGED_FLOOR_ROOM_RULES: List[Tuple[str, int, str, float, int]] = [
@@ -358,8 +414,12 @@ TABLES = {
             target_type    ENUM('self','enemy','ally','any') DEFAULT 'any',
             special_effect VARCHAR(50),
             element_id     INT,
+            status_effect_id INT,
+            status_duration INT,
             created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (element_id) REFERENCES elements(element_id) ON DELETE SET NULL
+            scaling_stat   ENUM('attack_power','magic_power','defense') NOT NULL,
+            FOREIGN KEY (element_id) REFERENCES elements(element_id) ON DELETE SET NULL,
+            FOREIGN KEY (status_effect_id) REFERENCES status_effects(effect_id) ON DELETE SET NULL
         )
     ''',
     # ---------- classes ----------
@@ -805,10 +865,10 @@ TABLES = {
             effect_id INT AUTO_INCREMENT PRIMARY KEY,
             effect_name VARCHAR(100) NOT NULL,
             effect_type ENUM('buff','debuff','neutral') NOT NULL,
-            value INT NOT NULL,
-            duration INT NOT NULL,
             icon_url VARCHAR(255),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            value INT NOT NULL,
+            duration INT NOT NULL
         )
     ''',
     # ---------- ability_status_effects ----------
@@ -982,8 +1042,9 @@ def insert_abilities_and_classes(cur):
             """
             INSERT INTO abilities
               (ability_name, description, effect, cooldown, icon_url,
-               target_type, special_effect, element_id, created_at)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+               target_type, special_effect, element_id,
+               status_effect_id, status_duration, created_at, scaling_stat)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """,
             [row[1:] for row in MERGED_ABILITIES]
         )
@@ -1189,7 +1250,7 @@ def insert_new_relational_tables(cur):
         cur.executemany(
             """
             INSERT INTO status_effects
-              (effect_name,effect_type,value,duration,icon_url,created_at)
+              (effect_name,effect_type,icon_url,created_at,value,duration)
             VALUES (%s,%s,%s,%s,%s,%s)
             """,
             [row[1:] for row in MERGED_STATUS_EFFECTS]

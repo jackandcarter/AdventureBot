@@ -53,10 +53,9 @@ A typical configuration looks like:
 
 ## Database setup 
 
-The database_setup.py script is needed for successful bot startup, it is used to check and verify a standard database with minimal default setup.
-The included seed info in this script is legacy and depricated, but is considered the base install of the database which is required for the bot to work. 
-
-A more recent version of the schema (based on patch 3.0.9) is provided at `database/dump.sql`. Import it if you need to prepopulate the database:
+The `database_setup.py` script is needed for successful bot startup and will seed
+the database with the same data found in `database/dump.sql`. You can either run
+the script or import the dump to prepopulate your tables:
 
 ```bash
 mysql -u <user> -p <database> < database/dump.sql
