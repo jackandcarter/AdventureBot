@@ -1993,10 +1993,15 @@ class GameMaster(commands.Cog):
                 await self.end_player_turn(interaction)
                 return
 
+        if challenge:
+            self.append_game_log(
+                session.session_id,
+                f"<@{interaction.user.id}>'s guess causes the illusion to dissipate."
+            )
+
         mapping = {
             "illusion_enemy": "monster",
             "illusion_treasure": "item",
-            "illusion_vendor": "shop",
             "illusion_empty": "safe",
         }
         new_type = mapping.get(choice)
@@ -2013,12 +2018,6 @@ class GameMaster(commands.Cog):
             tpl = cur.fetchone() or {}
 
             vendor_id = None
-            if new_type == "shop":
-                dg = self.bot.get_cog("DungeonGenerator")
-                if dg:
-                    gvid = dg.fetch_random_vendor()
-                    if gvid:
-                        vendor_id = dg.create_session_vendor_instance(session.session_id, gvid)
 
             cur.execute(
                 "UPDATE rooms SET room_type=%s, description=%s, image_url=%s, "
