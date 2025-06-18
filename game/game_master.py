@@ -374,17 +374,17 @@ class GameMaster(commands.Cog):
             answer = mapping[idx]
             desc = (
                 f"{room_info.get('description', 'The room shimmers mysteriously.')}\n\n"
-                "Four elemental crystals glow faintly. Only one dispels the mirage."
+                "Mystic crystals hover before you. Perhaps elemental magic will reveal the exit."
             )
             conn = self.db_connect()
+            limit = random.randint(2, 6)
             with conn.cursor(dictionary=True) as cur:
-                cur.execute("SELECT element_id, element_name FROM elements")
-                elements = cur.fetchall() or []
+                cur.execute(
+                    "SELECT * FROM crystal_templates ORDER BY RAND() LIMIT %s",
+                    (limit,),
+                )
+                crystals = cur.fetchall() or []
             conn.close()
-            if elements:
-                crystals = random.sample(elements, k=4) if len(elements) >= 4 else random.choices(elements, k=4)
-            else:
-                crystals = []
             session.game_state['illusion_crystal_order'] = crystals
             session.game_state['illusion_crystal_index'] = 0
 
@@ -2099,19 +2099,141 @@ class GameMaster(commands.Cog):
 
         current = crystals[idx]
         if ability.get("element_id") == current.get("element_id"):
-            self.append_game_log(session.session_id, f"{interaction.user.display_name} shatters the {current['element_name']} crystal!")
+            self.append_game_log(session.session_id, f"{interaction.user.display_name} shatters the {current.get('name','')} crystal!")
             idx += 1
             session.game_state["illusion_crystal_index"] = idx
             if idx >= len(crystals):
-                # completed
                 session.game_state.pop("illusion_crystal_order", None)
                 session.game_state.pop("illusion_crystal_index", None)
                 await self.handle_illusion_choice(interaction, challenge["answer"])
                 return
+            em = self.bot.get_cog("EmbedManager")
+            if em:
+                await em.send_illusion_crystal_embed(interaction, crystals, idx)
+            return
+
+        # wrong element – crystal cracks and illusion dissipates
+        session.game_state.pop("illusion_crystal_order", None)
+        session.game_state.pop("illusion_crystal_index", None)
+        session.game_state.pop("illusion_challenge", None)
+
+        conn = self.db_connect()
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute(
+                "SELECT coord_x, coord_y, current_floor_id FROM players WHERE player_id=%s AND session_id=%s",
+                (interaction.user.id, session.session_id),
+            )
+            pos = cur.fetchone()
+            if not pos:
+                conn.close()
+                return
+            cur.execute(
+                "SELECT room_id FROM rooms WHERE session_id=%s AND floor_id=%s AND coord_x=%s AND coord_y=%s",
+                (session.session_id, pos["current_floor_id"], pos["coord_x"], pos["coord_y"]),
+            )
+            room = cur.fetchone()
+            cur.execute(
+                "SELECT description, image_url, default_enemy_id FROM room_templates WHERE room_type=%s ORDER BY RAND() LIMIT 1",
+                ("illusion_empty",),
+            )
+            tpl = cur.fetchone() or {}
+            if room:
+                cur.execute(
+                    "UPDATE rooms SET room_type=%s, description=%s, image_url=%s, default_enemy_id=%s WHERE room_id=%s",
+                    (
+                        "illusion_empty",
+                        tpl.get("description"),
+                        tpl.get("image_url"),
+                        tpl.get("default_enemy_id"),
+                        room["room_id"],
+                    ),
+                )
+        conn.commit(); conn.close()
+
+        conn = self.db_connect()
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute(
+                "SELECT r.*, f.floor_number FROM rooms r JOIN floors f ON f.floor_id=r.floor_id WHERE r.session_id=%s AND r.floor_id=%s AND r.coord_x=%s AND r.coord_y=%s",
+                (session.session_id, pos["current_floor_id"], pos["coord_x"], pos["coord_y"]),
+            )
+            new_room = cur.fetchone()
+        conn.close()
 
         em = self.bot.get_cog("EmbedManager")
         if em:
-            await em.send_illusion_crystal_embed(interaction, crystals, idx)
+            await em.send_illusion_crystal_embed(interaction, [], 0)
+        if new_room:
+            await self.update_room_view(interaction, new_room, pos["coord_x"], pos["coord_y"])
+        await self.end_player_turn(interaction)
+
+    async def handle_illusion_leave_room(self, interaction: discord.Interaction) -> None:
+        """Teleport the player away from an unfinished crystal room."""
+        sm = self.bot.get_cog("SessionManager")
+        session = sm.get_session(interaction.channel.id) if sm else None
+        if not session:
+            return
+
+        if not interaction.response.is_done():
+            defer_fn = getattr(interaction.response, "defer_update", None)
+            if callable(defer_fn):
+                await defer_fn()
+            else:
+                await interaction.response.defer()
+
+        session.game_state.pop("illusion_crystal_order", None)
+        session.game_state.pop("illusion_crystal_index", None)
+        session.game_state.pop("illusion_challenge", None)
+
+        conn = self.db_connect()
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute(
+                "SELECT coord_x, coord_y, current_floor_id FROM players WHERE player_id=%s AND session_id=%s",
+                (interaction.user.id, session.session_id),
+            )
+            pos = cur.fetchone()
+        conn.close()
+        if not pos:
+            return
+        x, y, floor = pos["coord_x"], pos["coord_y"], pos["current_floor_id"]
+
+        visited = self.fetch_discovered_rooms(interaction.user.id, session.session_id)
+        distant = [
+            (f, cx, cy)
+            for (f, cx, cy) in visited
+            if f == floor and abs(cx - x) + abs(cy - y) >= 5
+        ]
+        if not distant:
+            distant = [(f, cx, cy) for (f, cx, cy) in visited if f == floor]
+        if not distant:
+            return await interaction.followup.send("❌ No safe destination.", ephemeral=True)
+
+        dest_floor, dest_x, dest_y = random.choice(distant)
+        conn = self.db_connect()
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE players SET coord_x=%s, coord_y=%s, current_floor_id=%s WHERE player_id=%s AND session_id=%s",
+                (dest_x, dest_y, dest_floor, interaction.user.id, session.session_id),
+            )
+        conn.commit(); conn.close()
+
+        await self.update_permanent_discovered_room(
+            interaction.user.id,
+            session.session_id,
+            (dest_floor, dest_x, dest_y),
+        )
+        SessionPlayerModel.increment_rooms_visited(session.session_id, interaction.user.id)
+        conn = self.db_connect()
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute(
+                "SELECT r.*, f.floor_number FROM rooms r JOIN floors f ON f.floor_id=r.floor_id WHERE r.session_id=%s AND r.floor_id=%s AND r.coord_x=%s AND r.coord_y=%s",
+                (session.session_id, dest_floor, dest_x, dest_y),
+            )
+            dest_room = cur.fetchone()
+        conn.close()
+
+        self.append_game_log(session.session_id, f"{interaction.user.display_name} has been teleported by illusion room magics.")
+        await self.update_room_view(interaction, dest_room, dest_x, dest_y)
+        await self.end_player_turn(interaction)
 
     # ────────────────────────────────────────────────────────────────────────────
     #  TURN HELPERS
@@ -2637,6 +2759,9 @@ class GameMaster(commands.Cog):
                 if shop:
                     vid = int(cid.split("_")[2])
                     return await shop.display_shop_menu(interaction, vid)
+
+            if cid == "illusion_leave_room":
+                return await self.handle_illusion_leave_room(interaction)
 
             if cid in {"illusion_enemy", "illusion_treasure", "illusion_vendor", "illusion_empty"}:
                 return await self.handle_illusion_choice(interaction, cid)

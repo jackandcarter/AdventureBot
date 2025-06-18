@@ -174,7 +174,8 @@ MERGED_ROOM_TEMPLATES: List[Tuple] = [
     (18, 'chest_unlocked','Unlocked Chest',     'The chest lies open, its contents revealed.', 'https://your.cdn/path/chest_unlocked.png', None, '2025-04-23 18:00:00'),
     (19, 'illusion_enemy_count', 'Illusion Chamber', 'Shifting shadows form the shapes of countless foes.', 'https://the-demiurge.com/DemiDevUnit/images/rooms/roomtypeillusion.png', None, '2025-04-24 12:00:00'),
     (20, 'illusion_inner_room',  'Illusion Chamber', 'Several doors materialise from thin air, each beckoning.', 'https://the-demiurge.com/DemiDevUnit/images/rooms/roomtypeillusion.png', None, '2025-04-24 12:00:00'),
-    (21, 'illusion_elemental',  'Illusion Chamber', 'Glowing elemental crystals illuminate the chamber.', 'https://the-demiurge.com/DemiDevUnit/images/rooms/roomtypeillusion.png', None, '2025-04-24 12:00:00')
+    (21, 'illusion_elemental',  'Illusion Chamber', 'Glowing elemental crystals illuminate the chamber.', 'https://the-demiurge.com/DemiDevUnit/images/rooms/roomtypeillusion.png', None, '2025-04-24 12:00:00'),
+    (22, 'illusion_empty', 'Illusion Chamber', 'The illusion fades, leaving the chamber eerily empty.', 'https://the-demiurge.com/DemiDevUnit/images/rooms/roomtypeillusion.png', None, '2025-04-24 12:00:00'),
 ]
 
 # --- items --------------------------------------------------------------------
@@ -488,6 +489,18 @@ TABLES = {
             image_url     VARCHAR(255),
             default_enemy_id INT,
             created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''',
+    # ---------- crystal_templates ----------
+    'crystal_templates': '''
+        CREATE TABLE IF NOT EXISTS crystal_templates (
+            template_id INT AUTO_INCREMENT PRIMARY KEY,
+            element_id  INT NOT NULL,
+            name        VARCHAR(100) NOT NULL,
+            description TEXT,
+            image_url   VARCHAR(255),
+            created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (element_id) REFERENCES elements(element_id) ON DELETE CASCADE
         )
     ''',
     # ---------- npc_vendors ----------
@@ -877,6 +890,7 @@ TABLE_ORDER = [
     'players',
     'floors',
     'room_templates',
+    'crystal_templates',
     'npc_vendors',
     'items',
     'npc_vendor_items',
@@ -1039,6 +1053,13 @@ def insert_room_templates(cur):
         [row[1:] for row in MERGED_ROOM_TEMPLATES]
     )
     logger.info("Inserted room_templates.")
+
+def insert_crystal_templates(cur):
+    logger.info("Checking crystal_templates seed data…")
+    if not table_is_empty(cur, "crystal_templates"):
+        logger.info("crystal_templates already populated – skipping")
+    else:
+        logger.info("No default crystal template seed data.")
 
 def insert_npc_vendors(cur):
     logger.info("Checking npc_vendors seed data…")
@@ -1243,6 +1264,7 @@ def main() -> None:
                 insert_levels(cur)
                 insert_intro_steps(cur)
                 insert_room_templates(cur)
+                insert_crystal_templates(cur)
                 insert_npc_vendors(cur)
                 insert_items(cur)
                 insert_enemies_and_abilities(cur)
