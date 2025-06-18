@@ -382,15 +382,13 @@ class GameMaster(commands.Cog):
                     JOIN elements e ON ct.element_id = e.element_id
                     """
                 )
-                templates = cur.fetchall() or []
+                crystal_templates = cur.fetchall() or []
             conn.close()
 
-            n = random.randint(2, 6)
-            if templates:
-                crystals = (
-                    random.sample(templates, k=n)
-                    if len(templates) >= n
-                    else random.choices(templates, k=n)
+            k = random.randint(2, 6)
+            if crystal_templates:
+                crystals = random.sample(
+                    crystal_templates, k=min(k, len(crystal_templates))
                 )
             else:
                 crystals = []
