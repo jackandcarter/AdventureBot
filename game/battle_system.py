@@ -1346,6 +1346,12 @@ class BattleSystem(commands.Cog):
     #                          Inventory / flee                             #
     # --------------------------------------------------------------------- #
     async def handle_item_menu(self, interaction: discord.Interaction) -> None:
+        if not interaction.response.is_done():
+            try:
+                await interaction.response.defer()
+            except discord.errors.HTTPException as e:
+                logger.debug("Deferred interaction failed: %s", e)
+
         inv = self.bot.get_cog("InventoryShop")
         if inv:
             return await inv.display_use_item_menu(interaction)
