@@ -118,3 +118,18 @@ def test_parse_columns_skips_fk_reference_lines():
         ("id", "INT"),
         ("item_id", "INT"),
     ]
+
+
+def test_insert_hub_embeds_inserts_rows(monkeypatch):
+    class RecordingCursor(FakeCursor):
+        def executemany(self, sql, params):
+            super().executemany(sql, params)
+            self.last_sql = sql
+            self.last_params = params
+
+    cur = RecordingCursor([])
+    database_setup.insert_hub_embeds(cur)
+
+    expected = [row[1:] for row in database_setup.MERGED_HUB_EMBEDS]
+    assert cur.last_params == expected
+    assert "INSERT INTO hub_embeds" in cur.last_sql
