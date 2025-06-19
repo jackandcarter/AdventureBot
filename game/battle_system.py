@@ -84,6 +84,15 @@ class BattleSystem(commands.Cog):
                 down = se.get(f"{attr}_down")
                 if down:
                     out[attr] = max(out.get(attr, 0) - down, 0)
+
+            # speed modifiers (e.g. Haste, Slow)
+            up = se.get("speed_up")
+            if up:
+                out["speed"] = out.get("speed", 0) + up
+            down = se.get("speed_down")
+            if down:
+                out["speed"] = max(out.get("speed", 0) - down, 0)
+
         return out
 
     def is_elemental_challenge(self, session: Any) -> bool:
