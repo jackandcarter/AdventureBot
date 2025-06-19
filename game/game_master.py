@@ -717,7 +717,7 @@ class GameMaster(commands.Cog):
         conn.commit()
         conn.close()
 
-        sm.set_initial_turn(chan_id)
+        sm.set_initial_turn(session.session_id)
         if session.current_turn is None:
             session.current_turn = session.owner_id
 
@@ -2765,7 +2765,7 @@ class GameMaster(commands.Cog):
                     )
 
                 # ←── **NEW**: initialize turn order now that everyone is in
-                sm.set_initial_turn(interaction.channel.id)
+                sm.set_initial_turn(session.session_id)
 
                 return
 
