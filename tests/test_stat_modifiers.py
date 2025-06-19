@@ -82,3 +82,39 @@ def test_stat_modifiers_apply_and_expire(monkeypatch, key, attr, expected):
     asyncio.run(session._status_engine.tick_combat("player"))
     stats = bs._apply_stat_modifiers(base, session.battle_state["player_effects"])
     assert stats[attr] == 10
+
+
+@pytest.mark.parametrize(
+    "key,expected",
+    [
+        ("speed_up", 15),
+        ("speed_down", 5),
+    ],
+)
+def test_speed_modifiers_apply_and_expire(monkeypatch, key, expected):
+    monkeypatch.setattr(SessionPlayerModel, "modify_hp", lambda *a, **k: None)
+    monkeypatch.setattr(SessionPlayerModel, "update_status_effects", lambda *a, **k: None)
+
+    bot = types.SimpleNamespace(get_cog=lambda name: None)
+    bs = BattleSystem(bot)
+
+    effect = {"effect_name": "Buff", key: 5, "remaining": 2}
+    session = types.SimpleNamespace(
+        session_id=1,
+        current_turn=1,
+        battle_state={"player_effects": [effect], "enemy_effects": [], "enemy": {"enemy_name": "E", "hp": 10, "max_hp": 10}},
+        game_log=[],
+    )
+    session._status_engine = StatusEffectEngine(session, lambda *a: None)
+
+    base = {"speed": 10}
+    stats = bs._apply_stat_modifiers(base, session.battle_state["player_effects"])
+    assert stats["speed"] == expected
+
+    asyncio.run(session._status_engine.tick_combat("player"))
+    stats = bs._apply_stat_modifiers(base, session.battle_state["player_effects"])
+    assert stats["speed"] == expected
+
+    asyncio.run(session._status_engine.tick_combat("player"))
+    stats = bs._apply_stat_modifiers(base, session.battle_state["player_effects"])
+    assert stats["speed"] == 10
