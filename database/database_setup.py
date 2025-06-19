@@ -84,11 +84,11 @@ MERGED_ABILITIES: List[Tuple] = [
     (30, 'Blink', 'Raises your evasion.', '{"evasion_up": 30}', 2, '🎯🔼', 'self', None, None, 10, 5, '2025-04-03 12:43:43', 'magic_power'),
     (31, 'Demi', 'Deals damaged based on enemy health.', '{"percent_damage": 0.25}', 1, '🌀', 'enemy', None, 4, None, None, '2025-04-03 12:43:43', 'attack_power'),
     (32, 'Gravity', 'Deals Air based damage while grounding flying enemies.', '{"base_damage": 80}', 1, '🪐', 'enemy', None, None, None, None, '2025-04-03 12:43:43', 'magic_power'),
-    (33, 'Haste', 'Grants higher speed with chance of increasing turns.', '{"speed_up": 30, "duration": 3}', 3, '⏱️🔼', 'self', None, None, None, None, '2025-04-03 12:43:43', 'magic_power'),
-    (34, 'Slow', 'Lowers enemy speed with chance of reducing turns.', '{"speed_down": 30, "duration": 2}', 2, '⏳🔽', 'enemy', None, None, None, None, '2025-04-03 12:43:43', 'magic_power'),
+    (33, 'Haste', 'Grants higher speed with chance of increasing turns.', '{"speed_up": 10, "duration": 5, "status_name": "Haste"}', 5, '⏱️🔼', 'self', None, None, None, None, '2025-04-03 12:43:43', 'magic_power'),
+    (34, 'Slow', 'Lowers enemy speed with chance of reducing turns.', '{"speed_down": 10, "duration": 5, "status_name": "Slow"}', 5, '⏳🔽', 'enemy', None, None, None, None, '2025-04-03 12:43:43', 'magic_power'),
     (35, 'Poison', 'Deals a small amount of damage over time.', '{"damage_over_time": {"duration": 3, "damage_per_turn": 10}}', 3, '☠️', 'enemy', None, None, 3, 5, '2025-04-03 12:43:43', 'attack_power'),
     (36, 'Bio', 'Deals a greater amount of damage over time.', '{"damage_over_time": {"duration": 5, "damage_per_turn": 12}}', 5, '☣️', 'enemy', None, None, 8, 5, '2025-04-03 12:43:43', 'attack_power'),
-    (37, 'Focus', 'Raises your magic power.', '{"magic_power_up": 30}', 1, '🔮🔼', 'self', None, None, 16, 5, '2025-04-03 12:43:43', 'attack_power'),
+    (37, 'Focus', 'Raises your magic power.', '{"magic_power_up": 30, "duration": 3, "status_name": "Magic Up"}', 1, '🔮🔼', 'self', None, None, 16, 3, '2025-04-03 12:43:43', 'attack_power'),
     (38, 'Fireblade', 'A Spellblade ability that fuses fire to your attacks.', '{"base_damage": 50}', 1, '🔥⚔️', 'enemy', None, 1, None, None, '2025-04-03 12:51:14', 'attack_power'),
     (39, 'Iceblade', 'A Spellblade ability that fuses ice to your attacks.', '{"base_damage": 50}', 1, '❄️⚔️', 'enemy', None, 2, None, None, '2025-04-03 12:51:14', 'attack_power'),
     (40, 'Thunderblade', 'A Spellblade ability that fuses thunder to your attacks.', '{"base_damage": 50}', 1, '⚡⚔️', 'enemy', None, 6, None, None, '2025-04-03 12:51:14', 'attack_power'),
@@ -97,7 +97,7 @@ MERGED_ABILITIES: List[Tuple] = [
     (43, 'Break', 'Reduce enemy HP to 1.', '{"set_enemy_hp_to": 1}', 5, '⚔️', 'enemy', None, None, None, None, '2025-04-15 02:47:21', 'attack_power'),
     (44, 'Demiblade', 'A Spellblade ability that reduces enemy hp by a percentage.', '{"percent_damage": 0.25}', 1, '⚔️', 'enemy', None, 4, None, None, '2025-04-27 19:16:00', 'attack_power'),
     (45, 'Gravityblade', 'A Spellblade ability that fuses gravity magic to your attacks.', '{"base_damage": 80}', 1, '⚔️', 'enemy', None, 5, None, None, '2025-04-27 19:16:00', 'attack_power'),
-    (46, 'Silence', 'Stops enemies from using magic for a short time.', None, 1, None, 'enemy', None, None, 9, 3, '2025-04-27 19:16:00', 'attack_power'),
+    (46, 'Silence', 'Stops enemies from using magic for a short time.', None, 3, None, 'enemy', None, None, 9, 3, '2025-04-27 19:16:00', 'attack_power'),
     (47, 'BioBlade', 'Deals initial base damage and greater amount of damage over time.', '{"damage_over_time": {"duration": 5, "damage_per_turn": 12}, "non_elemental_damage": 20}', 1, '☣️⚔', 'any', None, None, 8, 3, '2025-05-01 12:17:43', 'attack_power'),
     (48, 'Lucky 7', 'Deals 7, 77, 777, or 7777 damage if the player HP has a 7 in it. Otherwise deal 1 damage.', '{"lucky_7": true}', 1, '7️⃣', 'enemy', None, None, None, None, '2025-05-10 14:38:35', 'attack_power'),
     (49, 'Excalibur', 'Summons the legendary sword to deal massive non-elemental damage.', '{"base_damage": 200}', 5, '⚔️', 'enemy', None, 4, None, None, '2025-05-10 15:12:34', 'attack_power'),
@@ -155,6 +155,7 @@ MERGED_ABILITY_STATUS_EFFECTS: List[Tuple[int, int]] = [
     (36, 8),  # Bio -> Bio
     (33, 17), # Haste -> Haste
     (34, 18), # Slow -> Slow
+    (46, 9),  # Silence -> Silence
 ]
 
 # --- class ↔ ability links ----------------------------------------------------
@@ -352,7 +353,7 @@ MERGED_STATUS_EFFECTS: List[Tuple] = [
     (6, 'Burn', 'debuff', '🔥', '2025-03-31 02:40:47', 0, 0),
     (7, 'Freeze', 'debuff', '❄️', '2025-03-31 02:40:47', 0, 0),
     (8, 'Bio', 'debuff', '☣️', '2025-05-23 00:10:16', 0, 0),
-    (9, 'Silence', 'debuff', None, '2025-05-24 21:24:50', 0, 0),
+    (9, 'Silence', 'debuff', '💬', '2025-05-24 21:24:50', 0, 0),
     (10, 'Evasion Up', 'buff', None, '2025-05-24 21:25:42', 0, 0),
     (11, 'Blind', 'debuff', None, '2025-05-24 21:25:42', 0, 0),
     (12, 'Defense Up', 'buff', '🛡️🔼', '2025-05-24 21:28:44', 0, 0),
