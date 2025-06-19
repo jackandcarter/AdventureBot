@@ -435,6 +435,82 @@ class AbilityEngine:
                     }]
                 )
 
+            # attack_power_up
+            elif result is None and "attack_power_up" in effect_data:
+                amount = effect_data["attack_power_up"]
+                duration = effect_data.get("duration", 1)
+                se_name = effect_data.get("status_name", name)
+                logs.append(
+                    f"{name} increases attack power by {amount} for {duration} turn(s)."
+                )
+                result = AbilityResult(
+                    type="status",
+                    logs=logs,
+                    status_effects=[{
+                        "effect_name": se_name,
+                        "remaining": duration,
+                        "attack_power_up": amount,
+                        "target": ability.get("target_type", "self"),
+                    }]
+                )
+
+            # defense_down
+            elif result is None and "defense_down" in effect_data:
+                amount = effect_data["defense_down"]
+                duration = effect_data.get("duration", 1)
+                se_name = effect_data.get("status_name", name)
+                logs.append(
+                    f"{name} decreases defense by {amount} for {duration} turn(s)."
+                )
+                result = AbilityResult(
+                    type="status",
+                    logs=logs,
+                    status_effects=[{
+                        "effect_name": se_name,
+                        "remaining": duration,
+                        "defense_down": amount,
+                        "target": ability.get("target_type", "enemy"),
+                    }]
+                )
+
+            # magic_power_up
+            elif result is None and "magic_power_up" in effect_data:
+                amount = effect_data["magic_power_up"]
+                duration = effect_data.get("duration", 1)
+                se_name = effect_data.get("status_name", name)
+                logs.append(
+                    f"{name} increases magic power by {amount} for {duration} turn(s)."
+                )
+                result = AbilityResult(
+                    type="status",
+                    logs=logs,
+                    status_effects=[{
+                        "effect_name": se_name,
+                        "remaining": duration,
+                        "magic_power_up": amount,
+                        "target": ability.get("target_type", "self"),
+                    }]
+                )
+
+            # magic_defense_up
+            elif result is None and "magic_defense_up" in effect_data:
+                amount = effect_data["magic_defense_up"]
+                duration = effect_data.get("duration", 1)
+                se_name = effect_data.get("status_name", name)
+                logs.append(
+                    f"{name} increases magic defense by {amount} for {duration} turn(s)."
+                )
+                result = AbilityResult(
+                    type="status",
+                    logs=logs,
+                    status_effects=[{
+                        "effect_name": se_name,
+                        "remaining": duration,
+                        "magic_defense_up": amount,
+                        "target": ability.get("target_type", "self"),
+                    }]
+                )
+
             # scan
             elif result is None and effect_data.get("scan"):
                 ename = target.get("enemy_name", "Enemy")
