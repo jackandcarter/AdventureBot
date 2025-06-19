@@ -2299,6 +2299,7 @@ class GameMaster(commands.Cog):
             pid for pid in all_players
             if not SessionPlayerModel.is_player_dead(session.session_id, pid)
         ]
+        num_alive = len(alive)
         if not alive:
             # everyone fainted → end session
             await sm.terminate_session(session.session_id, "All players fainted")
@@ -2311,7 +2312,8 @@ class GameMaster(commands.Cog):
             idx = alive.index(session.current_turn)
             session.current_turn = alive[(idx + 1) % len(alive)]
 
-        session.append_log(f"Turn → <@{session.current_turn}>")
+        if num_alive > 1:
+            session.append_log(f"Turn → <@{session.current_turn}>")
         logger.info("Turn advanced → %s", session.current_turn)
 
     async def end_player_turn(self,
