@@ -2356,8 +2356,10 @@ class GameMaster(commands.Cog):
         await self.advance_turn(interaction, interaction.channel.id)
 
         # 3️⃣ Tick world HoT/DoT on the player whose turn it now is
+        #     (only when not in combat)
         new_pid = session.current_turn
-        await engine.tick_world(new_pid)
+        if not session.battle_state:
+            await engine.tick_world(new_pid)
 
         # 4️⃣ Finally redraw that player’s view
         await sm.refresh_current_state(interaction)
