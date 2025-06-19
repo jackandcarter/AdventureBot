@@ -84,6 +84,15 @@ class BattleSystem(commands.Cog):
                 down = se.get(f"{attr}_down")
                 if down:
                     out[attr] = max(out.get(attr, 0) - down, 0)
+
+            # speed modifiers use "speed_up"/"speed_down" keys
+            up = se.get("speed_up")
+            if up:
+                out["speed"] = out.get("speed", 0) + up
+            down = se.get("speed_down")
+            if down:
+                out["speed"] = max(out.get("speed", 0) - down, 0)
+
         return out
 
     def is_elemental_challenge(self, session: Any) -> bool:
@@ -304,6 +313,14 @@ class BattleSystem(commands.Cog):
         cursor.close(); conn.close()
         if not player:
             return
+
+        # Apply any active status effects so temporary speed buffs modify cooldowns
+        effects = []
+        if session and session.battle_state and session.battle_state.get("player_effects"):
+            effects = session.battle_state.get("player_effects", [])
+        else:
+            effects = SessionPlayerModel.get_status_effects(session.session_id, player_id)
+        player = self._apply_stat_modifiers(player, effects)
 
         player_speed = player["speed"]
         conn = self.db_connect()
