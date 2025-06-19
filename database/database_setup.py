@@ -149,7 +149,12 @@ MERGED_ABILITIES: List[Tuple] = [
 # --- ability ↔ status‑effects -------------------------------------------------
 MERGED_ABILITY_STATUS_EFFECTS: List[Tuple[int, int]] = [
     (10, 1),
-    (10, 2)
+    (10, 2),
+    # new links
+    (35, 3),  # Poison -> Poisoned
+    (36, 8),  # Bio -> Bio
+    (33, 17), # Haste -> Haste
+    (34, 18), # Slow -> Slow
 ]
 
 # --- class ↔ ability links ----------------------------------------------------
@@ -1105,6 +1110,19 @@ def insert_abilities_and_classes(cur):
     else:
         logger.info("status_effects already populated – skipping")
 
+    logger.info("Checking ability_status_effects links…")
+    cur.execute("SELECT ability_id, effect_id FROM ability_status_effects")
+    existing = set(cur.fetchall())
+    missing = [row for row in MERGED_ABILITY_STATUS_EFFECTS if tuple(row) not in existing]
+    if missing:
+        cur.executemany(
+            "INSERT INTO ability_status_effects (ability_id,effect_id) VALUES (%s,%s)",
+            missing,
+        )
+        logger.info("Inserted ability_status_effects links.")
+    else:
+        logger.info("ability_status_effects already populated – skipping")
+
     logger.info("Checking class_abilities links…")
     if table_is_empty(cur, "class_abilities"):
         cur.executemany(
@@ -1295,16 +1313,6 @@ def insert_new_relational_tables(cur):
         logger.info("Inserted status_effects.")
     else:
         logger.info("status_effects already populated – skipping")
-
-    logger.info("Checking ability_status_effects links…")
-    if table_is_empty(cur, "ability_status_effects"):
-        cur.executemany(
-            "INSERT INTO ability_status_effects (ability_id,effect_id) VALUES (%s,%s)",
-            MERGED_ABILITY_STATUS_EFFECTS
-        )
-        logger.info("Inserted ability_status_effects links.")
-    else:
-        logger.info("ability_status_effects already populated – skipping")
 
 def insert_hub_embeds(cur):
     logger.info("Checking hub_embeds seed data…")

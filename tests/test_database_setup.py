@@ -133,3 +133,20 @@ def test_insert_hub_embeds_inserts_rows(monkeypatch):
     expected = [row[1:] for row in database_setup.MERGED_HUB_EMBEDS]
     assert cur.last_params == expected
     assert "INSERT INTO hub_embeds" in cur.last_sql
+
+
+def test_insert_abilities_adds_status_effect_links(monkeypatch):
+    class RecordingCursor(FakeCursor):
+        def executemany(self, sql, params):
+            super().executemany(sql, params)
+            self.calls.append((sql, params))
+
+        def fetchall(self):
+            return []
+
+    cur = RecordingCursor([])
+    cur.calls = []
+    database_setup.insert_abilities_and_classes(cur)
+
+    stmt, params = next(c for c in cur.calls if "ability_status_effects" in c[0])
+    assert params == database_setup.MERGED_ABILITY_STATUS_EFFECTS
