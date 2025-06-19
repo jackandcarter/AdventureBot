@@ -95,6 +95,20 @@ class BattleSystem(commands.Cog):
 
         return out
 
+    def _check_speed_advantage(self, session: Any,
+                               player: Dict[str, Any],
+                               enemy: Dict[str, Any]) -> Optional[str]:
+        """Return 'player' or 'enemy' if either side beats the other's speed by ≥10."""
+        p_mod = self._apply_stat_modifiers(player, session.battle_state.get("player_effects", []))
+        e_mod = self._apply_stat_modifiers(enemy,  session.battle_state.get("enemy_effects", []))
+        ps = p_mod.get("speed", 0)
+        es = e_mod.get("speed", 0)
+        if ps >= es + 10:
+            return "player"
+        if es >= ps + 10:
+            return "enemy"
+        return None
+
     def is_elemental_challenge(self, session: Any) -> bool:
         """Return ``True`` if an elemental crystal challenge is active."""
         ch = session.game_state.get("illusion_challenge") if session else None
@@ -848,7 +862,7 @@ class BattleSystem(commands.Cog):
         conn = self.db_connect()
         cur = conn.cursor(dictionary=True)
         cur.execute(
-            "SELECT hp, max_hp, attack_power, magic_power, defense, magic_defense, accuracy, evasion FROM players WHERE player_id=%s AND session_id=%s",
+            "SELECT hp, max_hp, attack_power, magic_power, defense, magic_defense, accuracy, evasion, speed FROM players WHERE player_id=%s AND session_id=%s",
             (pid, session.session_id),
         )
         player = cur.fetchone()
@@ -1079,7 +1093,13 @@ class BattleSystem(commands.Cog):
         if enemy["hp"] <= 0:
             return await self.handle_enemy_defeat(interaction, session, enemy)
 
-        
+
+        adv = self._check_speed_advantage(session, player, enemy)
+        if adv == "player":
+            session.game_log.append("You act again with blistering speed!")
+            await self.update_battle_embed(interaction, pid, enemy)
+            return
+
         # 8) now let the enemy take their turn, then advance back
         await asyncio.sleep(1)
         await self.enemy_turn(interaction, enemy)
@@ -1111,7 +1131,7 @@ class BattleSystem(commands.Cog):
         conn = self.db_connect()
         cursor = conn.cursor(dictionary=True)
         cursor.execute(
-            "SELECT hp, max_hp, defense, magic_defense, accuracy, evasion "
+            "SELECT hp, max_hp, defense, magic_defense, accuracy, evasion, speed "
             "FROM players WHERE player_id = %s AND session_id = %s",
             (pid, session.session_id),
         )
@@ -1286,7 +1306,7 @@ class BattleSystem(commands.Cog):
         conn = self.db_connect()
         cursor = conn.cursor(dictionary=True)
         cursor.execute(
-            "SELECT hp, max_hp, defense, attack_power FROM players WHERE player_id = %s AND session_id = %s",
+            "SELECT hp, max_hp, defense, attack_power, speed FROM players WHERE player_id = %s AND session_id = %s",
             (pid, session.session_id),
         )
         player = cursor.fetchone()
@@ -1301,6 +1321,13 @@ class BattleSystem(commands.Cog):
 
         # 1) show your strike…
         await self.update_battle_embed(interaction, pid, enemy)
+
+        adv = self._check_speed_advantage(session, player, enemy)
+        if adv == "player":
+            session.game_log.append("You move swiftly and gain an extra turn!")
+            await self.update_battle_embed(interaction, pid, enemy)
+            return
+
         # 2) brief pause so it’s visible
         await asyncio.sleep(1)
         # 3) now let the enemy take its turn (enemy_turn will refresh and then call end‐of‐turn)
@@ -1682,10 +1709,31 @@ class BattleSystem(commands.Cog):
         return await sm.refresh_current_state(interaction)
 
     async def _end_enemy_action(self, interaction):
+        sm = self.bot.get_cog("SessionManager")
+        session = sm.get_session(interaction.channel.id) if sm else None
+
+        if session and session.current_enemy:
+            conn = self.db_connect()
+            cur = conn.cursor(dictionary=True)
+            cur.execute(
+                "SELECT speed FROM players WHERE player_id=%s AND session_id=%s",
+                (session.current_turn, session.session_id),
+            )
+            row = cur.fetchone()
+            cur.close(); conn.close()
+            player_stats = {"speed": row["speed"] if row else 0}
+            adv = self._check_speed_advantage(session, player_stats, session.current_enemy)
+            if adv == "enemy":
+                session.game_log.append(
+                    f"{session.current_enemy.get('enemy_name', 'The enemy')} strikes again due to speed!"
+                )
+                await self.update_battle_embed(interaction, session.current_turn, session.current_enemy)
+                await asyncio.sleep(1)
+                return await self.enemy_turn(interaction, session.current_enemy)
+
         gm = self.bot.get_cog("GameMaster")
         if gm:
             return await gm.end_player_turn(interaction)
-        sm = self.bot.get_cog("SessionManager")
         return await sm.refresh_current_state(interaction)
 
 
