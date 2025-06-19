@@ -1097,16 +1097,19 @@ def insert_abilities_and_classes(cur):
         logger.info("classes already populated – skipping")
 
     logger.info("Checking status_effects seed data…")
-    if table_is_empty(cur, "status_effects"):
+    cur.execute("SELECT effect_name FROM status_effects")
+    existing_names = {row[0] for row in cur.fetchall()}
+    missing_rows = [row for row in MERGED_STATUS_EFFECTS if row[1] not in existing_names]
+    if missing_rows:
         cur.executemany(
             """
             INSERT INTO status_effects
               (effect_name,effect_type,icon_url,created_at,value,duration)
             VALUES (%s,%s,%s,%s,%s,%s)
             """,
-            [row[1:] for row in MERGED_STATUS_EFFECTS]
+            [row[1:] for row in missing_rows]
         )
-        logger.info("Inserted status_effects.")
+        logger.info("Inserted %s new status_effects.", len(missing_rows))
     else:
         logger.info("status_effects already populated – skipping")
 
