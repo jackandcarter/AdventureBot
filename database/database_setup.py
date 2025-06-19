@@ -355,6 +355,8 @@ MERGED_STATUS_EFFECTS: List[Tuple] = [
     (14, 'Mag.Def Down', 'debuff', '🔮🛡️🔽', '2025-05-24 21:33:23', 0, 0),
     (15, 'Berserk', 'neutral', None, '2025-05-24 21:34:39', 0, 0),
     (16, 'Magic Up', 'buff', '🔮🔼', '2025-05-24 21:36:05', 0, 0),
+    (17, 'Haste', 'buff', '⏱️🔼', '2025-05-24 21:36:06', 0, 0),
+    (18, 'Slow', 'debuff', '⏳🔽', '2025-05-24 21:36:07', 0, 0),
 ]
 # --- floor → room placement rules seed data -------------------------------------------------
 # (difficulty_name, floor_number, room_type, chance, max_per_floor)
@@ -1088,6 +1090,20 @@ def insert_abilities_and_classes(cur):
         logger.info("Inserted classes.")
     else:
         logger.info("classes already populated – skipping")
+
+    logger.info("Checking status_effects seed data…")
+    if table_is_empty(cur, "status_effects"):
+        cur.executemany(
+            """
+            INSERT INTO status_effects
+              (effect_name,effect_type,icon_url,created_at,value,duration)
+            VALUES (%s,%s,%s,%s,%s,%s)
+            """,
+            [row[1:] for row in MERGED_STATUS_EFFECTS]
+        )
+        logger.info("Inserted status_effects.")
+    else:
+        logger.info("status_effects already populated – skipping")
 
     logger.info("Checking class_abilities links…")
     if table_is_empty(cur, "class_abilities"):
