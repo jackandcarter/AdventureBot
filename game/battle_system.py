@@ -73,6 +73,19 @@ class BattleSystem(commands.Cog):
         out["target"] = raw.get("target", "self")
         return out
 
+    def _apply_stat_modifiers(self, stats: Dict[str, Any], effects: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Return a copy of ``stats`` with attack/magic/defense buffs applied."""
+        out = stats.copy()
+        for se in effects or []:
+            for attr in ("attack_power", "defense", "magic_power", "magic_defense"):
+                up = se.get(f"{attr}_up")
+                if up:
+                    out[attr] = out.get(attr, 0) + up
+                down = se.get(f"{attr}_down")
+                if down:
+                    out[attr] = max(out.get(attr, 0) - down, 0)
+        return out
+
     def is_elemental_challenge(self, session: Any) -> bool:
         """Return ``True`` if an elemental crystal challenge is active."""
         ch = session.game_state.get("illusion_challenge") if session else None
@@ -507,6 +520,8 @@ class BattleSystem(commands.Cog):
         player = cursor.fetchone()
         cursor.close(); conn.close()
 
+        player = self._apply_stat_modifiers(player, session.battle_state.get("player_effects", []))
+
         self.embed_manager = self.embed_manager or self.bot.get_cog("EmbedManager")
         role = enemy.get("role", "normal")
         if role == "boss":
@@ -843,8 +858,13 @@ class BattleSystem(commands.Cog):
 
         # 3) resolve via AbilityEngine
         # if we’re outside battle, treat the player as the “target” for self‑buffs/heals
-        engine_target = enemy if enemy is not None else player
-        result = self.ability.resolve(player, engine_target, ability_meta)
+        player_mod = self._apply_stat_modifiers(player, session.battle_state.get("player_effects", []))
+        if enemy is not None:
+            enemy_mod = self._apply_stat_modifiers(enemy, session.battle_state.get("enemy_effects", []))
+        else:
+            enemy_mod = player_mod
+        engine_target = enemy_mod if enemy is not None else player_mod
+        result = self.ability.resolve(player_mod, engine_target, ability_meta)
         target = ability_meta.get("target_type", "self")
         # ── out‑of‑battle self‑buff / HoT ──
         if not in_battle and target == "self":
@@ -1094,8 +1114,10 @@ class BattleSystem(commands.Cog):
 
         # 4) fallback to plain attack
         if not ability:
+            enemy_mod = self._apply_stat_modifiers(enemy, session.battle_state.get("enemy_effects", []))
+            player_mod = self._apply_stat_modifiers(player, session.battle_state.get("player_effects", []))
             dmg = self.ability.jrpg_damage(
-                enemy, player,
+                enemy_mod, player_mod,
                 base_damage=0,
                 scaling_stat="attack_power",
                 scaling_factor=1.0
@@ -1109,7 +1131,9 @@ class BattleSystem(commands.Cog):
             return await self._end_enemy_action(interaction)
 
         # 5) otherwise resolve the chosen ability
-        result = self.ability.resolve(enemy, player, ability)
+        enemy_mod = self._apply_stat_modifiers(enemy, session.battle_state.get("enemy_effects", []))
+        player_mod = self._apply_stat_modifiers(player, session.battle_state.get("player_effects", []))
+        result = self.ability.resolve(enemy_mod, player_mod, ability)
 
         # 6) apply any status effects first (e.g. enemy‐inflicted DoT/HoT)
         for raw_se in getattr(result, "status_effects", []):
