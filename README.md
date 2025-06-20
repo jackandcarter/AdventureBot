@@ -81,3 +81,7 @@ Scores are recorded automatically when a session ends. The bot inserts player st
 Ensure this table exists by running `python database/database_setup.py` during setup.
 
 From the hub, press the **High Scores** button to view the leaderboard. Entries are sorted by play time (ascending) and then enemies defeated, but you can also sort programmatically by `enemies_defeated`, `gil` or `player_level` when using the API.
+
+## Active Time Battle
+
+Combat follows an active time battle (ATB) system. Each participant has a hidden gauge that fills over time at a rate determined by their speed stat. When a gauge reaches full, the character may select an action. Spells such as *haste* and *slow* modify speed, causing gauges to fill faster or slower respectively.
