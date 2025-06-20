@@ -8,6 +8,7 @@ import asyncio
 import random
 from utils.status_engine   import StatusEffectEngine
 from utils.ability_engine import AbilityEngine
+from game.atb_manager import ATBManager
 from utils.helpers import load_config
 from models.database import Database
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -26,6 +27,8 @@ class BattleSystem(commands.Cog):
         self.embed_manager: Optional[commands.Cog] = self.bot.get_cog("EmbedManager")
         # AbilityEngine handles ALL ability logic & damage formulas
         self.ability = AbilityEngine(self.db_connect, cfg.get("damage_variance", 0.0))
+        # Shared ATB manager for all battles
+        self.atb = ATBManager()
 
     # --------------------------------------------------------------------- #
     #                               Helpers                                 #
@@ -482,6 +485,9 @@ class BattleSystem(commands.Cog):
         # 2) Call your normal clear (in case it resets other bits)
         session.clear_battle_state()
 
+        # Stop ATB ticking for this session
+        self.atb.stop(session.session_id)
+
         # 3) Also nuke out the current_enemy reference so nothing remains truthy
         session.current_enemy = None
 
@@ -523,6 +529,8 @@ class BattleSystem(commands.Cog):
         enemy["gil_pool"]        = enemy.get("gil_drop", 0)
         session.game_log         = ["Battle initiated!"]
         session.current_enemy    = enemy
+        # Start the ATB tick loop for this battle
+        self.atb.start(session, self)
         def battle_log(sid: int, line: str):
             # 1) persist to your normal battle_log table via GameMaster
             self._append_battle_log(sid, line)
@@ -1450,6 +1458,8 @@ class BattleSystem(commands.Cog):
 
         # fully exit battle state
         session.clear_battle_state()
+        # stop ATB ticking
+        self.atb.stop(session.session_id)
 
         if prev:
             pfloor, px, py = prev
@@ -1512,6 +1522,8 @@ class BattleSystem(commands.Cog):
                     conn.commit()
                     conn.close()
                 session.clear_battle_state()
+                # ensure ATB loop stops on victory continue
+                self.atb.stop(session.session_id)
             gm = self.bot.get_cog("GameMaster")
             if gm:
                 await gm.end_player_turn(interaction)
