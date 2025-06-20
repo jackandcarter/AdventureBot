@@ -98,14 +98,17 @@ class BattleSystem(commands.Cog):
     def _check_speed_advantage(self, session: Any,
                                player: Dict[str, Any],
                                enemy: Dict[str, Any]) -> Optional[str]:
-        """Return 'player' or 'enemy' if either side beats the other's speed by ≥10."""
+        """Return ``"player"`` or ``"enemy"`` if either side beats the other's
+        speed by ≥10 and has not already gained an extra turn this round."""
         p_mod = self._apply_stat_modifiers(player, session.battle_state.get("player_effects", []))
         e_mod = self._apply_stat_modifiers(enemy,  session.battle_state.get("enemy_effects", []))
         ps = p_mod.get("speed", 0)
         es = e_mod.get("speed", 0)
-        if ps >= es + 10:
+        if ps >= es + 10 and session.battle_state.get("speed_advantage_used") != "player":
+            session.battle_state["speed_advantage_used"] = "player"
             return "player"
-        if es >= ps + 10:
+        if es >= ps + 10 and session.battle_state.get("speed_advantage_used") != "enemy":
+            session.battle_state["speed_advantage_used"] = "enemy"
             return "enemy"
         return None
 

@@ -582,7 +582,6 @@ class GameMaster(commands.Cog):
             return await interaction.followup.send(
                 "❌ No session.", ephemeral=True
             )
-
         conn = self.db_connect()
         with conn.cursor() as cur:
             cur.execute(
@@ -2328,6 +2327,10 @@ class GameMaster(commands.Cog):
             return await interaction.followup.send(
                 "❌ No session.", ephemeral=True
             )
+
+        # reset any temporary speed advantage so it can trigger again next round
+        if session.battle_state:
+            session.battle_state.pop("speed_advantage_used", None)
 
         # 1️⃣ Identify outgoing player and prep the engine.  We no longer
         # tick effects here so they only trigger once when a player's new
