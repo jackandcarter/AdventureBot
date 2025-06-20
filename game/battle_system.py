@@ -642,6 +642,8 @@ class BattleSystem(commands.Cog):
             name=f"Enemy: {enemy['enemy_name']}", value=enemy_val, inline=False
         )
 
+        pid = session.current_turn
+
         # show player HP + effects
         player_line = format_status_effects(session.battle_state["player_effects"])
         player_val = f"❤️ HP: {self.create_bar(player['hp'], player['max_hp'])}"
@@ -662,7 +664,6 @@ class BattleSystem(commands.Cog):
         if enemy.get("image_url"):
             eb.set_image(url=enemy["image_url"] + f"?t={int(time.time())}")
 
-        pid = session.current_turn
         trance = getattr(session, "trance_states", {}).get(pid)
         ready = session.is_ready(pid)
         if trance:
@@ -735,6 +736,8 @@ class BattleSystem(commands.Cog):
         if not session:
             return
 
+        pid = session.current_turn
+
         # If battle state is missing (e.g. player fled and old buttons were pressed)
         if not session.battle_state:
             return await mgr.refresh_current_state(interaction)
@@ -790,7 +793,6 @@ class BattleSystem(commands.Cog):
         if enemy.get("image_url"):
             eb.set_image(url=enemy["image_url"] + f"?t={int(time.time())}")
 
-        pid = session.current_turn
         trance = getattr(session, "trance_states", {}).get(pid)
         ready = session.is_ready(pid)
         if trance:
