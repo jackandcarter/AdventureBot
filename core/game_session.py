@@ -153,6 +153,9 @@ class GameSession:
         """Reset all stored data about the current battle."""
         self.battle_state = None
         self.current_enemy = None
+        self.atb_gauges = {}
+        self.enemy_atb = 0.0
+        self.atb_task = None
 
     def update_ability_cooldown(self, player_id: int, ability_id: int, cd: float) -> None:
         """Set the cooldown timer for a player's ability."""
