@@ -2005,7 +2005,11 @@ class BattleSystem(commands.Cog):
         # 3) re‐draw the battle embed (now at 0 HP) before dropping in the death panel
         await self.update_battle_embed(interaction, pid, session.current_enemy)
 
-        # 4) finally hand off to SessionManager/GameMaster to render the “💀 You have fallen” embed
+        # 4) teardown combat state and stop ATB
+        session.clear_battle_state()
+        self.atb.stop(session.session_id)
+
+        # 5) finally hand off to SessionManager/GameMaster to render the “💀 You have fallen” embed
         sm = self.bot.get_cog("SessionManager")
         return await sm.refresh_current_state(interaction)
 
