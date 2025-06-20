@@ -35,24 +35,25 @@ class ATBManager:
         enemy_speed = session.current_enemy.get("speed", 10) if session.current_enemy else 10
 
         try:
+            delta = self.tick_ms / 1000
             while session.battle_state:
-                await asyncio.sleep(self.tick_ms / 1000)
+                await asyncio.sleep(delta)
                 for pid, base in players.items():
-                    speed = base
-                    for se in session.status_effects.get(pid, []):
-                        speed += se.get("speed_up", 0)
-                        speed -= se.get("speed_down", 0)
-                    session.increment_gauge(pid, speed * self.tick_ms / 1000)
+                    effective = base + sum(
+                        se.get("speed_up", 0) - se.get("speed_down", 0)
+                        for se in session.status_effects.get(pid, [])
+                    )
+                    session.increment_gauge(pid, effective * delta)
                     if session.is_ready(pid):
                         if hasattr(battle_system, "on_player_ready"):
                             await battle_system.on_player_ready(session, pid)
                         session.reset_gauge(pid)
 
-                e_speed = enemy_speed
-                for se in session.battle_state.get("enemy_effects", []):
-                    e_speed += se.get("speed_up", 0)
-                    e_speed -= se.get("speed_down", 0)
-                session.enemy_atb += e_speed * self.tick_ms / 1000
+                e_effective = enemy_speed + sum(
+                    se.get("speed_up", 0) - se.get("speed_down", 0)
+                    for se in session.battle_state.get("enemy_effects", [])
+                )
+                session.enemy_atb += e_effective * delta
                 if session.enemy_atb >= 100:
                     if hasattr(battle_system, "on_enemy_ready"):
                         await battle_system.on_enemy_ready(session)
