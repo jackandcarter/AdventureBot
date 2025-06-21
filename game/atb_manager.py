@@ -9,7 +9,7 @@ from models.session_models import SessionPlayerModel
 class ATBManager:
     """Handle Active Time Battle gauge updates for a session."""
 
-    def __init__(self, tick_ms: int = 500, update_interval: float = 2.0) -> None:
+    def __init__(self, tick_ms: int = 1000, update_interval: float = 2.0) -> None:
         self.tick_ms = tick_ms
         self.update_interval = update_interval
         self._tasks: Dict[int, asyncio.Task] = {}
