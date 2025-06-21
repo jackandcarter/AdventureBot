@@ -113,18 +113,25 @@ class BattleSystem(commands.Cog):
     def _check_speed_advantage(
         self, session: Any, player: Dict[str, Any], enemy: Dict[str, Any]
     ) -> Optional[str]:
-        """Return 'player' or 'enemy' if either side beats the other's speed by ≥10."""
-        p_mod = self._apply_stat_modifiers(
-            player, session.battle_state.get("player_effects", [])
-        )
-        e_mod = self._apply_stat_modifiers(
-            enemy, session.battle_state.get("enemy_effects", [])
-        )
+        """Return 'player' or 'enemy' if haste/slow grants a one-time speed advantage."""
+        p_effects = session.battle_state.get("player_effects", [])
+        e_effects = session.battle_state.get("enemy_effects", [])
+        p_mod = self._apply_stat_modifiers(player, p_effects)
+        e_mod = self._apply_stat_modifiers(enemy, e_effects)
         ps = p_mod.get("speed", 0)
         es = e_mod.get("speed", 0)
-        if ps >= es + 10:
+
+        def has_key(effects, key):
+            return any(se.get(key) for se in effects or [])
+
+        if session.speed_bonus_used:
+            return None
+
+        if ps >= es + 10 and (has_key(p_effects, "speed_up") or has_key(e_effects, "speed_down")):
+            session.speed_bonus_used = True
             return "player"
-        if es >= ps + 10:
+        if es >= ps + 10 and (has_key(e_effects, "speed_up") or has_key(p_effects, "speed_down")):
+            session.speed_bonus_used = True
             return "enemy"
         return None
 
@@ -726,6 +733,32 @@ class BattleSystem(commands.Cog):
         fake = _FakeInteraction(channel)
         await self.update_battle_embed(fake, pid, enemy)
 
+    async def on_tick(self, session: Any) -> None:
+        """Update the battle embed each ATB tick to reflect gauge progress."""
+        enemy = session.current_enemy
+        if not enemy:
+            return
+        channel = self.bot.get_channel(int(session.thread_id))
+        if not channel:
+            try:
+                channel = await self.bot.fetch_channel(int(session.thread_id))
+            except Exception as e:  # pylint: disable=broad-except
+                logger.error("Failed to fetch channel for on_tick: %s", e)
+                return
+
+        class _FakeResponse:
+            def is_done(self) -> bool:
+                return True
+
+        class _FakeInteraction:
+            def __init__(self, ch: discord.abc.Messageable):
+                self.channel = ch
+                self.response = _FakeResponse()
+                self.followup = ch
+
+        fake = _FakeInteraction(channel)
+        await self.update_battle_embed(fake, session.current_turn, enemy)
+
     async def update_battle_embed(
         self, interaction: discord.Interaction, player_id: int, enemy: Dict[str, Any]
     ) -> None:
@@ -1207,6 +1240,7 @@ class BattleSystem(commands.Cog):
                 return await sm.refresh_current_state(interaction)
 
         await self.update_battle_embed(interaction, pid, enemy)
+        session.reset_gauge(pid)
         if result.type in ("damage", "dot") and enemy["hp"] <= 0:
             return await self.handle_enemy_defeat(interaction, session, enemy)
 
@@ -1291,6 +1325,7 @@ class BattleSystem(commands.Cog):
         else:
             # for “miss”, “pilfer”, “mug”, etc.
             await self.update_battle_embed(interaction, pid, enemy)
+            session.reset_gauge(pid)
             if result.type in ("pilfer", "mug") and result.type == "pilfer":
                 # apply gil steal on DB
                 self._steal_gil(pid, session.session_id, result.amount)
@@ -1307,10 +1342,12 @@ class BattleSystem(commands.Cog):
         if adv == "player":
             session.game_log.append("You act again with blistering speed!")
             await self.update_battle_embed(interaction, pid, enemy)
+            session.reset_gauge(pid)
             return
 
         # 8) now let the enemy take their turn, then advance back
         await asyncio.sleep(1)
+        session.reset_gauge(pid)
         await self.enemy_turn(interaction, enemy)
 
     # --------------------------------------------------------------------- #
@@ -1562,6 +1599,7 @@ class BattleSystem(commands.Cog):
 
         # 1) show your strike…
         await self.update_battle_embed(interaction, pid, enemy)
+        session.reset_gauge(pid)
 
         adv = self._check_speed_advantage(session, player, enemy)
         if adv == "player":
@@ -2044,9 +2082,17 @@ class BattleSystem(commands.Cog):
                 return await self.enemy_turn(interaction, session.current_enemy)
 
         gm = self.bot.get_cog("GameMaster")
+        result = None
         if gm:
-            return await gm.end_player_turn(interaction)
-        return await sm.refresh_current_state(interaction)
+            result = await gm.end_player_turn(interaction)
+        else:
+            result = await sm.refresh_current_state(interaction)
+
+        if session:
+            session.speed_bonus_used = False
+            session.enemy_atb = 0
+
+        return result
 
 
 async def setup(bot: commands.Bot) -> None:
