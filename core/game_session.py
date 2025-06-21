@@ -78,9 +78,15 @@ class GameSession:
         # { player_id: current_gauge }
         self.atb_gauges: Dict[int, float] = {}
         self.enemy_atb: float = 0.0
+        # per-player gauge maximums loaded from their class
+        self.atb_maxes: Dict[int, float] = {}
+        # enemy gauge maximum loaded when battle starts
+        self.enemy_atb_max: float = 5.0
         self.atb_task: Optional[asyncio.Task] = None
         # Limit speed-based extra turns to one until the next enemy action
         self.speed_bonus_used: bool = False
+        # when True the ATB loop pauses until the next action resolves
+        self.atb_paused: bool = False
         # ── status effects ───────────────────────────────────────────────
         # { player_id: [ { "effect_id": int, "remaining": int }, … ] }
         self.status_effects: Dict[int, List[Dict[str, Any]]] = {}
@@ -160,8 +166,11 @@ class GameSession:
         self.current_enemy = None
         self.atb_gauges = {}
         self.enemy_atb = 0.0
+        self.atb_maxes = {}
+        self.enemy_atb_max = 5.0
         self.atb_task = None
         self.speed_bonus_used = False
+        self.atb_paused = False
         self.cached_player_stats = {}
 
     def update_ability_cooldown(self, player_id: int, ability_id: int, cd: float) -> None:
@@ -187,8 +196,9 @@ class GameSession:
         self.atb_gauges[pid] = 0.0
 
     def is_ready(self, pid: int) -> bool:
-        """Return ``True`` if the player's ATB gauge is at least 100."""
-        return self.atb_gauges.get(pid, 0.0) >= 100.0
+        """Return ``True`` if the player's ATB gauge reached their maximum."""
+        max_val = self.atb_maxes.get(pid, 5)
+        return self.atb_gauges.get(pid, 0.0) >= max_val
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize the session to a dictionary for persistence."""
@@ -211,8 +221,11 @@ class GameSession:
             "ability_cooldowns": self.ability_cooldowns,
             "atb_gauges": self.atb_gauges,
             "enemy_atb": self.enemy_atb,
+            "atb_maxes": self.atb_maxes,
+            "enemy_atb_max": self.enemy_atb_max,
             "atb_task": None,
             "speed_bonus_used": self.speed_bonus_used,
+            "atb_paused": self.atb_paused,
             "trance_states": self.trance_states,
             "status_effects": self.status_effects,
             "current_enemy": self.current_enemy,
@@ -242,8 +255,11 @@ class GameSession:
         gs.ability_cooldowns = data.get("ability_cooldowns", {})
         gs.atb_gauges        = data.get("atb_gauges", {})
         gs.enemy_atb         = data.get("enemy_atb", 0.0)
+        gs.atb_maxes         = data.get("atb_maxes", {})
+        gs.enemy_atb_max     = data.get("enemy_atb_max", 5.0)
         gs.atb_task          = None
         gs.speed_bonus_used  = data.get("speed_bonus_used", False)
+        gs.atb_paused        = data.get("atb_paused", False)
         gs.trance_states     = data.get("trance_states", {})
         gs.status_effects    = data.get("status_effects", {})
         gs.current_enemy     = data.get("current_enemy")
