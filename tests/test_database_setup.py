@@ -102,6 +102,8 @@ def test_main_creates_crystal_templates(monkeypatch):
     database_setup.main()
 
     assert any("CREATE TABLE" in q and "crystal_templates" in q for q in log)
+    assert any("CREATE TABLE" in q and "classes" in q and "atb_max" in q for q in log)
+    assert any("CREATE TABLE" in q and "enemies" in q and "atb_max" in q for q in log)
 
 
 def test_parse_columns_skips_fk_reference_lines():
@@ -150,3 +152,8 @@ def test_insert_abilities_adds_status_effect_links(monkeypatch):
 
     stmt, params = next(c for c in cur.calls if "ability_status_effects" in c[0])
     assert params == database_setup.MERGED_ABILITY_STATUS_EFFECTS
+
+    class_stmt, class_params = next(c for c in cur.calls if "INSERT INTO classes" in c[0])
+    assert "atb_max" in class_stmt
+    expected = [row[1:] for row in database_setup.MERGED_CLASSES]
+    assert class_params == expected
