@@ -588,6 +588,9 @@ class BattleSystem(commands.Cog):
                 "❌ No session found.", ephemeral=True
             )
 
+        # Reset any old cached stats
+        session.cached_player_stats = {}
+
         session.battle_state = {
             "enemy": enemy,
             "player_effects": [],
@@ -615,19 +618,26 @@ class BattleSystem(commands.Cog):
 
         session._status_engine = StatusEffectEngine(session, battle_log)
 
-        conn = self.db_connect()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute(
-            "SELECT hp, max_hp, defense, attack_power FROM players WHERE player_id = %s AND session_id = %s",
-            (player_id, session.session_id),
-        )
-        player = cursor.fetchone()
-        cursor.close()
-        conn.close()
+        # Use cached player stats when available to avoid DB queries
+        player = session.cached_player_stats.get(player_id)
+        if not player:
+            conn = self.db_connect()
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                "SELECT hp, max_hp, defense, attack_power FROM players WHERE player_id = %s AND session_id = %s",
+                (player_id, session.session_id),
+            )
+            player = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            if player:
+                session.cached_player_stats[player_id] = dict(player)
 
         player = self._apply_stat_modifiers(
             player, session.battle_state.get("player_effects", [])
         )
+        # Cache player stats for quicker updates during battle
+        session.cached_player_stats[player_id] = dict(player)
 
         self.embed_manager = self.embed_manager or self.bot.get_cog("EmbedManager")
         role = enemy.get("role", "normal")
@@ -775,15 +785,19 @@ class BattleSystem(commands.Cog):
         if not session.battle_state:
             return await mgr.refresh_current_state(interaction)
 
-        conn = self.db_connect()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute(
-            "SELECT hp, max_hp, defense, attack_power FROM players WHERE player_id = %s AND session_id = %s",
-            (player_id, session.session_id),
-        )
-        player = cursor.fetchone()
-        cursor.close()
-        conn.close()
+        player = session.cached_player_stats.get(player_id)
+        if not player:
+            conn = self.db_connect()
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                "SELECT hp, max_hp, defense, attack_power FROM players WHERE player_id = %s AND session_id = %s",
+                (player_id, session.session_id),
+            )
+            player = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            if player:
+                session.cached_player_stats[player_id] = dict(player)
 
         role = enemy.get("role", "normal")
         if role == "boss":
@@ -1988,6 +2002,11 @@ class BattleSystem(commands.Cog):
         conn.commit()
         cur.close()
         conn.close()
+        mgr = self.bot.get_cog("SessionManager")
+        if mgr:
+            session = mgr.sessions.get(session_id)
+            if session and player_id in session.cached_player_stats:
+                session.cached_player_stats[player_id]["hp"] = new_hp
 
     def _steal_gil(self, player_id: int, session_id: int, amount: int):
         conn = self.db_connect()
@@ -2003,6 +2022,11 @@ class BattleSystem(commands.Cog):
 
     # ─── New: fetch current & max HP for DoT/HoT ─────────────────────────
     def _get_player_hp(self, player_id: int, session_id: int) -> int:
+        mgr = self.bot.get_cog("SessionManager")
+        if mgr:
+            session = mgr.sessions.get(session_id)
+            if session and player_id in session.cached_player_stats:
+                return session.cached_player_stats[player_id].get("hp", 0)
         conn = self.db_connect()
         cur = conn.cursor()
         cur.execute(
@@ -2012,9 +2036,18 @@ class BattleSystem(commands.Cog):
         row = cur.fetchone()
         cur.close()
         conn.close()
-        return row[0] if row else 0
+        if row:
+            if mgr and session:
+                session.cached_player_stats.setdefault(player_id, {})["hp"] = row[0]
+            return row[0]
+        return 0
 
     def _get_player_max_hp(self, player_id: int, session_id: int) -> int:
+        mgr = self.bot.get_cog("SessionManager")
+        if mgr:
+            session = mgr.sessions.get(session_id)
+            if session and player_id in session.cached_player_stats:
+                return session.cached_player_stats[player_id].get("max_hp", 0)
         conn = self.db_connect()
         cur = conn.cursor()
         cur.execute(
@@ -2024,7 +2057,11 @@ class BattleSystem(commands.Cog):
         row = cur.fetchone()
         cur.close()
         conn.close()
-        return row[0] if row else 0
+        if row:
+            if mgr and session:
+                session.cached_player_stats.setdefault(player_id, {})["max_hp"] = row[0]
+            return row[0]
+        return 0
 
     async def _kill_player(self, interaction, pid, session):
         # 1) force the DB → 0 HP so the next embed shows 0/max

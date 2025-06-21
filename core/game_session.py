@@ -87,6 +87,9 @@ class GameSession:
         # ── pending high score data ──────────────────────────────────────
         # { player_id: {"data": {...}, "message_id": int} }
         self.pending_high_score: Dict[int, Dict[str, Any]] = {}
+        # ── cached player stats during battle ─────────────────────────────
+        # { player_id: {"hp": int, "max_hp": int, "defense": int, "attack_power": int} }
+        self.cached_player_stats: Dict[int, Dict[str, Any]] = {}
 
     def add_player(self, player_id: int) -> None:
         """Add a player to the session.
@@ -159,6 +162,7 @@ class GameSession:
         self.enemy_atb = 0.0
         self.atb_task = None
         self.speed_bonus_used = False
+        self.cached_player_stats = {}
 
     def update_ability_cooldown(self, player_id: int, ability_id: int, cd: float) -> None:
         """Set the cooldown timer for a player's ability."""
@@ -211,7 +215,8 @@ class GameSession:
             "speed_bonus_used": self.speed_bonus_used,
             "trance_states": self.trance_states,
             "status_effects": self.status_effects,
-            "current_enemy": self.current_enemy
+            "current_enemy": self.current_enemy,
+            "cached_player_stats": self.cached_player_stats
         }
 
     @classmethod
@@ -242,6 +247,7 @@ class GameSession:
         gs.trance_states     = data.get("trance_states", {})
         gs.status_effects    = data.get("status_effects", {})
         gs.current_enemy     = data.get("current_enemy")
+        gs.cached_player_stats = data.get("cached_player_stats", {})
         return gs
 
     def __repr__(self) -> str:
