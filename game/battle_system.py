@@ -643,6 +643,7 @@ class BattleSystem(commands.Cog):
             "enemy_effects": [],
             "previous_coords": previous_coords,
         }
+        session.last_tick_values = {}
 
         # 2) Load & normalize any buffs the player already had
         raw_buffs = SessionPlayerModel.get_status_effects(session.session_id, player_id)
@@ -760,9 +761,12 @@ class BattleSystem(commands.Cog):
                 ("Flee", discord.ButtonStyle.secondary, "combat_flee", 0, not ready),
             ]
 
-        await self.embed_manager.send_or_update_embed(
+        msg = await self.embed_manager.send_or_update_embed(
             interaction, title="", description="", embed_override=eb, buttons=buttons
         )
+        session.battle_channel = interaction.channel
+        if msg:
+            session.battle_message = msg
 
     async def on_player_ready(self, session: Any, pid: int) -> None:
         """Re-enable action buttons when a player's ATB gauge is full."""
@@ -770,10 +774,11 @@ class BattleSystem(commands.Cog):
         if not enemy:
             return
 
-        channel = self.bot.get_channel(int(session.thread_id))
+        channel = session.battle_channel or self.bot.get_channel(int(session.thread_id))
         if not channel:
             try:
                 channel = await self.bot.fetch_channel(int(session.thread_id))
+                session.battle_channel = channel
             except Exception as e:  # pylint: disable=broad-except
                 logger.error("Failed to fetch channel for on_player_ready: %s", e)
                 return
@@ -797,10 +802,11 @@ class BattleSystem(commands.Cog):
         if not enemy:
             return
 
-        channel = self.bot.get_channel(int(session.thread_id))
+        channel = session.battle_channel or self.bot.get_channel(int(session.thread_id))
         if not channel:
             try:
                 channel = await self.bot.fetch_channel(int(session.thread_id))
+                session.battle_channel = channel
             except Exception as e:  # pylint: disable=broad-except
                 logger.error("Failed to fetch channel for on_enemy_ready: %s", e)
                 return
@@ -823,10 +829,11 @@ class BattleSystem(commands.Cog):
         enemy = session.current_enemy
         if not enemy:
             return
-        channel = self.bot.get_channel(int(session.thread_id))
+        channel = session.battle_channel or self.bot.get_channel(int(session.thread_id))
         if not channel:
             try:
                 channel = await self.bot.fetch_channel(int(session.thread_id))
+                session.battle_channel = channel
             except Exception as e:  # pylint: disable=broad-except
                 logger.error("Failed to fetch channel for on_tick: %s", e)
                 return
@@ -840,6 +847,13 @@ class BattleSystem(commands.Cog):
                 self.channel = ch
                 self.response = _FakeResponse()
                 self.followup = ch
+
+        values = {"enemy": int(session.enemy_atb)}
+        for pid in session.players:
+            values[pid] = int(session.atb_gauges.get(pid, 0))
+        if values == getattr(session, "last_tick_values", {}):
+            return
+        session.last_tick_values = values
 
         fake = _FakeInteraction(channel)
         await self.update_battle_embed(fake, session.current_turn, enemy)

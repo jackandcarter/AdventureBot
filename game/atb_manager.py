@@ -9,8 +9,9 @@ from models.session_models import SessionPlayerModel
 class ATBManager:
     """Handle Active Time Battle gauge updates for a session."""
 
-    def __init__(self, tick_ms: int = 500) -> None:
+    def __init__(self, tick_ms: int = 500, update_interval: float = 2.0) -> None:
         self.tick_ms = tick_ms
+        self.update_interval = update_interval
         self._tasks: Dict[int, asyncio.Task] = {}
 
     def start(self, session: Any, battle_system: Any) -> None:
@@ -38,6 +39,9 @@ class ATBManager:
             delta = self.tick_ms / 1000
             notified = {pid: False for pid in players}
             enemy_notified = False
+            last_int = {pid: 0 for pid in players}
+            last_enemy_int = 0
+            last_update = asyncio.get_event_loop().time()
             while session.battle_state:
                 await asyncio.sleep(delta)
                 if session.atb_paused:
@@ -83,8 +87,22 @@ class ATBManager:
                 else:
                     enemy_notified = False
 
-                if hasattr(battle_system, "on_tick"):
-                    await battle_system.on_tick(session)
+                trigger = False
+                for pid in players:
+                    cur = int(session.atb_gauges.get(pid, 0))
+                    if cur != last_int.get(pid):
+                        trigger = True
+                        last_int[pid] = cur
+                e_cur = int(session.enemy_atb)
+                if e_cur != last_enemy_int:
+                    trigger = True
+                    last_enemy_int = e_cur
+
+                now = asyncio.get_event_loop().time()
+                if trigger or now - last_update >= self.update_interval:
+                    if hasattr(battle_system, "on_tick"):
+                        await battle_system.on_tick(session)
+                    last_update = now
         finally:
             session.atb_task = None
             self._tasks.pop(session.session_id, None)
