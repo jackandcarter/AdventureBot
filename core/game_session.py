@@ -96,6 +96,11 @@ class GameSession:
         # ── cached player stats during battle ─────────────────────────────
         # { player_id: {"hp": int, "max_hp": int, "defense": int, "attack_power": int} }
         self.cached_player_stats: Dict[int, Dict[str, Any]] = {}
+        # Cached channel/message for battle updates
+        self.battle_channel: Any = None
+        self.battle_message: Any = None
+        # Previously displayed gauge values for on_tick throttling
+        self.last_tick_values: Dict[Any, Any] = {}
 
     def add_player(self, player_id: int) -> None:
         """Add a player to the session.
@@ -172,6 +177,9 @@ class GameSession:
         self.speed_bonus_used = False
         self.atb_paused = False
         self.cached_player_stats = {}
+        self.battle_channel = None
+        self.battle_message = None
+        self.last_tick_values = {}
 
     def update_ability_cooldown(self, player_id: int, ability_id: int, cd: float) -> None:
         """Set the cooldown timer for a player's ability."""
