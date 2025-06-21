@@ -629,7 +629,8 @@ class BattleSystem(commands.Cog):
             cur.close()
             conn.close()
 
-        session.atb_paused = False
+        # Pause gauges until the initial embed is displayed
+        session.atb_paused = True
         session.enemy_atb = 0.0
         for pid in session.players:
             session.atb_gauges[pid] = 0.0
@@ -654,8 +655,6 @@ class BattleSystem(commands.Cog):
         enemy["gil_pool"] = enemy.get("gil_drop", 0)
         session.game_log = ["Battle initiated!"]
         session.current_enemy = enemy
-        # Start the ATB tick loop for this battle
-        self.atb.start(session, self)
 
         def battle_log(sid: int, line: str):
             # 1) persist to your normal battle_log table via GameMaster
@@ -767,6 +766,10 @@ class BattleSystem(commands.Cog):
         session.battle_channel = interaction.channel
         if msg:
             session.battle_message = msg
+
+        # Now that the initial embed is sent, begin ticking ATB gauges
+        self.atb.start(session, self)
+        session.atb_paused = False
 
     async def on_player_ready(self, session: Any, pid: int) -> None:
         """Re-enable action buttons when a player's ATB gauge is full."""
