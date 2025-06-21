@@ -36,28 +36,43 @@ class ATBManager:
 
         try:
             delta = self.tick_ms / 1000
+            notified = {pid: False for pid in players}
+            enemy_notified = False
             while session.battle_state:
                 await asyncio.sleep(delta)
                 for pid, base in players.items():
-                    effective = base + sum(
-                        se.get("speed_up", 0) - se.get("speed_down", 0)
-                        for se in session.status_effects.get(pid, [])
-                    )
-                    session.increment_gauge(pid, effective * delta)
+                    if session.atb_gauges.get(pid, 0) < 100:
+                        effective = base + sum(
+                            se.get("speed_up", 0) - se.get("speed_down", 0)
+                            for se in session.status_effects.get(pid, [])
+                        )
+                        session.increment_gauge(pid, effective * delta)
+                        if session.atb_gauges[pid] >= 100:
+                            session.atb_gauges[pid] = 100
                     if session.is_ready(pid):
-                        if hasattr(battle_system, "on_player_ready"):
+                        if not notified[pid] and hasattr(battle_system, "on_player_ready"):
                             await battle_system.on_player_ready(session, pid)
-                        session.reset_gauge(pid)
+                            notified[pid] = True
+                    else:
+                        notified[pid] = False
 
-                e_effective = enemy_speed + sum(
-                    se.get("speed_up", 0) - se.get("speed_down", 0)
-                    for se in session.battle_state.get("enemy_effects", [])
-                )
-                session.enemy_atb += e_effective * delta
+                if session.enemy_atb < 100:
+                    e_effective = enemy_speed + sum(
+                        se.get("speed_up", 0) - se.get("speed_down", 0)
+                        for se in session.battle_state.get("enemy_effects", [])
+                    )
+                    session.enemy_atb += e_effective * delta
+                    if session.enemy_atb >= 100:
+                        session.enemy_atb = 100
                 if session.enemy_atb >= 100:
-                    if hasattr(battle_system, "on_enemy_ready"):
+                    if not enemy_notified and hasattr(battle_system, "on_enemy_ready"):
                         await battle_system.on_enemy_ready(session)
-                    session.enemy_atb = 0
+                        enemy_notified = True
+                else:
+                    enemy_notified = False
+
+                if hasattr(battle_system, "on_tick"):
+                    await battle_system.on_tick(session)
         finally:
             session.atb_task = None
             self._tasks.pop(session.session_id, None)

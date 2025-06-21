@@ -79,6 +79,8 @@ class GameSession:
         self.atb_gauges: Dict[int, float] = {}
         self.enemy_atb: float = 0.0
         self.atb_task: Optional[asyncio.Task] = None
+        # Limit speed-based extra turns to one until the next enemy action
+        self.speed_bonus_used: bool = False
         # ── status effects ───────────────────────────────────────────────
         # { player_id: [ { "effect_id": int, "remaining": int }, … ] }
         self.status_effects: Dict[int, List[Dict[str, Any]]] = {}
@@ -156,6 +158,7 @@ class GameSession:
         self.atb_gauges = {}
         self.enemy_atb = 0.0
         self.atb_task = None
+        self.speed_bonus_used = False
 
     def update_ability_cooldown(self, player_id: int, ability_id: int, cd: float) -> None:
         """Set the cooldown timer for a player's ability."""
@@ -205,6 +208,7 @@ class GameSession:
             "atb_gauges": self.atb_gauges,
             "enemy_atb": self.enemy_atb,
             "atb_task": None,
+            "speed_bonus_used": self.speed_bonus_used,
             "trance_states": self.trance_states,
             "status_effects": self.status_effects,
             "current_enemy": self.current_enemy
@@ -234,6 +238,7 @@ class GameSession:
         gs.atb_gauges        = data.get("atb_gauges", {})
         gs.enemy_atb         = data.get("enemy_atb", 0.0)
         gs.atb_task          = None
+        gs.speed_bonus_used  = data.get("speed_bonus_used", False)
         gs.trance_states     = data.get("trance_states", {})
         gs.status_effects    = data.get("status_effects", {})
         gs.current_enemy     = data.get("current_enemy")
