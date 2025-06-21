@@ -697,27 +697,27 @@ class BattleSystem(commands.Cog):
         eb = discord.Embed(title=title, color=color)
         # show enemy HP + effects
         enemy_line = format_status_effects(session.battle_state["enemy_effects"])
-        enemy_val = f"❤️ HP: {self.create_bar(enemy['hp'], enemy['max_hp'])}"
+        enemy_val = (
+            f"⏳ ATB: {create_progress_bar(int(min(session.enemy_atb, session.enemy_atb_max)), session.enemy_atb_max, length=6)}\n"
+            f"❤️ HP: {self.create_bar(enemy['hp'], enemy['max_hp'])}"
+        )
         if enemy_line:
-            enemy_val += f" {enemy_line}"
-        enemy_val += f"\n⏳ ATB: {create_progress_bar(int(min(session.enemy_atb, session.enemy_atb_max)), session.enemy_atb_max, length=6)}"
+            enemy_val += f"\u2003{enemy_line}"
         eb.add_field(
-            name=f"Enemy: {enemy['enemy_name']}", value=enemy_val, inline=True
+            name=f"Enemy: {enemy['enemy_name']}", value=enemy_val, inline=False
         )
 
         pid = session.current_turn
 
         # show player HP + effects
         player_line = format_status_effects(session.battle_state["player_effects"])
-        player_val = f"❤️ HP: {self.create_bar(player['hp'], player['max_hp'])}"
-        if player_line:
-            player_val += f" {player_line}"
-        player_val += (
-            f"\n⚔️ ATK: {player['attack_power']}\n"
-            f"🛡️ DEF: {player['defense']}\n"
-            f"⏳ ATB: {create_progress_bar(int(min(session.atb_gauges.get(pid, 0), session.atb_maxes.get(pid, 5))), session.atb_maxes.get(pid, 5), length=6)}"
+        player_val = (
+            f"⏳ ATB: {create_progress_bar(int(min(session.atb_gauges.get(pid, 0), session.atb_maxes.get(pid, 5))), session.atb_maxes.get(pid, 5), length=6)}\n"
+            f"❤️ HP: {self.create_bar(player['hp'], player['max_hp'])}"
         )
-        eb.add_field(name="Player Stats", value=player_val, inline=True)
+        if player_line:
+            player_val += f"\u2003{player_line}"
+        eb.add_field(name="Player Stats", value=player_val, inline=False)
 
         eb.add_field(
             name="Battle Log",
@@ -742,6 +742,7 @@ class BattleSystem(commands.Cog):
                     not ready,
                 ),
                 ("Use", discord.ButtonStyle.success, "combat_item", 0, not ready),
+                ("Character", discord.ButtonStyle.danger, "combat_character", 0, not ready),
                 ("Flee", discord.ButtonStyle.secondary, "combat_flee", 0, not ready),
             ]
         else:
@@ -755,6 +756,7 @@ class BattleSystem(commands.Cog):
                     not ready,
                 ),
                 ("Use", discord.ButtonStyle.success, "combat_item", 0, not ready),
+                ("Character", discord.ButtonStyle.danger, "combat_character", 0, not ready),
                 ("Flee", discord.ButtonStyle.secondary, "combat_flee", 0, not ready),
             ]
 
@@ -884,26 +886,26 @@ class BattleSystem(commands.Cog):
         enemy_line = format_status_effects(
             session.battle_state.get("enemy_effects", [])
         )
-        enemy_val = f"❤️ HP: {self.create_bar(enemy['hp'], enemy['max_hp'])}"
+        enemy_val = (
+            f"⏳ ATB: {create_progress_bar(int(min(session.enemy_atb, session.enemy_atb_max)), session.enemy_atb_max, length=6)}\n"
+            f"❤️ HP: {self.create_bar(enemy['hp'], enemy['max_hp'])}"
+        )
         if enemy_line:
-            enemy_val += f" {enemy_line}"
-        enemy_val += f"\n⏳ ATB: {create_progress_bar(int(min(session.enemy_atb, session.enemy_atb_max)), session.enemy_atb_max, length=6)}"
+            enemy_val += f"\u2003{enemy_line}"
         eb.add_field(
-            name=f"Enemy: {enemy['enemy_name']}", value=enemy_val, inline=True
+            name=f"Enemy: {enemy['enemy_name']}", value=enemy_val, inline=False
         )
 
         player_line = format_status_effects(
             session.battle_state.get("player_effects", [])
         )
-        player_val = f"❤️ HP: {self.create_bar(player['hp'], player['max_hp'])}"
-        if player_line:
-            player_val += f" {player_line}"
-        player_val += (
-            f"\n⚔️ ATK: {player['attack_power']}\n"
-            f"🛡️ DEF: {player['defense']}\n"
-            f"⏳ ATB: {create_progress_bar(int(min(session.atb_gauges.get(pid, 0), session.atb_maxes.get(pid, 5))), session.atb_maxes.get(pid, 5), length=6)}"
+        player_val = (
+            f"⏳ ATB: {create_progress_bar(int(min(session.atb_gauges.get(pid, 0), session.atb_maxes.get(pid, 5))), session.atb_maxes.get(pid, 5), length=6)}\n"
+            f"❤️ HP: {self.create_bar(player['hp'], player['max_hp'])}"
         )
-        eb.add_field(name="Player Stats", value=player_val, inline=True)
+        if player_line:
+            player_val += f"\u2003{player_line}"
+        eb.add_field(name="Player Stats", value=player_val, inline=False)
 
         eb.add_field(
             name="Battle Log",
@@ -928,6 +930,7 @@ class BattleSystem(commands.Cog):
                     not ready,
                 ),
                 ("Use", discord.ButtonStyle.success, "combat_item", 0, not ready),
+                ("Character", discord.ButtonStyle.danger, "combat_character", 0, not ready),
                 ("Flee", discord.ButtonStyle.secondary, "combat_flee", 0, not ready),
             ]
         else:
@@ -941,6 +944,7 @@ class BattleSystem(commands.Cog):
                     not ready,
                 ),
                 ("Use", discord.ButtonStyle.success, "combat_item", 0, not ready),
+                ("Character", discord.ButtonStyle.danger, "combat_character", 0, not ready),
                 ("Flee", discord.ButtonStyle.secondary, "combat_flee", 0, not ready),
             ]
 
@@ -1919,6 +1923,11 @@ class BattleSystem(commands.Cog):
             return await self.handle_skill_menu(interaction)
         if cid == "combat_item":
             return await self.handle_item_menu(interaction)
+        if cid == "combat_character":
+            gm = self.bot.get_cog("GameMaster")
+            if gm:
+                return await gm.display_character_sheet(interaction)
+            return
         if not cid.startswith("combat_"):
             return
         if cid == "combat_trance_back":
@@ -1997,6 +2006,7 @@ class BattleSystem(commands.Cog):
             ("Attack", discord.ButtonStyle.danger, "combat_attack", 0),
             ("Skill", discord.ButtonStyle.primary, "combat_skill_menu", 0),
             ("Use", discord.ButtonStyle.success, "combat_item", 0),
+            ("Character", discord.ButtonStyle.danger, "combat_character", 0),
             ("Flee", discord.ButtonStyle.secondary, "combat_flee", 0),
             ("Menu", discord.ButtonStyle.secondary, "action_menu", 0),
         ]

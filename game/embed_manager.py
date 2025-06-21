@@ -382,11 +382,12 @@ class EmbedManager(commands.Cog):
         title = "⚔️ You are in battle..."
         desc = f"A {enemy_name} appears!\nHP: {enemy_hp}/{enemy_max_hp}" if enemy_name else "Choose your action!"
         buttons = [
-            ("Attack", discord.ButtonStyle.danger,    "combat_attack",      0),
-            ("Skill",  discord.ButtonStyle.primary,   "combat_skill_menu",  0),
-            ("Use",    discord.ButtonStyle.success,   "combat_item",        0),
-            ("Flee",   discord.ButtonStyle.secondary, "combat_flee",        0),
-            ("Menu",   discord.ButtonStyle.secondary, "action_menu",        0),
+            ("Attack",    discord.ButtonStyle.danger,    "combat_attack",      0),
+            ("Skill",     discord.ButtonStyle.primary,   "combat_skill_menu",  0),
+            ("Use",       discord.ButtonStyle.success,   "combat_item",        0),
+            ("Character", discord.ButtonStyle.danger,    "combat_character",   0),
+            ("Flee",      discord.ButtonStyle.secondary, "combat_flee",        0),
+            ("Menu",      discord.ButtonStyle.secondary, "action_menu",        0),
         ]
         await self.send_or_update_embed(interaction, title, desc, buttons=buttons)
 
