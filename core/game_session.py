@@ -99,6 +99,7 @@ class GameSession:
         # Cached channel/message for battle updates
         self.battle_channel: Any = None
         self.battle_message: Any = None
+        self.atb_message: Any = None
         # Previously displayed gauge values for on_tick throttling
         self.last_tick_values: Dict[Any, Any] = {}
 
@@ -179,6 +180,7 @@ class GameSession:
         self.cached_player_stats = {}
         self.battle_channel = None
         self.battle_message = None
+        self.atb_message = None
         self.last_tick_values = {}
 
     def update_ability_cooldown(self, player_id: int, ability_id: int, cd: float) -> None:

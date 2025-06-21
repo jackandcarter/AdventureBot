@@ -74,6 +74,46 @@ class BattleSystem(commands.Cog):
         bar = block * filled + "⬜" * (length - filled)
         return f"[{bar}] {current}/{maximum}"
 
+    async def _send_or_edit_atb(self, session: Any) -> None:
+        """Create or update the separate ATB display message."""
+        channel = session.battle_channel
+        if not channel:
+            return
+
+        lines = [
+            f"Enemy: {create_progress_bar(int(min(session.enemy_atb, session.enemy_atb_max)), session.enemy_atb_max, length=6)}"
+        ]
+        for pid in session.players:
+            bar = create_progress_bar(
+                int(min(session.atb_gauges.get(pid, 0), session.atb_maxes.get(pid, 5))),
+                session.atb_maxes.get(pid, 5),
+                length=6,
+            )
+            lines.append(f"<@{pid}>: {bar}")
+
+        embed = discord.Embed(
+            title="ATB Gauges",
+            description="\n".join(lines),
+            color=discord.Color.dark_red(),
+        )
+
+        try:
+            if session.atb_message:
+                await session.atb_message.edit(embed=embed)
+            else:
+                session.atb_message = await channel.send(embed=embed)
+        except Exception as e:  # pylint: disable=broad-except
+            logger.warning("Failed to update ATB message: %s", e)
+
+    async def _delete_atb_message(self, session: Any) -> None:
+        """Delete the ATB message if present."""
+        if session.atb_message:
+            try:
+                await session.atb_message.delete()
+            except Exception as e:  # pylint: disable=broad-except
+                logger.warning("Failed to delete ATB message: %s", e)
+            session.atb_message = None
+
     def _normalize_se(self, raw: Dict[str, Any]) -> Dict[str, Any]:
         """
         Turn raw engine output into exactly the 3 keys our UI helper wants:
@@ -569,6 +609,7 @@ class BattleSystem(commands.Cog):
             session.battle_state.pop("enemy_effects", None)
 
         # 2) Call your normal clear (in case it resets other bits)
+        await self._delete_atb_message(session)
         session.clear_battle_state()
 
         # Stop ATB ticking for this session
@@ -767,6 +808,9 @@ class BattleSystem(commands.Cog):
         if msg:
             session.battle_message = msg
 
+        # Create the ATB gauge message
+        await self._send_or_edit_atb(session)
+
         # Now that the initial embed is sent, begin ticking ATB gauges
         self.atb.start(session, self)
         session.atb_paused = False
@@ -841,25 +885,13 @@ class BattleSystem(commands.Cog):
                 logger.error("Failed to fetch channel for on_tick: %s", e)
                 return
 
-        class _FakeResponse:
-            def is_done(self) -> bool:
-                return True
-
-        class _FakeInteraction:
-            def __init__(self, ch: discord.abc.Messageable):
-                self.channel = ch
-                self.response = _FakeResponse()
-                self.followup = ch
-
         values = {"enemy": int(session.enemy_atb)}
         for pid in session.players:
             values[pid] = int(session.atb_gauges.get(pid, 0))
         if values == getattr(session, "last_tick_values", {}):
             return
         session.last_tick_values = values
-
-        fake = _FakeInteraction(channel)
-        await self.update_battle_embed(fake, session.current_turn, enemy)
+        await self._send_or_edit_atb(session)
 
     async def update_battle_embed(
         self, interaction: discord.Interaction, player_id: int, enemy: Dict[str, Any]
@@ -1857,6 +1889,7 @@ class BattleSystem(commands.Cog):
                 )
 
         # fully exit battle state
+        await self._delete_atb_message(session)
         session.clear_battle_state()
         # stop ATB ticking
         self.atb.stop(session.session_id)
@@ -1925,6 +1958,7 @@ class BattleSystem(commands.Cog):
                         )
                     conn.commit()
                     conn.close()
+                await self._delete_atb_message(session)
                 session.clear_battle_state()
                 # ensure ATB loop stops on victory continue
                 self.atb.stop(session.session_id)
@@ -2188,6 +2222,7 @@ class BattleSystem(commands.Cog):
         await self.update_battle_embed(interaction, pid, session.current_enemy)
 
         # 4) teardown combat state and stop ATB
+        await self._delete_atb_message(session)
         session.clear_battle_state()
         self.atb.stop(session.session_id)
 
