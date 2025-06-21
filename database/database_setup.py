@@ -172,17 +172,17 @@ MERGED_CLASS_ABILITIES: List[Tuple[int, int]] = [
 
 # --- classes ------------------------------------------------------------------
 MERGED_CLASSES: List[Tuple] = [
-    (1, 'Warrior', 'A sturdy fighter with strong physical attacks.', 600, 40, 10, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1364778448379318442/war.gif?ex=680c39fa&is=680ae87a&hm=80c89e0290ea5ad2432f2d9b265df190741f94309c2bca981ad1885af90671c4&', None, '2025-03-31 02:40:47'),
-    (2, 'Berserker', 'A savage fighter who channels uncontrollable fury.', 600, 45, 10, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1365296689379938355/Berserker.gif?ex=680ccb20&is=680b79a0&hm=aa06cfa2c7fb2fb30ffe9e4991d2dda0d4f9420587656a0ddc61b192372ad067&', None, '2025-04-03 07:05:45'),
-    (3, 'Mystic Knight', 'A hybrid fighter that fuses magic to their blade.', 500, 40, 15, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1365296718815432724/mystic.gif?ex=680ccb27&is=680b79a7&hm=3f8ad9a2b215496adbc6c0dfd328a9e30621c73e292c40f0fd5ebfb0025bd910&', None, '2025-04-03 07:05:45'),
-    (4, 'Thief', 'A quick fighter who excels at stealing items.', 500, 45, 10, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1365296784301363303/thief.gif?ex=680ccb37&is=680b79b7&hm=34ee2d981b968e6de51e52e85c51b3c16ed4ac71974df3ada3f305603d95b59a&', None, '2025-03-31 02:40:47'),
-    (5, 'Green Mage', 'A powerful mage that manipulates time and space magics.', 500, 20, 20, 5, 1, 99, 1, 10, '', None, '2025-03-31 02:40:47'),
-    (6, 'Dragoon', 'A lancer who can jump high and strike down foes.', 500, 40, 10, 5, 1, 99, 1, 10, '', None, '2025-03-31 02:40:47'),
-    (7, 'Bard', 'A ranged attacker wielding a bow and musical influence.', 500, 45, 20, 5, 1, 99, 1, 10, '', None, '2025-04-03 07:05:45'),
-    (8, 'White Mage', 'A healer who uses holy magic to restore and protect.', 500, 15, 20, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1365296761723158538/whitemage.gif?ex=680ccb31&is=680b79b1&hm=cd94aeb45272086aac0e5c40507390e5738ef9ee419634a7eded75bf67ea91be&', None, '2025-04-03 07:05:45'),
-    (9, 'Black Mage', 'A mage who uses destructive elemental spells.', 500, 15, 25, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1364772285873127434/blm.gif?ex=680c343d&is=680ae2bd&hm=c3ce479bfd4cd9152348f3bf1d114ce29a63c7c04ac42c7d3ad845ab6bf51eda&', None, '2025-04-03 07:05:45'),
-    (10, 'Geomancer', 'A sorcerer using environmental/elemental attacks.', 500, 15, 20, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1372019632139145237/out.gif?ex=6825405b&is=6823eedb&hm=b0c22f7902cc76c50ce038d3c74dc16559a02e5e3d4262b5173592491bce32e6&', None, '2025-04-03 07:05:45'),
-    (11, 'Gun Mage', 'A mage clad in blue armor who holds a magic-infused pistol.', 600, 30, 15, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1372162446311165983/out.gif?ex=6825c55c&is=682473dc&hm=1e03aac8f24a02d80ee1f48c84a204d43207a75b55259d5bb8c461bb7af6f35e&', None, '2025-04-03 07:05:45'),
+    (1, 'Warrior', 'A sturdy fighter with strong physical attacks.', 600, 40, 10, 5, 1, 99, 1, 10, 5, 'https://cdn.discordapp.com/attachments/1362832151485354065/1364778448379318442/war.gif?ex=680c39fa&is=680ae87a&hm=80c89e0290ea5ad2432f2d9b265df190741f94309c2bca981ad1885af90671c4&', None, '2025-03-31 02:40:47'),
+    (2, 'Berserker', 'A savage fighter who channels uncontrollable fury.', 600, 45, 10, 5, 1, 99, 1, 10, 5, 'https://cdn.discordapp.com/attachments/1362832151485354065/1365296689379938355/Berserker.gif?ex=680ccb20&is=680b79a0&hm=aa06cfa2c7fb2fb30ffe9e4991d2dda0d4f9420587656a0ddc61b192372ad067&', None, '2025-04-03 07:05:45'),
+    (3, 'Mystic Knight', 'A hybrid fighter that fuses magic to their blade.', 500, 40, 15, 5, 1, 99, 1, 10, 5, 'https://cdn.discordapp.com/attachments/1362832151485354065/1365296718815432724/mystic.gif?ex=680ccb27&is=680b79a7&hm=3f8ad9a2b215496adbc6c0dfd328a9e30621c73e292c40f0fd5ebfb0025bd910&', None, '2025-04-03 07:05:45'),
+    (4, 'Thief', 'A quick fighter who excels at stealing items.', 500, 45, 10, 5, 1, 99, 1, 10, 5, 'https://cdn.discordapp.com/attachments/1362832151485354065/1365296784301363303/thief.gif?ex=680ccb37&is=680b79b7&hm=34ee2d981b968e6de51e52e85c51b3c16ed4ac71974df3ada3f305603d95b59a&', None, '2025-03-31 02:40:47'),
+    (5, 'Green Mage', 'A powerful mage that manipulates time and space magics.', 500, 20, 20, 5, 1, 99, 1, 10, 5, '', None, '2025-03-31 02:40:47'),
+    (6, 'Dragoon', 'A lancer who can jump high and strike down foes.', 500, 40, 10, 5, 1, 99, 1, 10, 5, '', None, '2025-03-31 02:40:47'),
+    (7, 'Bard', 'A ranged attacker wielding a bow and musical influence.', 500, 45, 20, 5, 1, 99, 1, 10, 5, '', None, '2025-04-03 07:05:45'),
+    (8, 'White Mage', 'A healer who uses holy magic to restore and protect.', 500, 15, 20, 5, 1, 99, 1, 10, 5, 'https://cdn.discordapp.com/attachments/1362832151485354065/1365296761723158538/whitemage.gif?ex=680ccb31&is=680b79b1&hm=cd94aeb45272086aac0e5c40507390e5738ef9ee419634a7eded75bf67ea91be&', None, '2025-04-03 07:05:45'),
+    (9, 'Black Mage', 'A mage who uses destructive elemental spells.', 500, 15, 25, 5, 1, 99, 1, 10, 5, 'https://cdn.discordapp.com/attachments/1362832151485354065/1364772285873127434/blm.gif?ex=680c343d&is=680ae2bd&hm=c3ce479bfd4cd9152348f3bf1d114ce29a63c7c04ac42c7d3ad845ab6bf51eda&', None, '2025-04-03 07:05:45'),
+    (10, 'Geomancer', 'A sorcerer using environmental/elemental attacks.', 500, 15, 20, 5, 1, 99, 1, 10, 5, 'https://cdn.discordapp.com/attachments/1362832151485354065/1372019632139145237/out.gif?ex=6825405b&is=6823eedb&hm=b0c22f7902cc76c50ce038d3c74dc16559a02e5e3d4262b5173592491bce32e6&', None, '2025-04-03 07:05:45'),
+    (11, 'Gun Mage', 'A mage clad in blue armor who holds a magic-infused pistol.', 600, 30, 15, 5, 1, 99, 1, 10, 5, 'https://cdn.discordapp.com/attachments/1362832151485354065/1372162446311165983/out.gif?ex=6825c55c&is=682473dc&hm=1e03aac8f24a02d80ee1f48c84a204d43207a75b55259d5bb8c461bb7af6f35e&', None, '2025-04-03 07:05:45'),
 ]
 MERGED_ELEMENTS: List[Tuple] = [
     (1, 'Fire',           '2025-03-30 21:40:47'),
@@ -254,14 +254,14 @@ MERGED_ITEMS: List[Tuple] = [
 
 # --- enemies ------------------------------------------------------------------
 MERGED_ENEMIES: List[Tuple] = [
-    (1, 'Behemoth',            'large, purple, canine-esque creature...', 100, 100, 15,  5,  5,  5,  90, 5, 'Easy',   None,'http://the-demiurge.com/DemiDevUnit/images/monsters/behemoth.png',             0.3, 100,  75, None, 1, None,'2025-03-31 02:40:47'),
-    (2, 'Ghost',               'pale, translucent, or wispy being...',    50,  50, 10,  5,  5,  3,  85, 5, 'Easy',   None,'http://the-demiurge.com/DemiDevUnit/images/monsters/ghost.png',                0.3,  50,  50, None, 2, None,'2025-03-31 02:40:47'),
-    (3, 'Dragon Whelp',        'A young dragon spitting small flames.',   100, 100, 15,  8, 10,  5,  80,10, 'Hard',   None,'https://example.com/images/dragon_whelp.png',                                  0.1, 150, 150, None, 1, None,'2025-03-31 02:40:47'),
-    (4, 'Lich',                'An undead sorcerer with devastating magic.',80, 80, 12,  4, 20, 10,  90, 5, 'Hard',   None,'https://example.com/images/lich.png',                                          0.2, 200, 200, None, 1, None,'2025-03-31 02:40:47'),
-    (5, 'Dark Knight',         'A mysterious warrior clad in obsidian armor.',120,120,20,10,  5,  8,  85, 5, 'Medium', None,'https://example.com/images/dark_knight.png',                                   0.4, 150, 250, None, 1, None,'2025-03-31 02:40:47'),
-    (6, 'Nightmare',           'You feel a sudden wave of fear as the dark shrouded creature approaches...',125,125,20,6,6,6,90,5,'Easy',None,'http://the-demiurge.com/DemiDevUnit/images/monsters/elementals/nightmare_elemental.png',0.1,125,150,None,1,None,'2025-04-09 20:20:32'),
-    (7, 'Tonberry Chef',       'A creature said to be only in legend. It seems to like cooking, but where did it get that knife and chef\'s hat? Also VERY big.',250,250,20,6,10,6,90,5,'Easy',None,'http://the-demiurge.com/DemiDevUnit/images/monsters/tonberry/tonberry_chef.png',0.1,150,110,None,1,None,'2025-04-09 20:20:32'),
-    (8, 'Overgrown Tonberry',  'A creature said to be only in legend. Also VERY big.',200,200,10,5,2,3,85,5,'Easy',None,'http://the-demiurge.com/DemiDevUnit/images/monsters/tonberry/overgrown_tonberry.png', 0.3, 75,  90, None, 1, None,'2025-03-31 02:40:47')
+    (1, 'Behemoth',            'large, purple, canine-esque creature...', 100, 100, 15,  5,  5,  5,  90, 5, 5, 'Easy',   None,'http://the-demiurge.com/DemiDevUnit/images/monsters/behemoth.png',             0.3, 100,  75, None, 1, None,'2025-03-31 02:40:47'),
+    (2, 'Ghost',               'pale, translucent, or wispy being...',    50,  50, 10,  5,  5,  3,  85, 5, 5, 'Easy',   None,'http://the-demiurge.com/DemiDevUnit/images/monsters/ghost.png',                0.3,  50,  50, None, 2, None,'2025-03-31 02:40:47'),
+    (3, 'Dragon Whelp',        'A young dragon spitting small flames.',   100, 100, 15,  8, 10,  5,  80,10, 5, 'Hard',   None,'https://example.com/images/dragon_whelp.png',                                  0.1, 150, 150, None, 1, None,'2025-03-31 02:40:47'),
+    (4, 'Lich',                'An undead sorcerer with devastating magic.',80, 80, 12,  4, 20, 10,  90, 5, 5, 'Hard',   None,'https://example.com/images/lich.png',                                          0.2, 200, 200, None, 1, None,'2025-03-31 02:40:47'),
+    (5, 'Dark Knight',         'A mysterious warrior clad in obsidian armor.',120,120,20,10,  5,  8,  85, 5, 5, 'Medium', None,'https://example.com/images/dark_knight.png',                                   0.4, 150, 250, None, 1, None,'2025-03-31 02:40:47'),
+    (6, 'Nightmare',           'You feel a sudden wave of fear as the dark shrouded creature approaches...',125,125,20,6,6,6,90,5, 5,'Easy',None,'http://the-demiurge.com/DemiDevUnit/images/monsters/elementals/nightmare_elemental.png',0.1,125,150,None,1,None,'2025-04-09 20:20:32'),
+    (7, 'Tonberry Chef',       'A creature said to be only in legend. It seems to like cooking, but where did it get that knife and chef\'s hat? Also VERY big.',250,250,20,6,10,6,90,5, 5,'Easy',None,'http://the-demiurge.com/DemiDevUnit/images/monsters/tonberry/tonberry_chef.png',0.1,150,110,None,1,None,'2025-04-09 20:20:32'),
+    (8, 'Overgrown Tonberry',  'A creature said to be only in legend. Also VERY big.',200,200,10,5,2,3,85,5, 5,'Easy',None,'http://the-demiurge.com/DemiDevUnit/images/monsters/tonberry/overgrown_tonberry.png', 0.3, 75,  90, None, 1, None,'2025-03-31 02:40:47')
 ]
 
 # --- enemy ↔ ability links ----------------------------------------------------
@@ -465,6 +465,7 @@ TABLES = {
             base_accuracy       INT DEFAULT 95,
             base_evasion        INT DEFAULT 5,
             base_speed          INT DEFAULT 10,
+            atb_max             INT DEFAULT 5,
             image_url           VARCHAR(255),
             creator_id          BIGINT,
             created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -818,6 +819,7 @@ TABLES = {
             magic_defense INT DEFAULT 5,
             accuracy INT DEFAULT 95,
             evasion INT DEFAULT 5,
+            atb_max INT DEFAULT 5,
             difficulty VARCHAR(50),
             abilities JSON,
             image_url VARCHAR(255),
@@ -1088,8 +1090,8 @@ def insert_abilities_and_classes(cur):
             INSERT INTO classes
               (class_name, description, base_hp, base_attack, base_magic,
                base_defense, base_magic_defense, base_accuracy,
-               base_evasion, base_speed, image_url, creator_id, created_at)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+               base_evasion, base_speed, atb_max, image_url, creator_id, created_at)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """,
             [row[1:] for row in MERGED_CLASSES]
         )
@@ -1231,10 +1233,10 @@ def insert_enemies_and_abilities(cur):
             """
             INSERT INTO enemies
               (enemy_name, description, hp, max_hp, attack_power, defense,
-               magic_power, magic_defense, accuracy, evasion, difficulty,
+               magic_power, magic_defense, accuracy, evasion, atb_max, difficulty,
                abilities, image_url, spawn_chance, gil_drop, xp_reward,
                loot_item_id, loot_quantity, creator_id, created_at)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """,
             [row[1:] for row in MERGED_ENEMIES]
         )
