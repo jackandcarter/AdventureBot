@@ -122,8 +122,9 @@ class HubManager(commands.Cog):
         lfg_embed = discord.Embed(
             title=f"{starter_name} started a new adventure!",
             description=(
-                "Click **Join Game** to join this session.\n\n"
-                "Once everyone has joined, this join message will be removed."
+                "Use **Join Game** below if you want to take part in this session.\n\n"
+                "The creator is already in the thread and doesn't need to press Join.\n\n"
+                "Once everyone has joined, this message will disappear."
             ),
             color=discord.Color.green()
         )
@@ -412,7 +413,7 @@ class LFGView(discord.ui.View):
         session = session_manager.sessions.get(self.session_id)
         if session and interaction.user.id == session.owner_id:
             return await interaction.response.send_message(
-                "⚠️ You’re the game creator—no need to join yourself. Open your thread directly!",
+                "⚠️ You started this session and were added automatically. Open the thread to manage your game.",
                 ephemeral=True
             )
         if session and interaction.user.id in session.players:

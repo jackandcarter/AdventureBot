@@ -324,7 +324,7 @@ MERGED_HUB_EMBEDS: List[Tuple] = [
         2,
         'tutorial',
         'Starting A Game',
-        '\nSimply click the **New Game** button to create a new game thread.\n\nThis will add you to the **Queue** system inside the thread, along with anyone else who wants to join.\n\n- Only the players who join the game session will see the private thread and be added to it automatically.\n\n- Up to 6 players can join via the LFG post in the Game Channel by clicking the Join button. \n\n- Additional players will be shown in the **Queue List** in the thread.\n\nWhen the creator is ready they may click **Start Game** to lock in the emount of players playing.\n\n\n',
+        '\nClick **New Game** to create your own session thread. You\'re placed in the queue automatically.\n\nOther players join by pressing **Join Game** on the LFG post in the game channel—only they should use this button.\n\nUp to 6 players can join directly; extra players appear in the **Queue List** inside the thread.\n\nWhen the creator is ready, they press **Start Game** to lock in the party.\n\n',
         'https://cdn.discordapp.com/attachments/1362832151485354065/1373622234865733652/Screenshot_2025-05-18_at_6.14.47_AM.png?ex=682b14e5&is=6829c365&hm=b91a3c24ed88f1f493db9a8f61473923e316e284782ab15bd565f6a82ac25966&',
         'Coming Soon...',
         1,
