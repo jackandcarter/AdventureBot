@@ -56,11 +56,22 @@ class BattleSystem(commands.Cog):
         return await AsyncDatabase().get_connection()
 
     def create_bar(self, current: int, maximum: int, length: int = 10) -> str:
+        """Return an emoji based HP bar with colour based on remaining health."""
         current = max(current, 0)
         if maximum <= 0:
             return "[No Data]"
+
         filled = int(round(length * current / float(maximum)))
-        bar = "█" * filled + "░" * (length - filled)
+
+        pct = 100 * current / maximum if maximum else 0
+        if pct >= 70:
+            block = "🟩"
+        elif pct >= 40:
+            block = "🟨"
+        else:
+            block = "🟥"
+
+        bar = block * filled + "⬜" * (length - filled)
         return f"[{bar}] {current}/{maximum}"
 
     def _normalize_se(self, raw: Dict[str, Any]) -> Dict[str, Any]:
@@ -656,7 +667,7 @@ class BattleSystem(commands.Cog):
             enemy_val += f" {enemy_line}"
         enemy_val += f"\n⏳ ATB: {create_progress_bar(int(min(session.enemy_atb, 100)), 100, length=6)}"
         eb.add_field(
-            name=f"Enemy: {enemy['enemy_name']}", value=enemy_val, inline=False
+            name=f"Enemy: {enemy['enemy_name']}", value=enemy_val, inline=True
         )
 
         pid = session.current_turn
@@ -671,7 +682,7 @@ class BattleSystem(commands.Cog):
             f"🛡️ DEF: {player['defense']}\n"
             f"⏳ ATB: {create_progress_bar(int(min(session.atb_gauges.get(pid, 0), 100)), 100, length=6)}"
         )
-        eb.add_field(name="Your Stats", value=player_val, inline=False)
+        eb.add_field(name="Player Stats", value=player_val, inline=True)
 
         eb.add_field(
             name="Battle Log",
@@ -816,7 +827,7 @@ class BattleSystem(commands.Cog):
             enemy_val += f" {enemy_line}"
         enemy_val += f"\n⏳ ATB: {create_progress_bar(int(min(session.enemy_atb, 100)), 100, length=6)}"
         eb.add_field(
-            name=f"Enemy: {enemy['enemy_name']}", value=enemy_val, inline=False
+            name=f"Enemy: {enemy['enemy_name']}", value=enemy_val, inline=True
         )
 
         player_line = format_status_effects(
@@ -830,7 +841,7 @@ class BattleSystem(commands.Cog):
             f"🛡️ DEF: {player['defense']}\n"
             f"⏳ ATB: {create_progress_bar(int(min(session.atb_gauges.get(pid, 0), 100)), 100, length=6)}"
         )
-        eb.add_field(name="Your Stats", value=player_val, inline=False)
+        eb.add_field(name="Player Stats", value=player_val, inline=True)
 
         eb.add_field(
             name="Battle Log",
