@@ -40,32 +40,44 @@ class ATBManager:
             enemy_notified = False
             while session.battle_state:
                 await asyncio.sleep(delta)
+                if session.atb_paused:
+                    continue
+
                 for pid, base in players.items():
-                    if session.atb_gauges.get(pid, 0) < 100:
+                    if session.atb_paused:
+                        break
+                    max_val = session.atb_maxes.get(pid, 5)
+                    if session.atb_gauges.get(pid, 0) < max_val:
                         effective = base + sum(
                             se.get("speed_up", 0) - se.get("speed_down", 0)
                             for se in session.status_effects.get(pid, [])
                         )
                         session.increment_gauge(pid, effective * delta)
-                        if session.atb_gauges[pid] >= 100:
-                            session.atb_gauges[pid] = 100
-                    if session.is_ready(pid):
+                        if session.atb_gauges[pid] >= max_val:
+                            session.atb_gauges[pid] = max_val
+                    if session.atb_gauges.get(pid, 0) >= max_val:
                         if not notified[pid] and hasattr(battle_system, "on_player_ready"):
+                            session.atb_paused = True
                             await battle_system.on_player_ready(session, pid)
                             notified[pid] = True
                     else:
                         notified[pid] = False
 
-                if session.enemy_atb < 100:
+                if session.atb_paused:
+                    continue
+
+                max_enemy = session.enemy_atb_max
+                if session.enemy_atb < max_enemy:
                     e_effective = enemy_speed + sum(
                         se.get("speed_up", 0) - se.get("speed_down", 0)
                         for se in session.battle_state.get("enemy_effects", [])
                     )
                     session.enemy_atb += e_effective * delta
-                    if session.enemy_atb >= 100:
-                        session.enemy_atb = 100
-                if session.enemy_atb >= 100:
+                    if session.enemy_atb >= max_enemy:
+                        session.enemy_atb = max_enemy
+                if session.enemy_atb >= max_enemy:
                     if not enemy_notified and hasattr(battle_system, "on_enemy_ready"):
+                        session.atb_paused = True
                         await battle_system.on_enemy_ready(session)
                         enemy_notified = True
                 else:

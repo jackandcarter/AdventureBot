@@ -599,6 +599,41 @@ class BattleSystem(commands.Cog):
                 "❌ No session found.", ephemeral=True
             )
 
+        # Load ATB maximums for all participants
+        session.atb_maxes = {}
+        conn = self.db_connect()
+        cur = conn.cursor(dictionary=True)
+        try:
+            for pid in session.players:
+                cur.execute(
+                    """
+                    SELECT COALESCE(c.atb_max, 5) AS atb_max
+                    FROM players p
+                    LEFT JOIN classes c ON p.class_id = c.class_id
+                    WHERE p.player_id=%s AND p.session_id=%s
+                    LIMIT 1
+                    """,
+                    (pid, session.session_id),
+                )
+                row = cur.fetchone()
+                session.atb_maxes[pid] = row["atb_max"] if row else 5
+
+            # enemy atb max
+            cur.execute(
+                "SELECT atb_max FROM enemies WHERE enemy_id=%s",
+                (enemy.get("enemy_id"),),
+            )
+            erow = cur.fetchone()
+            session.enemy_atb_max = erow["atb_max"] if erow else 5
+        finally:
+            cur.close()
+            conn.close()
+
+        session.atb_paused = False
+        session.enemy_atb = 0.0
+        for pid in session.players:
+            session.atb_gauges[pid] = 0.0
+
         # Reset any old cached stats
         session.cached_player_stats = {}
 
@@ -665,7 +700,7 @@ class BattleSystem(commands.Cog):
         enemy_val = f"❤️ HP: {self.create_bar(enemy['hp'], enemy['max_hp'])}"
         if enemy_line:
             enemy_val += f" {enemy_line}"
-        enemy_val += f"\n⏳ ATB: {create_progress_bar(int(min(session.enemy_atb, 100)), 100, length=6)}"
+        enemy_val += f"\n⏳ ATB: {create_progress_bar(int(min(session.enemy_atb, session.enemy_atb_max)), session.enemy_atb_max, length=6)}"
         eb.add_field(
             name=f"Enemy: {enemy['enemy_name']}", value=enemy_val, inline=True
         )
@@ -680,7 +715,7 @@ class BattleSystem(commands.Cog):
         player_val += (
             f"\n⚔️ ATK: {player['attack_power']}\n"
             f"🛡️ DEF: {player['defense']}\n"
-            f"⏳ ATB: {create_progress_bar(int(min(session.atb_gauges.get(pid, 0), 100)), 100, length=6)}"
+            f"⏳ ATB: {create_progress_bar(int(min(session.atb_gauges.get(pid, 0), session.atb_maxes.get(pid, 5))), session.atb_maxes.get(pid, 5), length=6)}"
         )
         eb.add_field(name="Player Stats", value=player_val, inline=True)
 
@@ -754,6 +789,33 @@ class BattleSystem(commands.Cog):
         fake = _FakeInteraction(channel)
         await self.update_battle_embed(fake, pid, enemy)
 
+    async def on_enemy_ready(self, session: Any) -> None:
+        """Trigger the enemy's action when its ATB gauge fills."""
+        enemy = session.current_enemy
+        if not enemy:
+            return
+
+        channel = self.bot.get_channel(int(session.thread_id))
+        if not channel:
+            try:
+                channel = await self.bot.fetch_channel(int(session.thread_id))
+            except Exception as e:  # pylint: disable=broad-except
+                logger.error("Failed to fetch channel for on_enemy_ready: %s", e)
+                return
+
+        class _FakeResponse:
+            def is_done(self) -> bool:
+                return True
+
+        class _FakeInteraction:
+            def __init__(self, ch: discord.abc.Messageable):
+                self.channel = ch
+                self.response = _FakeResponse()
+                self.followup = ch
+
+        fake = _FakeInteraction(channel)
+        await self.enemy_turn(fake, enemy)
+
     async def on_tick(self, session: Any) -> None:
         """Update the battle embed each ATB tick to reflect gauge progress."""
         enemy = session.current_enemy
@@ -825,7 +887,7 @@ class BattleSystem(commands.Cog):
         enemy_val = f"❤️ HP: {self.create_bar(enemy['hp'], enemy['max_hp'])}"
         if enemy_line:
             enemy_val += f" {enemy_line}"
-        enemy_val += f"\n⏳ ATB: {create_progress_bar(int(min(session.enemy_atb, 100)), 100, length=6)}"
+        enemy_val += f"\n⏳ ATB: {create_progress_bar(int(min(session.enemy_atb, session.enemy_atb_max)), session.enemy_atb_max, length=6)}"
         eb.add_field(
             name=f"Enemy: {enemy['enemy_name']}", value=enemy_val, inline=True
         )
@@ -839,7 +901,7 @@ class BattleSystem(commands.Cog):
         player_val += (
             f"\n⚔️ ATK: {player['attack_power']}\n"
             f"🛡️ DEF: {player['defense']}\n"
-            f"⏳ ATB: {create_progress_bar(int(min(session.atb_gauges.get(pid, 0), 100)), 100, length=6)}"
+            f"⏳ ATB: {create_progress_bar(int(min(session.atb_gauges.get(pid, 0), session.atb_maxes.get(pid, 5))), session.atb_maxes.get(pid, 5), length=6)}"
         )
         eb.add_field(name="Player Stats", value=player_val, inline=True)
 
@@ -1266,6 +1328,7 @@ class BattleSystem(commands.Cog):
 
         await self.update_battle_embed(interaction, pid, enemy)
         session.reset_gauge(pid)
+        session.atb_paused = False
         if result.type in ("damage", "dot") and enemy["hp"] <= 0:
             return await self.handle_enemy_defeat(interaction, session, enemy)
 
@@ -1351,6 +1414,7 @@ class BattleSystem(commands.Cog):
             # for “miss”, “pilfer”, “mug”, etc.
             await self.update_battle_embed(interaction, pid, enemy)
             session.reset_gauge(pid)
+            session.atb_paused = False
             if result.type in ("pilfer", "mug") and result.type == "pilfer":
                 # apply gil steal on DB
                 self._steal_gil(pid, session.session_id, result.amount)
@@ -1368,11 +1432,13 @@ class BattleSystem(commands.Cog):
             session.game_log.append("You act again with blistering speed!")
             await self.update_battle_embed(interaction, pid, enemy)
             session.reset_gauge(pid)
+            session.atb_paused = False
             return
 
         # 8) now let the enemy take their turn, then advance back
         await asyncio.sleep(1)
         session.reset_gauge(pid)
+        session.atb_paused = False
         await self.enemy_turn(interaction, enemy)
 
     # --------------------------------------------------------------------- #
@@ -1625,6 +1691,7 @@ class BattleSystem(commands.Cog):
         # 1) show your strike…
         await self.update_battle_embed(interaction, pid, enemy)
         session.reset_gauge(pid)
+        session.atb_paused = False
 
         adv = self._check_speed_advantage(session, player, enemy)
         if adv == "player":
@@ -2139,6 +2206,7 @@ class BattleSystem(commands.Cog):
         if session:
             session.speed_bonus_used = False
             session.enemy_atb = 0
+            session.atb_paused = False
 
         return result
 
