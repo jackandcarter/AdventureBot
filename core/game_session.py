@@ -5,7 +5,6 @@ AdventureBot runtime to track players, turns, dungeon state and various
 temporary battle attributes while a game is in progress.
 """
 
-import asyncio
 from typing import List, Optional, Dict, Any
 
 
@@ -74,19 +73,8 @@ class GameSession:
         # { player_id: { ability_id: remaining_seconds } }
         self.ability_cooldowns: Dict[int, Dict[int, float]] = {}
 
-        # ── ATB gauges ──────────────────────────────────────────────────
-        # { player_id: current_gauge }
-        self.atb_gauges: Dict[int, float] = {}
-        self.enemy_atb: float = 0.0
-        # per-player gauge maximums loaded from their class
-        self.atb_maxes: Dict[int, float] = {}
-        # enemy gauge maximum loaded when battle starts
-        self.enemy_atb_max: float = 5.0
-        self.atb_task: Optional[asyncio.Task] = None
         # Limit speed-based extra turns to one until the next enemy action
         self.speed_bonus_used: bool = False
-        # when True the ATB loop pauses until the next action resolves
-        self.atb_paused: bool = False
         # ── status effects ───────────────────────────────────────────────
         # { player_id: [ { "effect_id": int, "remaining": int }, … ] }
         self.status_effects: Dict[int, List[Dict[str, Any]]] = {}
@@ -99,9 +87,6 @@ class GameSession:
         # Cached channel/message for battle updates
         self.battle_channel: Any = None
         self.battle_message: Any = None
-        self.atb_message: Any = None
-        # Previously displayed gauge values for on_tick throttling
-        self.last_tick_values: Dict[Any, Any] = {}
 
     def add_player(self, player_id: int) -> None:
         """Add a player to the session.
@@ -170,18 +155,10 @@ class GameSession:
         """Reset all stored data about the current battle."""
         self.battle_state = None
         self.current_enemy = None
-        self.atb_gauges = {}
-        self.enemy_atb = 0.0
-        self.atb_maxes = {}
-        self.enemy_atb_max = 5.0
-        self.atb_task = None
         self.speed_bonus_used = False
-        self.atb_paused = False
         self.cached_player_stats = {}
         self.battle_channel = None
         self.battle_message = None
-        self.atb_message = None
-        self.last_tick_values = {}
 
     def update_ability_cooldown(self, player_id: int, ability_id: int, cd: float) -> None:
         """Set the cooldown timer for a player's ability."""
@@ -195,20 +172,6 @@ class GameSession:
         for _, cds in self.ability_cooldowns.items():
             for aid in list(cds):
                 cds[aid] = max(cds[aid] - amount, 0.0)
-
-    # ── ATB utilities ───────────────────────────────────────────────────
-    def increment_gauge(self, pid: int, amount: float) -> None:
-        """Increase a player's ATB gauge by ``amount``."""
-        self.atb_gauges[pid] = self.atb_gauges.get(pid, 0.0) + amount
-
-    def reset_gauge(self, pid: int) -> None:
-        """Reset a player's ATB gauge to zero."""
-        self.atb_gauges[pid] = 0.0
-
-    def is_ready(self, pid: int) -> bool:
-        """Return ``True`` if the player's ATB gauge reached their maximum."""
-        max_val = self.atb_maxes.get(pid, 5)
-        return self.atb_gauges.get(pid, 0.0) >= max_val
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize the session to a dictionary for persistence."""
@@ -229,13 +192,7 @@ class GameSession:
             "game_state": self.game_state,
             "battle_state": self.battle_state,
             "ability_cooldowns": self.ability_cooldowns,
-            "atb_gauges": self.atb_gauges,
-            "enemy_atb": self.enemy_atb,
-            "atb_maxes": self.atb_maxes,
-            "enemy_atb_max": self.enemy_atb_max,
-            "atb_task": None,
             "speed_bonus_used": self.speed_bonus_used,
-            "atb_paused": self.atb_paused,
             "trance_states": self.trance_states,
             "status_effects": self.status_effects,
             "current_enemy": self.current_enemy,
@@ -263,13 +220,7 @@ class GameSession:
         gs.current_turn      = data.get("current_turn")
         gs.battle_state      = data.get("battle_state")
         gs.ability_cooldowns = data.get("ability_cooldowns", {})
-        gs.atb_gauges        = data.get("atb_gauges", {})
-        gs.enemy_atb         = data.get("enemy_atb", 0.0)
-        gs.atb_maxes         = data.get("atb_maxes", {})
-        gs.enemy_atb_max     = data.get("enemy_atb_max", 5.0)
-        gs.atb_task          = None
         gs.speed_bonus_used  = data.get("speed_bonus_used", False)
-        gs.atb_paused        = data.get("atb_paused", False)
         gs.trance_states     = data.get("trance_states", {})
         gs.status_effects    = data.get("status_effects", {})
         gs.current_enemy     = data.get("current_enemy")
