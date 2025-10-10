@@ -82,6 +82,6 @@ Ensure this table exists by running `python database/database_setup.py` during s
 
 From the hub, press the **High Scores** button to view the leaderboard. Entries are sorted by play time (ascending) and then enemies defeated, but you can also sort programmatically by `enemies_defeated`, `gil` or `player_level` when using the API.
 
-## Active Time Battle
+## Turn-Based Combat
 
-Combat follows an active time battle (ATB) system. Each participant has a hidden gauge that fills over time at a rate determined by their speed stat. When a gauge reaches full, the character may select an action. Spells such as *haste* and *slow* modify speed, causing gauges to fill faster or slower respectively.
+Battles now use a classic turn-based flow. The side with the higher effective speed stat acts first; if the enemy is faster they gain a pre-emptive strike, while faster players open the battle. Speed-altering effects such as *haste* or *slow* can still grant occasional extra turns when the difference is large enough, preserving the strategic value of speed without the need for visible gauges.

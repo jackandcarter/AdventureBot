@@ -46,26 +46,27 @@ discord.Color.dark_red = getattr(discord.Color, "dark_red", lambda: None)
 
 
 class FakeCursor:
+    def __init__(self, result):
+        self.result = result
+
     def execute(self, sql, params=None):
-        if "COALESCE" in sql:
-            self.result = {"atb_max": 5}
-        elif sql.startswith("SELECT atb_max FROM enemies"):
-            self.result = {"atb_max": 5}
-        elif sql.startswith("SELECT hp"):
-            self.result = {"hp": 10, "max_hp": 10, "defense": 0, "attack_power": 0}
-        else:
-            self.result = None
+        self.sql = sql
 
     def fetchone(self):
-        return self.result
+        if "SELECT hp" in self.sql:
+            return self.result
+        return None
 
     def close(self):
         pass
 
 
 class FakeConnection:
+    def __init__(self, result):
+        self.result = result
+
     def cursor(self, dictionary=False):
-        return FakeCursor()
+        return FakeCursor(self.result)
 
     def close(self):
         pass
@@ -80,15 +81,11 @@ class FakeSessionManager:
 
 
 class FakeEmbedManager:
-    def __init__(self, session):
-        self.session = session
-        self.gauges = None
+    def __init__(self):
+        self.buttons = None
 
-    async def send_or_update_embed(self, *a, **k):
-        self.gauges = (
-            self.session.atb_gauges.get(self.session.current_turn, None),
-            self.session.enemy_atb,
-        )
+    async def send_or_update_embed(self, *_, **kwargs):
+        self.buttons = kwargs.get("buttons")
         return None
 
 
@@ -113,28 +110,84 @@ class FakeInteraction:
         self.followup = FakeFollowup()
 
 
-def test_battle_gauges_start_at_zero(monkeypatch):
-    # Other tests may replace discord.Color; ensure dark_red is available
-    discord.Color.dark_red = lambda: None
+def _make_battle_system(monkeypatch, session, player_speed):
+    discord.Color.dark_red = getattr(discord.Color, "dark_red", lambda: None)
+    if not hasattr(discord, "Embed") or not hasattr(discord.Embed, "add_field"):
+        discord.Embed = type(
+            "Embed",
+            (),
+            {
+                "__init__": lambda self, **_: None,
+                "add_field": lambda *_, **__: None,
+                "set_image": lambda *_, **__: None,
+            },
+        )
+    else:
+        def _add_field(self, *_, **__):
+            return None
+
+        def _set_image(self, *_, **__):
+            return None
+
+        discord.Embed.add_field = _add_field
+        discord.Embed.set_image = _set_image
+    sm = FakeSessionManager(session)
+    em = FakeEmbedManager()
+    bot = FakeBot(sm, em)
+    bs = BattleSystem(bot)
+
+    result = {
+        "hp": 10,
+        "max_hp": 10,
+        "defense": 0,
+        "attack_power": 0,
+        "speed": player_speed,
+    }
+
+    monkeypatch.setattr(bs, "db_connect", lambda: FakeConnection(result))
+    monkeypatch.setattr(SessionPlayerModel, "get_status_effects", lambda *a, **k: [])
+    monkeypatch.setattr(bs, "_append_battle_log", lambda *a, **k: None)
+
+    return bs, em
+
+
+def test_player_turn_first_when_faster(monkeypatch):
     session = GameSession(1, 1, "1", 42)
     session.players = [42]
     session.current_turn = 42
 
-    sm = FakeSessionManager(session)
-    em = FakeEmbedManager(session)
-    bot = FakeBot(sm, em)
-    bs = BattleSystem(bot)
-
-    monkeypatch.setattr(bs, "db_connect", lambda: FakeConnection())
-    monkeypatch.setattr(SessionPlayerModel, "get_status_effects", lambda *a, **k: [])
-    monkeypatch.setattr(bs, "_append_battle_log", lambda *a, **k: None)
-    monkeypatch.setattr(bs.atb, "start", lambda *a, **k: None)
+    bs, em = _make_battle_system(monkeypatch, session, player_speed=15)
 
     interaction = FakeInteraction()
     enemy = {"enemy_id": 99, "enemy_name": "Goblin", "hp": 10, "max_hp": 10, "speed": 10}
 
     asyncio.run(bs.start_battle(interaction, 42, enemy))
 
-    assert em.gauges == (0.0, 0.0)
-    assert session.atb_gauges[42] == 0.0
-    assert session.enemy_atb == 0.0
+    assert session.battle_state["active_combatant"] == "player"
+    assert em.buttons[0][4] is False  # buttons enabled
+
+
+def test_enemy_preemptive_when_faster(monkeypatch):
+    session = GameSession(1, 1, "1", 42)
+    session.players = [42]
+    session.current_turn = 42
+
+    bs, em = _make_battle_system(monkeypatch, session, player_speed=5)
+
+    interaction = FakeInteraction()
+    enemy = {"enemy_id": 99, "enemy_name": "Goblin", "hp": 10, "max_hp": 10, "speed": 12}
+
+    called = False
+
+    async def fake_enemy_turn(*_args, **_kwargs):
+        nonlocal called
+        called = True
+        return None
+
+    monkeypatch.setattr(bs, "enemy_turn", fake_enemy_turn)
+
+    asyncio.run(bs.start_battle(interaction, 42, enemy))
+
+    assert called is True
+    assert session.battle_state["active_combatant"] == "enemy"
+    assert em.buttons[0][4] is True  # buttons disabled while enemy acts
