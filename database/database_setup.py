@@ -189,7 +189,10 @@ MERGED_ELEMENTS: List[Tuple] = [
     (2, 'Ice',            '2025-03-30 21:40:47'),
     (3, 'Holy',           '2025-03-30 21:40:47'),
     (4, 'Non-Elemental',  '2025-03-30 21:40:47'),
-    (5, 'Air',            '2025-03-30 21:40:47')
+    (5, 'Air',            '2025-03-30 21:40:47'),
+    (6, 'Lightning',      '2025-03-30 21:40:47'),
+    (7, 'Water',          '2025-03-30 21:40:47'),
+    (8, 'Earth',          '2025-03-30 21:40:47'),
 ]
 # --- difficulties -------------------------------------------------------------
 MERGED_DIFFICULTIES: List[Tuple] = [
@@ -429,6 +432,18 @@ TABLES = {
             element_id   INT AUTO_INCREMENT PRIMARY KEY,
             element_name VARCHAR(50) NOT NULL UNIQUE,
             created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''',
+    # ---------- status_effects ----------
+    'status_effects': '''
+        CREATE TABLE IF NOT EXISTS status_effects (
+            effect_id   INT AUTO_INCREMENT PRIMARY KEY,
+            effect_name VARCHAR(100) NOT NULL,
+            effect_type ENUM('buff','debuff','neutral') NOT NULL,
+            icon_url    VARCHAR(255),
+            created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            value       INT NOT NULL,
+            duration    INT NOT NULL
         )
     ''',
     # ---------- abilities ----------
@@ -890,18 +905,6 @@ TABLES = {
             FOREIGN KEY (ability_id) REFERENCES abilities(ability_id) ON DELETE CASCADE
         )
     ''',
-    # ---------- status_effects ----------
-    'status_effects': '''
-        CREATE TABLE IF NOT EXISTS status_effects (
-            effect_id INT AUTO_INCREMENT PRIMARY KEY,
-            effect_name VARCHAR(100) NOT NULL,
-            effect_type ENUM('buff','debuff','neutral') NOT NULL,
-            icon_url VARCHAR(255),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            value INT NOT NULL,
-            duration INT NOT NULL
-        )
-    ''',
     # ---------- ability_status_effects ----------
     'ability_status_effects': '''
         CREATE TABLE IF NOT EXISTS ability_status_effects (
@@ -983,6 +986,7 @@ TABLE_ORDER = [
     'difficulties',
     'floor_room_rules',
     'elements',
+    'status_effects',
     'abilities',
     'classes',
     'levels',
@@ -1010,7 +1014,6 @@ TABLE_ORDER = [
     'game_saves',
     'intro_steps',
     'enemy_abilities',
-    'status_effects',
     'ability_status_effects',
     'enemy_resistances',
     'item_effects',
@@ -1066,6 +1069,24 @@ def insert_elements(cur):
     )
     logger.info("Inserted elements.")
 
+def insert_status_effects(cur):
+    logger.info("Ensuring status_effects seed data…")
+    cur.execute("SELECT effect_name FROM status_effects")
+    existing_names = {row[0] for row in cur.fetchall()}
+    missing_rows = [row for row in MERGED_STATUS_EFFECTS if row[1] not in existing_names]
+    if missing_rows:
+        cur.executemany(
+            """
+            INSERT INTO status_effects
+              (effect_name, effect_type, icon_url, created_at, value, duration)
+            VALUES (%s,%s,%s,%s,%s,%s)
+            """,
+            [row[1:] for row in missing_rows]
+        )
+        logger.info("Inserted %s new status_effects.", len(missing_rows))
+    else:
+        logger.info("status_effects already up to date – skipping")
+
 def insert_abilities_and_classes(cur):
     logger.info("Checking abilities seed data…")
     if table_is_empty(cur, "abilities"):
@@ -1098,23 +1119,6 @@ def insert_abilities_and_classes(cur):
         logger.info("Inserted classes.")
     else:
         logger.info("classes already populated – skipping")
-
-    logger.info("Checking status_effects seed data…")
-    cur.execute("SELECT effect_name FROM status_effects")
-    existing_names = {row[0] for row in cur.fetchall()}
-    missing_rows = [row for row in MERGED_STATUS_EFFECTS if row[1] not in existing_names]
-    if missing_rows:
-        cur.executemany(
-            """
-            INSERT INTO status_effects
-              (effect_name,effect_type,icon_url,created_at,value,duration)
-            VALUES (%s,%s,%s,%s,%s,%s)
-            """,
-            [row[1:] for row in missing_rows]
-        )
-        logger.info("Inserted %s new status_effects.", len(missing_rows))
-    else:
-        logger.info("status_effects already populated – skipping")
 
     logger.info("Checking ability_status_effects links…")
     cur.execute("SELECT ability_id, effect_id FROM ability_status_effects")
@@ -1305,21 +1309,6 @@ def insert_npc_vendor_items(cur):
     )
     logger.info("Inserted npc_vendor_items.")
 
-def insert_new_relational_tables(cur):
-    logger.info("Checking status_effects seed data…")
-    if table_is_empty(cur, "status_effects"):
-        cur.executemany(
-            """
-            INSERT INTO status_effects
-              (effect_name,effect_type,icon_url,created_at,value,duration)
-            VALUES (%s,%s,%s,%s,%s,%s)
-            """,
-            [row[1:] for row in MERGED_STATUS_EFFECTS]
-        )
-        logger.info("Inserted status_effects.")
-    else:
-        logger.info("status_effects already populated – skipping")
-
 def insert_hub_embeds(cur):
     logger.info("Checking hub_embeds seed data…")
     if not table_is_empty(cur, "hub_embeds"):
@@ -1384,6 +1373,7 @@ def main() -> None:
                 insert_difficulties(cur)
                 insert_floor_room_rules(cur)
                 insert_elements(cur)
+                insert_status_effects(cur)
                 insert_abilities_and_classes(cur)
                 insert_levels(cur)
                 insert_intro_steps(cur)
@@ -1395,7 +1385,6 @@ def main() -> None:
                 insert_enemy_drops(cur)
                 insert_enemy_resistances(cur)
                 insert_npc_vendor_items(cur)
-                insert_new_relational_tables(cur)
                 insert_hub_embeds(cur)
                 cnx.commit()
                 logger.info("Database setup complete ✔")

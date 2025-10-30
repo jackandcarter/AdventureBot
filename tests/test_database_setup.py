@@ -83,6 +83,7 @@ def test_main_creates_crystal_templates(monkeypatch):
         "insert_difficulties",
         "insert_floor_room_rules",
         "insert_elements",
+        "insert_status_effects",
         "insert_abilities_and_classes",
         "insert_levels",
         "insert_intro_steps",
@@ -94,7 +95,6 @@ def test_main_creates_crystal_templates(monkeypatch):
         "insert_enemy_drops",
         "insert_enemy_resistances",
         "insert_npc_vendor_items",
-        "insert_new_relational_tables",
         "insert_hub_embeds",
     ]:
         monkeypatch.setattr(database_setup, fn, lambda cur: None)
