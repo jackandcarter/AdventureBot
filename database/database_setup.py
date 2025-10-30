@@ -257,14 +257,14 @@ MERGED_ITEMS: List[Tuple] = [
 
 # --- enemies ------------------------------------------------------------------
 MERGED_ENEMIES: List[Tuple] = [
-    (1, 'Behemoth',            'large, purple, canine-esque creature...', 100, 100, 15,  5,  5,  5,  90, 5, 5, 'Easy',   None,'http://the-demiurge.com/DemiDevUnit/images/monsters/behemoth.png',             0.3, 100,  75, None, 1, None,'2025-03-31 02:40:47'),
-    (2, 'Ghost',               'pale, translucent, or wispy being...',    50,  50, 10,  5,  5,  3,  85, 5, 5, 'Easy',   None,'http://the-demiurge.com/DemiDevUnit/images/monsters/ghost.png',                0.3,  50,  50, None, 2, None,'2025-03-31 02:40:47'),
-    (3, 'Dragon Whelp',        'A young dragon spitting small flames.',   100, 100, 15,  8, 10,  5,  80,10, 5, 'Hard',   None,'https://example.com/images/dragon_whelp.png',                                  0.1, 150, 150, None, 1, None,'2025-03-31 02:40:47'),
-    (4, 'Lich',                'An undead sorcerer with devastating magic.',80, 80, 12,  4, 20, 10,  90, 5, 5, 'Hard',   None,'https://example.com/images/lich.png',                                          0.2, 200, 200, None, 1, None,'2025-03-31 02:40:47'),
-    (5, 'Dark Knight',         'A mysterious warrior clad in obsidian armor.',120,120,20,10,  5,  8,  85, 5, 5, 'Medium', None,'https://example.com/images/dark_knight.png',                                   0.4, 150, 250, None, 1, None,'2025-03-31 02:40:47'),
-    (6, 'Nightmare',           'You feel a sudden wave of fear as the dark shrouded creature approaches...',125,125,20,6,6,6,90,5, 5,'Easy',None,'http://the-demiurge.com/DemiDevUnit/images/monsters/elementals/nightmare_elemental.png',0.1,125,150,None,1,None,'2025-04-09 20:20:32'),
-    (7, 'Tonberry Chef',       'A creature said to be only in legend. It seems to like cooking, but where did it get that knife and chef\'s hat? Also VERY big.',250,250,20,6,10,6,90,5, 5,'Easy',None,'http://the-demiurge.com/DemiDevUnit/images/monsters/tonberry/tonberry_chef.png',0.1,150,110,None,1,None,'2025-04-09 20:20:32'),
-    (8, 'Overgrown Tonberry',  'A creature said to be only in legend. Also VERY big.',200,200,10,5,2,3,85,5, 5,'Easy',None,'http://the-demiurge.com/DemiDevUnit/images/monsters/tonberry/overgrown_tonberry.png', 0.3, 75,  90, None, 1, None,'2025-03-31 02:40:47')
+    (1, 'Behemoth',            'large, purple, canine-esque creature...', 100, 100, 15,  5,  5,  5,  90, 5, 5, 'Easy',   'normal', None,'http://the-demiurge.com/DemiDevUnit/images/monsters/behemoth.png',             0.3, 100,  75, None, 1, None,'2025-03-31 02:40:47'),
+    (2, 'Ghost',               'pale, translucent, or wispy being...',    50,  50, 10,  5,  5,  3,  85, 5, 5, 'Easy',   'normal', None,'http://the-demiurge.com/DemiDevUnit/images/monsters/ghost.png',                0.3,  50,  50, None, 2, None,'2025-03-31 02:40:47'),
+    (3, 'Dragon Whelp',        'A young dragon spitting small flames.',   100, 100, 15,  8, 10,  5,  80,10, 5, 'Hard',   'normal', None,'https://example.com/images/dragon_whelp.png',                                  0.1, 150, 150, None, 1, None,'2025-03-31 02:40:47'),
+    (4, 'Lich',                'An undead sorcerer with devastating magic.',80, 80, 12,  4, 20, 10,  90, 5, 5, 'Hard',   'normal', None,'https://example.com/images/lich.png',                                          0.2, 200, 200, None, 1, None,'2025-03-31 02:40:47'),
+    (5, 'Dark Knight',         'A mysterious warrior clad in obsidian armor.',120,120,20,10,  5,  8,  85, 5, 5, 'Medium', 'normal', None,'https://example.com/images/dark_knight.png',                                   0.4, 150, 250, None, 1, None,'2025-03-31 02:40:47'),
+    (6, 'Nightmare',           'You feel a sudden wave of fear as the dark shrouded creature approaches...',125,125,20,6,6,6,90,5, 5,'Easy','normal',None,'http://the-demiurge.com/DemiDevUnit/images/monsters/elementals/nightmare_elemental.png',0.1,125,150,None,1,None,'2025-04-09 20:20:32'),
+    (7, 'Tonberry Chef',       'A creature said to be only in legend. It seems to like cooking, but where did it get that knife and chef\'s hat? Also VERY big.',250,250,20,6,10,6,90,5, 5,'Easy','normal',None,'http://the-demiurge.com/DemiDevUnit/images/monsters/tonberry/tonberry_chef.png',0.1,150,110,None,1,None,'2025-04-09 20:20:32'),
+    (8, 'Overgrown Tonberry',  'A creature said to be only in legend. Also VERY big.',200,200,10,5,2,3,85,5, 5,'Easy','normal',None,'http://the-demiurge.com/DemiDevUnit/images/monsters/tonberry/overgrown_tonberry.png', 0.3, 75,  90, None, 1, None,'2025-03-31 02:40:47')
 ]
 
 # --- enemy ↔ ability links ----------------------------------------------------
@@ -836,6 +836,7 @@ TABLES = {
             evasion INT DEFAULT 5,
             atb_max INT DEFAULT 5,
             difficulty VARCHAR(50),
+            role VARCHAR(20) DEFAULT 'normal',
             abilities JSON,
             image_url VARCHAR(255),
             spawn_chance FLOAT DEFAULT 0.5,
@@ -1238,9 +1239,9 @@ def insert_enemies_and_abilities(cur):
             INSERT INTO enemies
               (enemy_name, description, hp, max_hp, attack_power, defense,
                magic_power, magic_defense, accuracy, evasion, atb_max, difficulty,
-               abilities, image_url, spawn_chance, gil_drop, xp_reward,
+               role, abilities, image_url, spawn_chance, gil_drop, xp_reward,
                loot_item_id, loot_quantity, creator_id, created_at)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """,
             [row[1:] for row in MERGED_ENEMIES]
         )
