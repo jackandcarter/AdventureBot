@@ -559,7 +559,7 @@ class DungeonGenerator(commands.Cog):
 
         # 4) boss/exit coordinates
         boss_coord = path[-2] if is_last_floor and len(path) >= 2 else None
-        exit_coord = path[-1] if is_last_floor else None
+        exit_coord = path[-1] if is_last_floor else final_exit
 
         # 5) shops
         shops_needed = min(shop_limit, len(interior))
@@ -625,9 +625,12 @@ class DungeonGenerator(commands.Cog):
                 if coord == boss_coord:
                     rtype = "boss"
                 elif coord == exit_coord:
-                    rtype = "exit"
+                    if is_last_floor:
+                        rtype = "exit"
+                    else:
+                        rtype = "staircase_down"
                 elif coord == (start_x, start_y):
-                    rtype = "safe" if floor_number == 1 else "staircase_down"
+                    rtype = "safe" if floor_number == 1 else "staircase_up"
                 elif coord in shop_positions:
                     rtype = "shop"
                 else:
@@ -1334,10 +1337,10 @@ class DungeonGenerator(commands.Cog):
                     cur.execute(
                         """
                         UPDATE rooms
-                           SET room_type='staircase_up',
-                               stair_up_floor_id=%s,
-                               stair_up_x=%s,
-                               stair_up_y=%s
+                           SET room_type='staircase_down',
+                               stair_down_floor_id=%s,
+                               stair_down_x=%s,
+                               stair_down_y=%s
                          WHERE session_id=%s
                            AND floor_id=%s
                            AND coord_x=%s
@@ -1356,9 +1359,10 @@ class DungeonGenerator(commands.Cog):
                     cur.execute(
                         """
                         UPDATE rooms
-                           SET stair_down_floor_id=%s,
-                               stair_down_x=%s,
-                               stair_down_y=%s
+                           SET room_type='staircase_up',
+                               stair_up_floor_id=%s,
+                               stair_up_x=%s,
+                               stair_up_y=%s
                          WHERE session_id=%s
                            AND floor_id=%s
                            AND coord_x=%s
