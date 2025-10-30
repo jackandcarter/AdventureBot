@@ -916,7 +916,7 @@ class DungeonGenerator(commands.Cog):
         locked_count = 0
         for _, x, y, rtype, exits in first_defs:
             inner_id = None
-            stair_down_floor_id = None
+            stair_down_floor = None
             stair_down_x = None
             stair_down_y = None
             vendor_id = None
@@ -926,7 +926,7 @@ class DungeonGenerator(commands.Cog):
                 # this is the locked entrance to basement
                 rtype = "locked"
                 inner_id = staircase_down_tpl
-                stair_down_floor_id = basement_floor_id
+                stair_down_floor = basement_floor_id
                 stair_down_x, stair_down_y = x, y
             elif rtype == "locked":
                 if mb_index < len(miniboss_pool):
@@ -980,7 +980,7 @@ class DungeonGenerator(commands.Cog):
                         (session_id,floor_id,coord_x,coord_y,description,
                          room_type,image_url,default_enemy_id,exits,
                          vendor_id,inner_template_id,
-                         stair_down_floor_id,stair_down_x,stair_down_y)
+                         stair_down_floor,stair_down_x,stair_down_y)
                     VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     """,
                     (
@@ -995,7 +995,7 @@ class DungeonGenerator(commands.Cog):
                         json.dumps(exits),
                         vendor_id,
                         inner_id,
-                        stair_down_floor_id,
+                        stair_down_floor,
                         stair_down_x,
                         stair_down_y,
                     ),
@@ -1013,7 +1013,7 @@ class DungeonGenerator(commands.Cog):
                     """
                     UPDATE rooms
                        SET room_type='staircase_up',
-                           stair_up_floor_id=%s,
+                           stair_up_floor=%s,
                            stair_up_x=%s,
                            stair_up_y=%s
                      WHERE session_id=%s
@@ -1035,7 +1035,7 @@ class DungeonGenerator(commands.Cog):
                 cur.execute(
                     """
                     UPDATE rooms
-                       SET stair_down_floor_id=%s,
+                       SET stair_down_floor=%s,
                            stair_down_x=%s,
                            stair_down_y=%s
                      WHERE session_id=%s
@@ -1338,7 +1338,7 @@ class DungeonGenerator(commands.Cog):
                         """
                         UPDATE rooms
                            SET room_type='staircase_down',
-                               stair_down_floor_id=%s,
+                               stair_down_floor=%s,
                                stair_down_x=%s,
                                stair_down_y=%s
                          WHERE session_id=%s
@@ -1360,7 +1360,7 @@ class DungeonGenerator(commands.Cog):
                         """
                         UPDATE rooms
                            SET room_type='staircase_up',
-                               stair_up_floor_id=%s,
+                               stair_up_floor=%s,
                                stair_up_x=%s,
                                stair_up_y=%s
                          WHERE session_id=%s
