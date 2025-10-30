@@ -1161,8 +1161,8 @@ class GameMaster(commands.Cog):
         with conn.cursor(dictionary=True) as cur:
             cur.execute(
                 """
-                SELECT stair_down_floor_id, stair_down_x, stair_down_y,
-                       stair_up_floor_id,   stair_up_x,   stair_up_y
+                SELECT stair_down_floor, stair_down_x, stair_down_y,
+                       stair_up_floor,   stair_up_x,   stair_up_y
                 FROM rooms
                 WHERE room_id = %s
                 """,
@@ -1185,19 +1185,19 @@ class GameMaster(commands.Cog):
                   r.image_url           = tpl.image_url,
                   r.default_enemy_id    = tpl.default_enemy_id,
                   r.inner_template_id   = NULL,
-                  r.stair_down_floor_id = %s,
+                  r.stair_down_floor = %s,
                   r.stair_down_x        = %s,
                   r.stair_down_y        = %s,
-                  r.stair_up_floor_id   = %s,
+                  r.stair_up_floor   = %s,
                   r.stair_up_x          = %s,
                   r.stair_up_y          = %s
                 WHERE r.room_id = %s
                 """,
                 (
-                    stair_info["stair_down_floor_id"],
+                    stair_info["stair_down_floor"],
                     stair_info["stair_down_x"],
                     stair_info["stair_down_y"],
-                    stair_info["stair_up_floor_id"],
+                    stair_info["stair_up_floor"],
                     stair_info["stair_up_x"],
                     stair_info["stair_up_y"],
                     room["room_id"],
@@ -1212,8 +1212,8 @@ class GameMaster(commands.Cog):
             with conn2.cursor(dictionary=True) as cur2:
                 cur2.execute(
                     """
-                    SELECT stair_up_floor_id, stair_up_x, stair_up_y,
-                           stair_down_floor_id, stair_down_x, stair_down_y
+                    SELECT stair_up_floor, stair_up_x, stair_up_y,
+                           stair_down_floor, stair_down_x, stair_down_y
                     FROM rooms
                     WHERE room_id = %s
                     """,
@@ -1221,9 +1221,9 @@ class GameMaster(commands.Cog):
                 )
                 stair_info = cur2.fetchone()
             conn2.close()
-            if room["new_room_type"] == "staircase_up" and stair_info["stair_up_floor_id"] is None:
+            if room["new_room_type"] == "staircase_up" and stair_info["stair_up_floor"] is None:
                 logger.warning(f"⚠️ Unlocked staircase_up at ({x},{y}) has no destination!")
-            if room["new_room_type"] == "staircase_down" and stair_info["stair_down_floor_id"] is None:
+            if room["new_room_type"] == "staircase_down" and stair_info["stair_down_floor"] is None:
                 logger.warning(f"⚠️ Unlocked staircase_down at ({x},{y}) has no destination!")
 
         # 7) re‑load the revealed room
@@ -1559,12 +1559,12 @@ class GameMaster(commands.Cog):
         dest_floor_id = None
         dest_x, dest_y = x, y
 
-        if room["room_type"] == "staircase_up" and room["stair_up_floor_id"] is not None:
-            dest_floor_id = room["stair_up_floor_id"]
+        if room["room_type"] == "staircase_up" and room["stair_up_floor"] is not None:
+            dest_floor_id = room["stair_up_floor"]
             dest_x = room["stair_up_x"]
             dest_y = room["stair_up_y"]
-        elif room["room_type"] == "staircase_down" and room["stair_down_floor_id"] is not None:
-            dest_floor_id = room["stair_down_floor_id"]
+        elif room["room_type"] == "staircase_down" and room["stair_down_floor"] is not None:
+            dest_floor_id = room["stair_down_floor"]
             dest_x = room["stair_down_x"]
             dest_y = room["stair_down_y"]
         else:
