@@ -17,6 +17,8 @@ Install the dependencies with:
 pip install -r requirements.txt
 ```
 
+If you are deploying on Ubuntu 24.04, see the detailed [Ubuntu setup guide](docs/ubuntu-setup.md) for end-to-end instructions covering system packages, MariaDB configuration, and environment variables.
+
 Enable the required Discord intents for your application and initialize the database:
 
 ```bash
