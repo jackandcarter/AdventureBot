@@ -3,6 +3,10 @@
 
 AdventureBot is a Discord bot that powers a turn‑based dungeon adventure. It uses MySQL to store game sessions and data while gameplay logic lives in the `game` package. The `hub` package manages server setup and player interactions.
 
+## Web App Port
+
+Early scaffolding for a standalone web app lives in the `webapp/` directory. The Node + TypeScript service currently exposes health and readiness endpoints while we build out lobby, auth, and gameplay APIs described in the [web app roadmap](docs/webapp-roadmap.md). See `webapp/README.md` for setup steps.
+
 ## Prerequisites
 
 - **Python** 3.10+
