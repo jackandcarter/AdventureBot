@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { lobbyStore } from '../services/lobby-store.js';
-import { Difficulty } from '../services/types.js';
 import { serializeSession } from '../services/session-serializer.js';
 
 export const lobbyRouter = Router();
@@ -29,7 +28,7 @@ lobbyRouter.post('/lobby/messages', (req, res, next) => {
 
 const createRoomSchema = z.object({
   ownerName: z.string().min(1),
-  difficulty: z.enum(['easy', 'normal', 'hard']).default('normal') as unknown as Difficulty,
+  difficulty: z.enum(['easy', 'normal', 'hard']).default('normal'),
   allowJoinMidgame: z.boolean().optional().default(true),
   password: z.string().min(4).max(50).optional(),
   maxPlayers: z.number().int().min(1).max(10).optional(),

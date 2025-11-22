@@ -1,19 +1,60 @@
 export type Difficulty = 'easy' | 'normal' | 'hard';
 
-export type SessionStatus = 'waiting' | 'in_progress';
+export type SessionStatus = 'waiting' | 'in_progress' | 'completed';
 
 export interface Position {
   x: number;
   y: number;
 }
 
-export type RoomType = 'entrance' | 'empty' | 'enemy' | 'treasure' | 'stairs';
+export type RoomKind = 'entrance' | 'hall' | 'enemy' | 'treasure' | 'stairs' | 'locked' | 'boss' | 'shop';
+
+export interface Stats {
+  maxHealth: number;
+  health: number;
+  attack: number;
+  defense: number;
+}
+
+export interface InventoryItem {
+  id: string;
+  name: string;
+  type: 'treasure' | 'quest' | 'consumable';
+  quantity: number;
+}
+
+export interface RoomState {
+  position: Position;
+  kind: RoomKind;
+  discovered: boolean;
+  cleared: boolean;
+  locked: boolean;
+  seed: string;
+  enemy?: Stats;
+  loot?: InventoryItem[];
+}
+
+export interface FloorState {
+  index: number;
+  size: number;
+  start: Position;
+  stairs: Position;
+  rooms: RoomState[][];
+}
+
+export interface DungeonState {
+  seed: string;
+  currentFloor: number;
+  floors: FloorState[];
+}
 
 export interface Player {
   id: string;
   name: string;
   position: Position;
-  health: number;
+  floor: number;
+  stats: Stats;
+  inventory: InventoryItem[];
 }
 
 export interface GameSession {
@@ -21,22 +62,22 @@ export interface GameSession {
   difficulty: Difficulty;
   ownerName: string;
   createdAt: string;
-  gridSize: number;
-  grid: RoomType[][];
   players: Player[];
+  turnOrder: string[];
   turnIndex: number;
   log: string[];
   status: SessionStatus;
   allowJoinMidgame: boolean;
   password?: string | null;
   maxPlayers: number;
+  dungeon: DungeonState;
+  version: number;
 }
 
-export interface MoveResult {
+export interface MoveOutcome {
   session: GameSession;
-  movedPlayer: Player;
-  room: RoomType;
-  description: string;
+  room: RoomState;
+  events: string[];
 }
 
 export interface CreateSessionOptions {
