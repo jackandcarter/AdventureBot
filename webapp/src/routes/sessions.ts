@@ -83,8 +83,8 @@ sessionsRouter.post('/sessions/:sessionId/actions/move', (req, res, next) => {
     const result = sessionStore.movePlayer(req.params.sessionId, body.playerId, body.direction);
 
     res.json({
-      description: result.description,
-      roomType: result.room,
+      events: result.events,
+      room: result.room,
       state: serializeSession(result.session),
     });
   } catch (error) {
