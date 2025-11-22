@@ -35,3 +35,8 @@ dist/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Node artifacts
+node_modules/
+webapp/dist/
+webapp/.env
