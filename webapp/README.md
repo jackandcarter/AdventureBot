@@ -45,4 +45,13 @@ Early web game APIs are exposed under `/api` and use in-memory state to start ex
 - `GET /api/sessions/:sessionId` — fetch the latest session state (players, turn order, log, and grid size).
 - `POST /api/sessions/:sessionId/actions/move` — move the active player north/south/east/west. Enforces turn order and appends a descriptive log entry for the discovered room type.
 
+Sessions now support lobby-style controls: optional passwords, configurable maximum party size, and a toggle that allows or blocks mid-dungeon joins once a run begins. Live sessions report their status (`waiting` or `in_progress`), whether a password is required, and how many seats remain.
+
+## Lobby and cyber chat prototype
+The lobby surfaces an in-memory chat feed alongside the list of joinable rooms to help players coordinate:
+
+- `GET /api/lobby` — fetch the current lobby snapshot (chat messages annotated with session summaries and the live room list).
+- `POST /api/lobby/messages` — append a chat message with an author and body; optionally associate it with a session ID so UI can deep-link into a lobby entry.
+- `POST /api/lobby/rooms` — create a new room with difficulty, allow-join toggle, optional password, and max player count. The response returns the initial session state plus an updated lobby snapshot so the UI can refresh the chat feed and room list.
+
 Sessions currently live only in memory to keep iteration fast; they will be backed by MariaDB and real game logic in future phases.
