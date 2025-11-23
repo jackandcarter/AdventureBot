@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import pinoHttp from 'pino-http';
 import { logger } from './logger.js';
 import { healthRouter } from './routes/health.js';
+import { hubRouter } from './routes/hub.js';
 import { lobbyRouter } from './routes/lobby.js';
 import { sessionsRouter } from './routes/sessions.js';
 import { HttpError } from './errors/http-error.js';
@@ -20,6 +21,7 @@ export const createApp = () => {
   app.use(express.static(publicDir));
 
   app.use(healthRouter);
+  app.use('/api', hubRouter);
   app.use('/api', lobbyRouter);
   app.use('/api', sessionsRouter);
 
