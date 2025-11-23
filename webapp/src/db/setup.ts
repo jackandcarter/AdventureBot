@@ -36,6 +36,22 @@ const hasSchema = async (connection: mysql.Connection): Promise<boolean> => {
   return rows.length > 0;
 };
 
+const ensureWebUsersTable = async (connection: mysql.Connection): Promise<void> => {
+  const [rows] = await connection.query<RowDataPacket[]>("SHOW TABLES LIKE 'web_users'");
+  if (rows.length > 0) return;
+
+  await connection.query(`
+      CREATE TABLE IF NOT EXISTS web_users (
+        id            INT AUTO_INCREMENT PRIMARY KEY,
+        email         VARCHAR(255) NOT NULL UNIQUE,
+        display_name  VARCHAR(255) NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+  logger.info('Created missing web_users table');
+};
+
 export const ensureDatabaseSetup = async (): Promise<void> => {
   const adminConnection = await mysql.createConnection({
     host: env.mysql.host,
@@ -65,17 +81,19 @@ export const ensureDatabaseSetup = async (): Promise<void> => {
 
   try {
     const schemaPresent = await hasSchema(connection);
+    if (!schemaPresent) {
+      const statements = loadSetupStatements();
+      for (const statement of statements) {
+        await connection.query(statement);
+      }
+
+      logger.info('Database schema and seed data installed');
+    }
+
+    await ensureWebUsersTable(connection);
     if (schemaPresent) {
-      logger.info('Database schema already present; skipping setup');
-      return;
+      logger.info('Database schema already present; ensured user table');
     }
-
-    const statements = loadSetupStatements();
-    for (const statement of statements) {
-      await connection.query(statement);
-    }
-
-    logger.info('Database schema and seed data installed');
   } catch (error) {
     logger.error({ err: error }, 'Database setup failed');
     throw error;

@@ -19,6 +19,7 @@ const EnvSchema = z.object({
   MYSQL_USER: z.string().min(1),
   MYSQL_PASSWORD: z.string().min(1),
   MYSQL_DATABASE: z.string().min(1),
+  JWT_SECRET: z.string().min(10),
 });
 
 const parsed = EnvSchema.safeParse(process.env);
@@ -38,6 +39,7 @@ const env = {
     password: parsed.data.MYSQL_PASSWORD,
     database: parsed.data.MYSQL_DATABASE,
   },
+  jwtSecret: parsed.data.JWT_SECRET,
 };
 
 export type Environment = typeof env;
