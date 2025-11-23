@@ -1,6 +1,6 @@
-import { Difficulty, DifficultyDefinition } from './types.js';
+import { Difficulty, DifficultyDefinition, difficultyKeys } from './types.js';
 
-export const difficultyOrder: Difficulty[] = ['easy', 'medium', 'hard', 'crazy_catto'];
+export const difficultyOrder: Difficulty[] = [...difficultyKeys];
 
 export const difficultyDefinitions: Record<Difficulty, DifficultyDefinition> = {
   easy: {
@@ -63,4 +63,4 @@ export const difficultyDefinitions: Record<Difficulty, DifficultyDefinition> = {
 
 export const getDifficultyDefinition = (key: Difficulty): DifficultyDefinition => difficultyDefinitions[key];
 
-export const difficultyKeys = Object.keys(difficultyDefinitions) as Difficulty[];
+export { difficultyKeys };

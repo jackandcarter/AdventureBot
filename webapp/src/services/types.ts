@@ -1,4 +1,5 @@
-export type Difficulty = 'easy' | 'medium' | 'hard' | 'crazy_catto';
+export const difficultyKeys = ['easy', 'medium', 'hard', 'crazy_catto'] as const;
+export type Difficulty = (typeof difficultyKeys)[number];
 
 export interface DifficultyDefinition {
   key: Difficulty;
