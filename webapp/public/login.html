@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sign in • AdventureBot Web</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="auth-body">
+    <main class="auth-card">
+      <p class="eyebrow">AdventureBot Web</p>
+      <h1>Welcome back</h1>
+      <p class="lede">Sign in to reach the lobby and manage your sessions.</p>
+
+      <form id="auth-form" class="auth-form" data-mode="login">
+        <label>
+          Email
+          <input type="email" name="email" autocomplete="email" required />
+        </label>
+        <label>
+          Password
+          <input type="password" name="password" autocomplete="current-password" required />
+        </label>
+        <button type="submit" class="primary">Sign in</button>
+      </form>
+
+      <div id="auth-error" class="result"></div>
+      <p class="muted">Need an account? <a href="/register">Create one here.</a></p>
+    </main>
+
+    <script src="/auth.js"></script>
+  </body>
+</html>

@@ -39,6 +39,7 @@ DROP TABLE IF EXISTS `status_effects`;
 DROP TABLE IF EXISTS `elements`;
 DROP TABLE IF EXISTS `floor_room_rules`;
 DROP TABLE IF EXISTS `difficulties`;
+DROP TABLE IF EXISTS `web_users`;
 
 CREATE TABLE IF NOT EXISTS difficulties (
             difficulty_id       INT AUTO_INCREMENT PRIMARY KEY,
@@ -54,6 +55,14 @@ CREATE TABLE IF NOT EXISTS difficulties (
             basement_min_rooms  INT NOT NULL DEFAULT 0,
             basement_max_rooms  INT NOT NULL DEFAULT 0,
             created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+CREATE TABLE IF NOT EXISTS web_users (
+            id            INT AUTO_INCREMENT PRIMARY KEY,
+            email         VARCHAR(255) NOT NULL UNIQUE,
+            display_name  VARCHAR(255) NOT NULL,
+            password_hash VARCHAR(255) NOT NULL,
+            created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
 CREATE TABLE IF NOT EXISTS floor_room_rules (

@@ -13,13 +13,17 @@ const statWaitingEl = document.querySelector('#stat-waiting');
 const onlineUsersEl = document.querySelector('#online-users');
 
 let difficultyDefinitions = [];
+let currentUser = null;
 
 const api = async (path, options = {}) => {
+  const { headers, ...rest } = options;
   const response = await fetch(`/api${path}`, {
+    credentials: 'include',
+    ...rest,
     headers: {
       'Content-Type': 'application/json',
+      ...(headers || {}),
     },
-    ...options,
   });
 
   const payload = await response.json().catch(() => ({}));
@@ -29,6 +33,19 @@ const api = async (path, options = {}) => {
   }
 
   return payload;
+};
+
+const ensureAuthenticated = async () => {
+  try {
+    const { user } = await api('/auth/me');
+    currentUser = user;
+    if (statusEl) {
+      statusEl.textContent = `Signed in as ${user.displayName}`;
+    }
+  } catch (error) {
+    window.location.href = '/login';
+    throw error;
+  }
 };
 
 const roomLegend = [
@@ -488,6 +505,14 @@ document.querySelectorAll('[data-scroll]').forEach((button) => {
   });
 });
 
-loadDifficulties().then(() => refreshLobby());
-renderLegend();
-renderSession(null);
+const bootstrapLobby = async () => {
+  await ensureAuthenticated();
+  renderLegend();
+  renderSession(null);
+  await loadDifficulties();
+  await refreshLobby();
+};
+
+bootstrapLobby().catch(() => {
+  statusEl.textContent = 'Redirecting to sign-in…';
+});
