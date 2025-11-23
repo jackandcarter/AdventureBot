@@ -15,7 +15,17 @@ class Database:
     and provides a .get_connection() method returning a MySQL connector.
     """
     def __init__(self):
-        self.config = DB_CONFIG
+        self.config = self._normalize_config(DB_CONFIG)
+
+    @staticmethod
+    def _normalize_config(cfg: dict) -> dict:
+        normalized = cfg.copy()
+        if "port" in normalized and isinstance(normalized["port"], str):
+            try:
+                normalized["port"] = int(normalized["port"])
+            except ValueError:
+                logger.warning("Invalid port value '%s' in DB config; leaving as-is", normalized["port"])
+        return normalized
 
     def get_connection(self):
         try:
@@ -30,7 +40,7 @@ class AsyncDatabase:
     """Asynchronous counterpart using aiomysql."""
 
     def __init__(self):
-        self.config = DB_CONFIG
+        self.config = Database._normalize_config(DB_CONFIG)
 
     async def get_connection(self):
         try:
