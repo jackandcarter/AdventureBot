@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { HttpError } from '../errors/http-error.js';
 import { createSeededRng, pickFrom, randomInt } from './random.js';
 import { baseRoomTypes, floorRoomRules } from './floor-room-rules.js';
-import { difficultyDefinitions, getDifficultyDefinition } from './difficulties.js';
+import { getDifficultyDefinition } from './difficulties.js';
 import {
   CreateSessionOptions,
   Difficulty,
@@ -105,7 +105,7 @@ const pickFloorRules = (difficulty: Difficulty, floorIndex: number) => {
 
 const sprinkleRooms = (floor: FloorState, difficulty: Difficulty) => {
   const rng = createSeededRng(`${floor.start.x},${floor.start.y}:${difficulty}:${floor.index}`);
-  const definition = difficultyDefinitions[difficulty];
+  const definition = getDifficultyDefinition(difficulty);
   const rules = pickFloorRules(difficulty, floor.index);
   const occupied = new Set<string>([`${floor.start.x},${floor.start.y}`, `${floor.stairs.x},${floor.stairs.y}`]);
   const occupy = (pos: Position) => occupied.add(`${pos.x},${pos.y}`);
