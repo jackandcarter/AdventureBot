@@ -20,15 +20,22 @@ This service ports the Discord AdventureBot experience to a standalone web stack
    ```bash
    npm install
    ```
-3. Run the development server with automatic reloads:
+3. Create or refresh the database schema and seed data from the repository dump:
+   ```bash
+   npm run db:setup
+   ```
+   This script creates the configured database if it does not exist, then installs the AdventureBot tables and seed rows from
+   `database/dump.sql`.
+
+4. Run the development server with automatic reloads:
    ```bash
    npm run dev
    ```
-4. Build the production bundle:
+5. Build the production bundle:
    ```bash
    npm run build
    ```
-5. Start the compiled server:
+6. Start the compiled server:
    ```bash
    npm start
    ```
