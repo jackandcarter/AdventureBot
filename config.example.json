@@ -1,9 +1,20 @@
 {
     "discord_token": "YOUR_DISCORD_TOKEN",
+    "database_url": "mysql://YOUR_DB_USER:YOUR_DB_PASSWORD@localhost:3306/adventure",
     "mysql": {
         "host": "localhost",
         "user": "YOUR_DB_USER",
         "password": "YOUR_DB_PASSWORD",
-        "database": "adventure"
+        "database": "adventure",
+        "port": 3306
+    },
+    "mail_url": "smtp+tls://user:pass@mail.example.com:587",
+    "mail": {
+        "host": "mail.example.com",
+        "port": 587,
+        "username": "user",
+        "password": "pass",
+        "use_tls": true,
+        "use_ssl": false
     }
 }

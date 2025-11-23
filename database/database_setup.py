@@ -6,11 +6,17 @@
 import json
 import logging
 import os
-from typing import List, Tuple
 import re
+import sys
+from pathlib import Path
+from typing import List, Tuple
 
 import mysql.connector
 from mysql.connector import Error
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.append(str(ROOT))
+from utils.helpers import load_config  # noqa: E402
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  LOGGING
@@ -24,18 +30,6 @@ logger = logging.getLogger("DatabaseSetup")
 # ═══════════════════════════════════════════════════════════════════════════
 #  CONFIG
 # ═══════════════════════════════════════════════════════════════════════════
-def load_config() -> dict:
-    here       = os.path.dirname(os.path.abspath(__file__))
-    root       = os.path.dirname(here)
-    cfg_path   = os.path.join(root, "config.json")
-    if not os.path.exists(cfg_path):
-        logger.error("❌ Config file missing at %s", cfg_path)
-        raise SystemExit(1)
-    with open(cfg_path, "r") as fh:
-        cfg = json.load(fh)
-    logger.debug("Configuration loaded ✓")
-    return cfg
-
 CONFIG    = load_config()
 DB_CONFIG = CONFIG["mysql"]
 

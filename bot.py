@@ -8,7 +8,6 @@ starts the Discord client used for gameplay.
 
 import asyncio
 import importlib
-import json
 import logging
 import os
 import subprocess
@@ -32,33 +31,16 @@ logger.setLevel(logging.DEBUG)  # Your bot logs are still DEBUG
 logging.getLogger("discord").setLevel(logging.WARNING)
 logging.getLogger("discord.gateway").setLevel(logging.WARNING)
 logging.getLogger("discord.http").setLevel(logging.WARNING)
+from utils.helpers import get_bot_root, load_config
+from utils.mail_client import MailClient
 
 # ---------------------
 #   CONFIG LOADING
 # ---------------------
-def get_bot_root():
-    """Return the absolute path to the directory containing this script."""
-    return os.path.dirname(os.path.abspath(__file__))
-
-CONFIG_PATH = os.path.join(get_bot_root(), 'config.json')
-
-def load_config():
-    """Load bot configuration from disk.
-
-    Exits the program if the configuration file cannot be read.
-    """
-    try:
-        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
-            config_data = json.load(f)
-            logger.debug("Configuration loaded successfully.")
-            return config_data
-    except Exception as e:
-        logger.error("\u274c Failed to load config from %s: %s", CONFIG_PATH, e)
-        sys.exit(1)
-
 config = load_config()
 TOKEN = config.get('discord_token')
 DB_CONFIG = config.get('mysql', {})
+MAIL_CONFIG = config.get('mail', {})
 
 # ---------------------
 #   DATABASE SETUP
@@ -81,6 +63,17 @@ def run_database_setup():
     else:
         logger.error("\u274c Database setup encountered an error. Exiting bot.")
         sys.exit(1)
+
+
+def log_mail_health():
+    """Verify mail connectivity for password reset and verification flows."""
+
+    if not MAIL_CONFIG or not MAIL_CONFIG.get("host"):
+        logger.info("✉️ Mail configuration not provided; skipping mail health check.")
+        return
+
+    mail_client = MailClient(MAIL_CONFIG)
+    mail_client.health_check(logger)
 
 # ---------------------
 #   BOT INTENTS
@@ -171,6 +164,7 @@ logger.info("Discovered cog modules: %s", modules)
 async def main():
     """Start the bot and load all discovered extensions."""
     run_database_setup()
+    log_mail_health()
 
     if not TOKEN:
         logger.error("\u274c Discord token not found in config. Exiting...")
