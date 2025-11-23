@@ -5,12 +5,13 @@ import { lobbyStore } from '../services/lobby-store.js';
 import { sessionStore } from '../services/session-store.js';
 import { Difficulty } from '../services/types.js';
 import { serializeSession } from '../services/session-serializer.js';
+import { difficultyKeys } from '../services/difficulties.js';
 
 export const sessionsRouter = Router();
 
 const createSessionSchema = z.object({
   ownerName: z.string().min(1),
-  difficulty: z.enum(['easy', 'normal', 'hard']).default('normal'),
+  difficulty: z.enum(difficultyKeys).default('easy'),
   allowJoinMidgame: z.boolean().optional().default(true),
   password: z.string().min(4).max(50).optional(),
   maxPlayers: z.number().int().min(1).max(10).optional(),

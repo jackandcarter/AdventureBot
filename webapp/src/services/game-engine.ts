@@ -1,8 +1,11 @@
 import crypto from 'crypto';
 import { HttpError } from '../errors/http-error.js';
 import { createSeededRng, pickFrom, randomInt } from './random.js';
+import { baseRoomTypes, floorRoomRules } from './floor-room-rules.js';
+import { difficultyDefinitions, getDifficultyDefinition } from './difficulties.js';
 import {
   CreateSessionOptions,
+  Difficulty,
   DungeonState,
   FloorState,
   GameSession,
@@ -16,47 +19,62 @@ import {
 
 const DEFAULT_STATS: Stats = { maxHealth: 100, health: 100, attack: 10, defense: 4 };
 const MAX_LOG_ENTRIES = 50;
-const DEFAULT_GRID = 9;
-const DEFAULT_FLOORS = 3;
 
-const enemyTemplates: Record<string, Stats> = {
+const enemyTemplates: Record<Difficulty, Stats> = {
   easy: { maxHealth: 24, health: 24, attack: 6, defense: 2 },
-  normal: { maxHealth: 30, health: 30, attack: 8, defense: 3 },
+  medium: { maxHealth: 30, health: 30, attack: 8, defense: 3 },
   hard: { maxHealth: 40, health: 40, attack: 10, defense: 4 },
+  crazy_catto: { maxHealth: 52, health: 52, attack: 12, defense: 6 },
 };
-
-const difficultyKeys: Record<string, number> = { easy: 1, normal: 2, hard: 3 };
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
 const describeRoom = (room: RoomState) => {
   switch (room.kind) {
-    case 'enemy':
+    case 'monster':
       return 'a hostile creature blocks the path';
-    case 'treasure':
+    case 'item':
       return 'a gleaming treasure chest awaits';
     case 'locked':
       return 'a locked door stands in your way';
-    case 'stairs':
+    case 'staircase_down':
       return 'a staircase descends to the next floor';
+    case 'staircase_up':
+      return 'a staircase rises back to safety';
     case 'boss':
       return 'a powerful foe defends this chamber';
     case 'shop':
       return 'a wandering merchant offers wares';
+    case 'trap':
+      return 'the floor bristles with hidden traps';
+    case 'illusion':
+      return 'shifting illusions distort the hallway';
+    case 'exit':
+      return 'a path back to the entrance glows faintly';
+    case 'safe':
+      return 'quiet stone corridors stretch forward';
+    case 'entrance':
+      return 'the party gathers here';
     default:
       return 'quiet stone corridors stretch forward';
   }
 };
 
-const createEmptyFloor = (size: number, floorIndex: number, seed: string): FloorState => {
+const createEmptyFloor = (
+  width: number,
+  height: number,
+  floorIndex: number,
+  seed: string,
+  isBasement = false,
+): FloorState => {
   const rng = createSeededRng(`${seed}:floor:${floorIndex}`);
   const rooms: RoomState[][] = [];
-  for (let y = 0; y < size; y += 1) {
+  for (let y = 0; y < height; y += 1) {
     const row: RoomState[] = [];
-    for (let x = 0; x < size; x += 1) {
+    for (let x = 0; x < width; x += 1) {
       row.push({
         position: { x, y },
-        kind: 'hall',
+        kind: 'safe',
         discovered: false,
         cleared: true,
         locked: false,
@@ -66,86 +84,122 @@ const createEmptyFloor = (size: number, floorIndex: number, seed: string): Floor
     rooms.push(row);
   }
 
-  const start: Position = { x: Math.floor(size / 2), y: Math.floor(size / 2) };
-  const stairs: Position = { x: randomInt(rng, 0, size - 1), y: randomInt(rng, 0, size - 1) };
+  const start: Position = { x: Math.floor(width / 2), y: Math.floor(height / 2) };
+  const stairs: Position = { x: randomInt(rng, 0, width - 1), y: randomInt(rng, 0, height - 1) };
   rooms[start.y][start.x].kind = 'entrance';
   rooms[start.y][start.x].cleared = true;
   rooms[start.y][start.x].discovered = true;
-  rooms[stairs.y][stairs.x].kind = 'stairs';
+  rooms[stairs.y][stairs.x].kind = 'staircase_down';
   rooms[stairs.y][stairs.x].cleared = false;
+  rooms[stairs.y][stairs.x].legend = 'Advance to the next floor';
 
-  return { index: floorIndex, size, start, stairs, rooms };
+  return { index: floorIndex, width, height, start, stairs, rooms, isBasement };
 };
 
-const sprinkleRooms = (floor: FloorState, difficulty: string) => {
+const pickFloorRules = (difficulty: Difficulty, floorIndex: number) => {
+  const floorNumber = floorIndex + 1;
+  return floorRoomRules.filter(
+    (rule) => rule.difficulty === difficulty && (rule.floorNumber === null || rule.floorNumber === floorNumber),
+  );
+};
+
+const sprinkleRooms = (floor: FloorState, difficulty: Difficulty) => {
   const rng = createSeededRng(`${floor.start.x},${floor.start.y}:${difficulty}:${floor.index}`);
-  const density = clamp(6 + difficultyKeys[difficulty] * 2, 4, floor.size * 2);
-
-  const pickCoords = (): Position => {
-    return { x: randomInt(rng, 0, floor.size - 1), y: randomInt(rng, 0, floor.size - 1) };
-  };
-
+  const definition = difficultyDefinitions[difficulty];
+  const rules = pickFloorRules(difficulty, floor.index);
   const occupied = new Set<string>([`${floor.start.x},${floor.start.y}`, `${floor.stairs.x},${floor.stairs.y}`]);
   const occupy = (pos: Position) => occupied.add(`${pos.x},${pos.y}`);
   occupy(floor.stairs);
   occupy(floor.start);
 
-  for (let i = 0; i < density; i += 1) {
-    const pos = pickCoords();
-    const key = `${pos.x},${pos.y}`;
-    if (occupied.has(key)) continue;
-    occupy(pos);
-    const template = pickFrom(rng, ['enemy', 'treasure', 'locked', 'enemy', 'treasure', 'hall'] as RoomKind[]);
-    const room = floor.rooms[pos.y][pos.x];
-    room.kind = template;
-    room.discovered = false;
-    room.cleared = template !== 'enemy' && template !== 'locked';
-    if (template === 'enemy') {
-      room.enemy = { ...enemyTemplates[difficulty] };
+  const availableCells = floor.width * floor.height - occupied.size;
+  const baseDensity = Math.min(definition.minRooms, availableCells);
+
+  const pickCoords = (): Position => {
+    return { x: randomInt(rng, 0, floor.width - 1), y: randomInt(rng, 0, floor.height - 1) };
+  };
+
+  const applyRule = (roomType: RoomKind, count: number) => {
+    for (let i = 0; i < count; i += 1) {
+      let pos = pickCoords();
+      let attempts = 0;
+      while (occupied.has(`${pos.x},${pos.y}`) && attempts < 10) {
+        pos = pickCoords();
+        attempts += 1;
+      }
+      if (occupied.has(`${pos.x},${pos.y}`)) continue;
+      occupy(pos);
+      const room = floor.rooms[pos.y][pos.x];
+      room.kind = roomType;
+      room.discovered = false;
+      room.cleared = roomType === 'safe' || roomType === 'shop' || roomType === 'illusion';
+      if (roomType === 'monster' || roomType === 'boss') {
+        room.enemy = { ...enemyTemplates[difficulty] };
+      }
+      if (roomType === 'item') {
+        room.loot = [
+          {
+            id: crypto.randomUUID(),
+            name: pickFrom(rng, ['Potion', 'Old Coin', 'Strange Relic', 'Sturdy Key']),
+            type: 'treasure',
+            quantity: 1,
+          },
+        ];
+      }
+      if (roomType === 'locked') {
+        room.locked = true;
+        room.cleared = false;
+      }
+      if (roomType === 'trap') {
+        room.legend = 'Watch your step — traps ahead';
+      }
+      if (roomType === 'illusion') {
+        room.legend = 'Illusory walls hide secrets';
+      }
     }
-    if (template === 'treasure') {
-      room.loot = [
-        {
-          id: crypto.randomUUID(),
-          name: pickFrom(rng, ['Potion', 'Old Coin', 'Strange Relic', 'Sturdy Key']),
-          type: 'treasure',
-          quantity: 1,
-        },
-      ];
-    }
-    if (template === 'locked') {
-      room.locked = true;
-      room.cleared = false;
-    }
+  };
+
+  const estimatedCells = baseDensity || availableCells;
+  rules.forEach((rule) => {
+    const desired = Math.min(rule.maxPerFloor, Math.max(1, Math.round(rule.chance * estimatedCells)));
+    applyRule(rule.roomType, desired);
+  });
+
+  if (!rules.length) {
+    baseRoomTypes.forEach((type) => {
+      const weight = type === 'monster' ? definition.enemyChance : 0.08;
+      applyRule(type, Math.max(1, Math.floor(weight * estimatedCells)));
+    });
   }
 
-  // Ensure a key exists if we spawned locks
   const hasLock = floor.rooms.some((row) => row.some((r) => r.locked));
-  if (hasLock) {
-    const keySpot = pickCoords();
-    const room = floor.rooms[keySpot.y][keySpot.x];
-    room.kind = 'treasure';
-    room.locked = false;
-    room.cleared = false;
-    room.loot = [
-      { id: crypto.randomUUID(), name: 'Iron Key', type: 'quest', quantity: 1 },
-      { id: crypto.randomUUID(), name: 'Rations', type: 'consumable', quantity: 1 },
-    ];
+  const hasKey = floor.rooms.some((row) => row.some((r) => r.loot?.some((l) => l.name === 'Sturdy Key')));
+  if (hasLock && !hasKey) {
+    applyRule('item', 1);
   }
 
-  // Boss on final floor guarding stairs
-  if (floor.index === DEFAULT_FLOORS - 1) {
+  const isFinalFloor = !floor.isBasement && floor.index === Math.max(0, definition.maxFloors - 1);
+  if (isFinalFloor) {
     const room = floor.rooms[floor.stairs.y][floor.stairs.x];
     room.kind = 'boss';
     room.cleared = false;
-    room.enemy = { maxHealth: 60, health: 60, attack: 14, defense: 6 };
+    room.enemy = { maxHealth: 80, health: 80, attack: 16, defense: 7 };
+    room.legend = 'The final encounter awaits';
   }
 };
 
-const createDungeon = (difficulty: string, seed: string): DungeonState => {
+const createDungeon = (difficulty: Difficulty, seed: string): DungeonState => {
+  const definition = getDifficultyDefinition(difficulty);
   const floors: FloorState[] = [];
-  for (let i = 0; i < DEFAULT_FLOORS; i += 1) {
-    const floor = createEmptyFloor(DEFAULT_GRID, i, seed);
+  const rng = createSeededRng(`${seed}:floors`);
+  const totalFloors = randomInt(rng, definition.minFloors, definition.maxFloors);
+  const includeBasement = rng() < definition.basementChance;
+  const basementFloors = includeBasement ? 1 : 0;
+  const total = totalFloors + basementFloors;
+
+  for (let i = 0; i < total; i += 1) {
+    const isBasement = includeBasement && i === total - 1 && basementFloors > 0;
+    const floor = createEmptyFloor(definition.width, definition.height, i, seed, isBasement);
     sprinkleRooms(floor, difficulty);
     floors.push(floor);
   }
@@ -197,6 +251,7 @@ export class GameEngine {
   static createSession(options: CreateSessionOptions): GameSession {
     const sessionId = crypto.randomUUID();
     const createdAt = new Date().toISOString();
+    const definition = getDifficultyDefinition(options.difficulty);
     const dungeon = createDungeon(options.difficulty, sessionId);
     const owner: Player = {
       id: crypto.randomUUID(),
@@ -222,6 +277,7 @@ export class GameEngine {
       maxPlayers: options.maxPlayers ?? 6,
       dungeon,
       version: 1,
+      difficultySettings: definition,
     };
   }
 
@@ -257,7 +313,7 @@ export class GameEngine {
 
     const floor = session.dungeon.floors[player.floor];
     const next: Position = { x: player.position.x + delta[direction].x, y: player.position.y + delta[direction].y };
-    if (next.x < 0 || next.y < 0 || next.x >= floor.size || next.y >= floor.size) {
+    if (next.x < 0 || next.y < 0 || next.x >= floor.width || next.y >= floor.height) {
       throw new HttpError(400, 'Cannot move beyond the dungeon walls');
     }
 
@@ -272,18 +328,17 @@ export class GameEngine {
 
     if (room.locked && player.inventory.some((item) => item.type === 'quest')) {
       room.locked = false;
-      room.kind = room.kind === 'locked' ? 'hall' : room.kind;
       events.push(`${player.name} unlocks the door.`);
     }
 
-    if (room.kind === 'enemy' || room.kind === 'boss') {
+    if (room.kind === 'monster' || room.kind === 'boss') {
       events.push(resolveCombat(room, player));
     }
 
     const lootLog = collectLoot(room, player);
     if (lootLog) events.push(lootLog);
 
-    if (room.kind === 'stairs' && room.cleared) {
+    if ((room.kind === 'staircase_down' || room.kind === 'staircase_up') && room.cleared) {
       if (session.dungeon.currentFloor < session.dungeon.floors.length - 1) {
         session.dungeon.currentFloor += 1;
         const nextFloor = session.dungeon.floors[session.dungeon.currentFloor];
@@ -294,6 +349,12 @@ export class GameEngine {
         session.status = 'completed';
         events.push(`${player.name} reaches the final chamber. The run is complete!`);
       }
+    }
+
+    if (room.kind === 'trap') {
+      const trapDamage = clamp(randomInt(createSeededRng(room.seed), 5, 12), 1, player.stats.health);
+      player.stats.health = clamp(player.stats.health - trapDamage, 0, player.stats.maxHealth);
+      events.push(`${player.name} is hurt by a trap for ${trapDamage} damage.`);
     }
 
     const description = `${player.name} moved ${direction} and found ${describeRoom(room)}.`;
@@ -314,4 +375,3 @@ export class GameEngine {
     return { session, room, events };
   }
 }
-

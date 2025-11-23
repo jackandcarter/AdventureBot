@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { lobbyStore } from '../services/lobby-store.js';
 import { serializeSession } from '../services/session-serializer.js';
+import { difficultyDefinitions, difficultyKeys } from '../services/difficulties.js';
 
 export const lobbyRouter = Router();
 
@@ -16,6 +17,10 @@ lobbyRouter.get('/lobby', (_req, res) => {
   res.json(snapshot);
 });
 
+lobbyRouter.get('/difficulties', (_req, res) => {
+  res.json({ difficulties: difficultyKeys.map((key) => difficultyDefinitions[key]) });
+});
+
 lobbyRouter.post('/lobby/messages', (req, res, next) => {
   try {
     const payload = messageSchema.parse(req.body);
@@ -28,7 +33,7 @@ lobbyRouter.post('/lobby/messages', (req, res, next) => {
 
 const createRoomSchema = z.object({
   ownerName: z.string().min(1),
-  difficulty: z.enum(['easy', 'normal', 'hard']).default('normal'),
+  difficulty: z.enum(difficultyKeys).default('easy'),
   allowJoinMidgame: z.boolean().optional().default(true),
   password: z.string().min(4).max(50).optional(),
   maxPlayers: z.number().int().min(1).max(10).optional(),

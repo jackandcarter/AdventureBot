@@ -1,4 +1,19 @@
-export type Difficulty = 'easy' | 'normal' | 'hard';
+export type Difficulty = 'easy' | 'medium' | 'hard' | 'crazy_catto';
+
+export interface DifficultyDefinition {
+  key: Difficulty;
+  name: string;
+  width: number;
+  height: number;
+  minFloors: number;
+  maxFloors: number;
+  minRooms: number;
+  enemyChance: number;
+  npcCount: number;
+  basementChance: number;
+  basementMinRooms: number;
+  basementMaxRooms: number;
+}
 
 export type SessionStatus = 'waiting' | 'in_progress' | 'completed';
 
@@ -7,7 +22,19 @@ export interface Position {
   y: number;
 }
 
-export type RoomKind = 'entrance' | 'hall' | 'enemy' | 'treasure' | 'stairs' | 'locked' | 'boss' | 'shop';
+export type RoomKind =
+  | 'entrance'
+  | 'safe'
+  | 'monster'
+  | 'item'
+  | 'shop'
+  | 'boss'
+  | 'trap'
+  | 'illusion'
+  | 'staircase_up'
+  | 'staircase_down'
+  | 'exit'
+  | 'locked';
 
 export interface Stats {
   maxHealth: number;
@@ -32,11 +59,14 @@ export interface RoomState {
   seed: string;
   enemy?: Stats;
   loot?: InventoryItem[];
+  legend?: string;
 }
 
 export interface FloorState {
   index: number;
-  size: number;
+  width: number;
+  height: number;
+  isBasement: boolean;
   start: Position;
   stairs: Position;
   rooms: RoomState[][];
@@ -60,6 +90,7 @@ export interface Player {
 export interface GameSession {
   id: string;
   difficulty: Difficulty;
+  difficultySettings: DifficultyDefinition;
   ownerName: string;
   createdAt: string;
   players: Player[];

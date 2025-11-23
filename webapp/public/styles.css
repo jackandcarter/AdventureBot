@@ -1,0 +1,182 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 1.4;
+  padding: 0 1rem;
+}
+
+body {
+  max-width: 1200px;
+  margin: 0 auto 3rem;
+}
+
+header {
+  text-align: center;
+  padding: 1rem 0 0.5rem;
+}
+
+main {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.panel {
+  border: 1px solid var(--border-color, #ccc);
+  border-radius: 10px;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--panel-color, #f7f7f7), transparent 10%);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0.75rem;
+}
+
+.field.checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+label {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+input,
+select,
+button {
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 1rem;
+}
+
+button {
+  cursor: pointer;
+  background: linear-gradient(90deg, #5e60ce, #64dfdf);
+  color: white;
+  border: none;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+}
+
+.result {
+  min-height: 1.5rem;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+}
+
+#rooms,
+#session {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.room-card {
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 0.75rem;
+  background: rgba(100, 223, 223, 0.08);
+}
+
+.room-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.room-meta {
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+.room-body {
+  margin: 0.5rem 0;
+  font-size: 0.95rem;
+}
+
+.scrollable {
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.message {
+  margin-bottom: 0.5rem;
+}
+
+.message .meta {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.session-summary {
+  font-size: 0.95rem;
+}
+
+.session-summary h3 {
+  margin: 0.25rem 0;
+}
+
+ul {
+  padding-left: 1.25rem;
+}
+
+.grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.muted {
+  opacity: 0.8;
+  font-size: 0.95rem;
+}
+
+.legend {
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.4rem;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.legend-item {
+  padding: 0.5rem;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.legend-item strong {
+  display: block;
+}
+
+.pill {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  background: rgba(94, 96, 206, 0.12);
+  border: 1px solid rgba(94, 96, 206, 0.25);
+  margin-right: 0.25rem;
+}
+
+.card {
+  border: 1px solid #d7d7d7;
+  border-radius: 8px;
+  padding: 0.75rem;
+  background: rgba(94, 96, 206, 0.05);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
