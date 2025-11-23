@@ -58,6 +58,25 @@ class SessionStore {
     return Array.from(this.sessions.values());
   }
 
+  startSession(sessionId: string, playerId: string): GameSession {
+    const session = this.getSession(sessionId);
+
+    if (session.status !== 'waiting') {
+      throw new HttpError(409, 'This run has already started');
+    }
+
+    if (session.ownerId !== playerId) {
+      throw new HttpError(403, 'Only the lobby owner can start the run');
+    }
+
+    session.status = 'in_progress';
+    session.log.push(`${session.ownerName} rallies the party. The run begins!`);
+    this.trimLog(session);
+    session.version += 1;
+
+    return session;
+  }
+
   movePlayer(sessionId: string, playerId: string, direction: 'north' | 'south' | 'east' | 'west'): MoveOutcome {
     const session = this.getSession(sessionId);
     const result = GameEngine.move(session, playerId, direction);

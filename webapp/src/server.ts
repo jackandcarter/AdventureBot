@@ -7,15 +7,12 @@ const env = getEnv();
 const app = createApp();
 
 const startServer = async () => {
-  try {
-    await ensureDatabaseSetup();
-    app.listen(env.port, () => {
-      logger.info({ port: env.port, nodeEnv: env.nodeEnv }, 'Web app server listening');
-    });
-  } catch (error) {
-    logger.error({ err: error }, 'Failed to start server');
-    process.exit(1);
-  }
+  await ensureDatabaseSetup();
+  app.listen(env.port, () => {
+    logger.info({ port: env.port, nodeEnv: env.nodeEnv }, 'Web app server listening');
+  });
 };
 
-startServer();
+startServer().catch((error) => {
+  logger.error({ err: error }, 'Failed to start server');
+});

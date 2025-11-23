@@ -6,6 +6,7 @@ const createRoomResultEl = document.querySelector('#create-room-result');
 const joinResultEl = document.querySelector('#join-result');
 const difficultyCardsEl = document.querySelector('#difficulty-cards');
 const legendEl = document.querySelector('#legend');
+const startResultEl = document.querySelector('#start-result');
 
 let difficultyDefinitions = [];
 
@@ -153,6 +154,11 @@ const renderSession = (state) => {
   ).toLocaleString()}`;
   wrapper.appendChild(meta);
 
+  const ownerMeta = document.createElement('div');
+  ownerMeta.className = 'muted';
+  ownerMeta.textContent = `Owner player ID: ${state.ownerId}`;
+  wrapper.appendChild(ownerMeta);
+
   const players = document.createElement('div');
   const list = document.createElement('ul');
   state.players.forEach((player) => {
@@ -238,6 +244,23 @@ const loadDifficulties = async () => {
   }
 };
 
+const prefillSessionFields = ({ sessionId, playerId }) => {
+  const joinId = document.querySelector('#join-session-id');
+  const sessionIdInput = document.querySelector('#session-id');
+  const startSessionInput = document.querySelector('#start-session-id');
+  const startPlayerInput = document.querySelector('#start-player-id');
+
+  if (sessionId) {
+    [joinId, sessionIdInput, startSessionInput].forEach((node) => {
+      if (node) node.value = sessionId;
+    });
+  }
+
+  if (playerId && startPlayerInput) {
+    startPlayerInput.value = playerId;
+  }
+};
+
 const createRoomForm = document.querySelector('#create-room-form');
 createRoomForm?.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -252,9 +275,8 @@ createRoomForm?.addEventListener('submit', async (event) => {
       method: 'POST',
       body: JSON.stringify(payload),
     });
-    createRoomResultEl.textContent = `Lobby created! Session ID: ${result.sessionId}`;
-    document.querySelector('#join-session-id').value = result.sessionId;
-    document.querySelector('#session-id').value = result.sessionId;
+    createRoomResultEl.textContent = `Lobby created! Session ID: ${result.sessionId} • Owner player ID: ${result.ownerPlayerId}`;
+    prefillSessionFields({ sessionId: result.sessionId, playerId: result.ownerPlayerId });
     refreshLobby();
   } catch (error) {
     createRoomResultEl.textContent = error.message;
@@ -296,6 +318,7 @@ joinForm?.addEventListener('submit', async (event) => {
       body: JSON.stringify(payload),
     });
     joinResultEl.textContent = `Joined! Player ID: ${response.playerId}`;
+    prefillSessionFields({ sessionId, playerId: response.playerId });
     refreshSession(sessionId);
     refreshLobby();
   } catch (error) {
@@ -307,7 +330,30 @@ const sessionForm = document.querySelector('#load-session-form');
 sessionForm?.addEventListener('submit', async (event) => {
   event.preventDefault();
   const sessionId = new FormData(sessionForm).get('session-id');
+  prefillSessionFields({ sessionId });
   refreshSession(sessionId);
+});
+
+const startForm = document.querySelector('#start-session-form');
+startForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const formData = new FormData(startForm);
+  const sessionId = formData.get('start-session-id');
+  const playerId = formData.get('start-player-id');
+
+  if (!sessionId || !playerId) return;
+
+  try {
+    const response = await api(`/sessions/${sessionId}/start`, {
+      method: 'POST',
+      body: JSON.stringify({ playerId }),
+    });
+    startResultEl.textContent = 'Run started!';
+    renderSession(response.state);
+    refreshLobby();
+  } catch (error) {
+    startResultEl.textContent = error.message;
+  }
 });
 
 const refreshSession = async (sessionId) => {

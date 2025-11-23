@@ -265,7 +265,9 @@ export class GameEngine {
     return {
       id: sessionId,
       difficulty: options.difficulty,
+      difficultySettings: definition,
       ownerName: options.ownerName,
+      ownerId: owner.id,
       createdAt,
       players: [owner],
       turnOrder: [owner.id],
@@ -277,7 +279,6 @@ export class GameEngine {
       maxPlayers: options.maxPlayers ?? 6,
       dungeon,
       version: 1,
-      difficultySettings: definition,
     };
   }
 

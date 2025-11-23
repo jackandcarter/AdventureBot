@@ -111,6 +111,24 @@
           </div>
           <button type="submit">Load session</button>
         </form>
+        <form id="start-session-form">
+          <div class="field">
+            <label for="start-session-id">Session ID</label>
+            <input id="start-session-id" name="start-session-id" type="text" required />
+          </div>
+          <div class="field">
+            <label for="start-player-id">Owner player ID</label>
+            <input
+              id="start-player-id"
+              name="start-player-id"
+              type="text"
+              placeholder="Returned when you create the lobby"
+              required
+            />
+          </div>
+          <button type="submit">Start run</button>
+        </form>
+        <div id="start-result" class="result"></div>
         <div id="session"></div>
       </section>
     </main>

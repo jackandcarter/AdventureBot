@@ -47,6 +47,10 @@ const joinSessionSchema = z.object({
   password: z.string().min(1).max(50).optional(),
 });
 
+const startSessionSchema = z.object({
+  playerId: z.string().uuid(),
+});
+
 sessionsRouter.post('/sessions/:sessionId/join', (req, res, next) => {
   try {
     const body = joinSessionSchema.parse(req.body);
@@ -59,6 +63,22 @@ sessionsRouter.post('/sessions/:sessionId/join', (req, res, next) => {
     );
 
     res.status(201).json({ playerId: newPlayer.id, state: serializeSession(session) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+sessionsRouter.post('/sessions/:sessionId/start', (req, res, next) => {
+  try {
+    const body = startSessionSchema.parse(req.body);
+    const session = sessionStore.startSession(req.params.sessionId, body.playerId);
+
+    lobbyStore.postSystemMessage(
+      `${session.ownerName} started a ${session.difficulty} run (${session.players.length}/${session.maxPlayers}).`,
+      session.id,
+    );
+
+    res.json({ state: serializeSession(session) });
   } catch (error) {
     next(error);
   }
