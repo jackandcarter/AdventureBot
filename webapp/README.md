@@ -64,6 +64,13 @@ Early web game APIs are exposed under `/api` and use in-memory state to start ex
 
 Sessions now support lobby-style controls: optional passwords, configurable maximum party size, and a toggle that allows or blocks mid-dungeon joins once a run begins. Live sessions report their status (`waiting` or `in_progress`), whether a password is required, and how many seats remain.
 
+## Hub content APIs
+Hub/tutorial surfaces now pull directly from the `hub_embeds` and `high_scores` tables so the web UI can mirror the Discord experience:
+
+- `GET /api/hub/main` — returns the primary hub embed row (title, description, hero image, and news text field) or `null` when not configured.
+- `GET /api/hub/tutorial?page=1` — fetches a tutorial page by 1-based index, reporting the total page count so clients can paginate.
+- `GET /api/hub/high-scores?sort=score_value&limit=20` — retrieve leaderboard entries sorted by score, enemies defeated, bosses defeated, gil, level, or rooms visited (defaults to score).
+
 ## Lobby and cyber chat prototype APIs
 The lobby surfaces an in-memory chat feed alongside the list of joinable rooms to help players coordinate:
 
