@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AdventureBot Web Lobby</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>AdventureBot Web Lobby</h1>
+      <p>Prototype web interface for creating and joining dungeon runs.</p>
+      <div id="status"></div>
+    </header>
+
+    <main>
+      <section class="panel">
+        <h2>Create a Lobby</h2>
+        <form id="create-room-form">
+          <div class="field">
+            <label for="ownerName">Owner name</label>
+            <input id="ownerName" name="ownerName" type="text" required />
+          </div>
+
+          <div class="field">
+            <label for="difficulty">Difficulty</label>
+            <select id="difficulty" name="difficulty">
+              <option disabled selected>Loading difficulties…</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="maxPlayers">Max players</label>
+            <input id="maxPlayers" name="maxPlayers" type="number" min="1" max="10" value="4" />
+          </div>
+
+          <div class="field checkbox">
+            <input id="allowJoinMidgame" name="allowJoinMidgame" type="checkbox" checked />
+            <label for="allowJoinMidgame">Allow join mid-dungeon</label>
+          </div>
+
+          <div class="field">
+            <label for="password">Password (optional)</label>
+            <input id="password" name="password" type="password" placeholder="min 4 characters" />
+          </div>
+
+          <button type="submit">Create lobby</button>
+        </form>
+        <div id="create-room-result" class="result"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Dungeon settings (mirrors database)</h2>
+        <p class="muted">Difficulties and room types come from AdventureBot's database tables, not hard-coded defaults.</p>
+        <div id="difficulty-cards" class="grid"></div>
+        <div id="legend" class="legend"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Lobby Rooms</h2>
+        <button id="refresh-lobby">Refresh lobby</button>
+        <div id="rooms"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Lobby Chat</h2>
+        <div id="chat" class="scrollable"></div>
+        <form id="chat-form">
+          <div class="field">
+            <label for="chat-author">Name</label>
+            <input id="chat-author" name="chat-author" type="text" required />
+          </div>
+          <div class="field">
+            <label for="chat-body">Message</label>
+            <input id="chat-body" name="chat-body" type="text" required />
+          </div>
+          <div class="field">
+            <label for="chat-session">Session ID (optional)</label>
+            <input id="chat-session" name="chat-session" type="text" placeholder="Session to link" />
+          </div>
+          <button type="submit">Send message</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <h2>Join a Session</h2>
+        <form id="join-form">
+          <div class="field">
+            <label for="join-session-id">Session ID</label>
+            <input id="join-session-id" name="join-session-id" type="text" required />
+          </div>
+          <div class="field">
+            <label for="join-name">Player name</label>
+            <input id="join-name" name="join-name" type="text" required />
+          </div>
+          <div class="field">
+            <label for="join-password">Password (if required)</label>
+            <input id="join-password" name="join-password" type="password" />
+          </div>
+          <button type="submit">Join session</button>
+        </form>
+        <div id="join-result" class="result"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Session State</h2>
+        <form id="load-session-form">
+          <div class="field">
+            <label for="session-id">Session ID</label>
+            <input id="session-id" name="session-id" type="text" required />
+          </div>
+          <button type="submit">Load session</button>
+        </form>
+        <div id="session"></div>
+      </section>
+    </main>
+
+    <template id="room-template">
+      <div class="room-card">
+        <div class="room-heading">
+          <strong class="room-owner"></strong>
+          <span class="room-meta"></span>
+        </div>
+        <div class="room-body"></div>
+        <button class="join-room">Copy Session ID</button>
+      </div>
+    </template>
+
+    <script src="/main.js" type="module"></script>
+  </body>
+</html>

@@ -6,6 +6,7 @@ export const serializeSession = (session: GameSession) => {
   return {
     id: session.id,
     difficulty: session.difficulty,
+    difficultySettings: session.difficultySettings,
     ownerName: session.ownerName,
     createdAt: session.createdAt,
     players: session.players.map((player) => ({
@@ -17,26 +18,29 @@ export const serializeSession = (session: GameSession) => {
       maxHealth: player.stats.maxHealth,
       inventory: player.inventory,
     })),
-    dungeon: {
-      currentFloor: session.dungeon.currentFloor,
-      floors: session.dungeon.floors.map((floor) => ({
-        index: floor.index,
-        size: floor.size,
-        start: floor.start,
-        stairs: floor.stairs,
-        rooms: floor.rooms.map((row) =>
-          row.map((room) => ({
-            position: room.position,
-            kind: room.kind,
-            discovered: room.discovered,
-            cleared: room.cleared,
-            locked: room.locked,
-            enemy: room.enemy ? { ...room.enemy } : undefined,
-            loot: room.loot,
-          })),
-        ),
-      })),
-    },
+      dungeon: {
+        currentFloor: session.dungeon.currentFloor,
+        floors: session.dungeon.floors.map((floor) => ({
+          index: floor.index,
+          width: floor.width,
+          height: floor.height,
+          isBasement: floor.isBasement,
+          start: floor.start,
+          stairs: floor.stairs,
+          rooms: floor.rooms.map((row) =>
+            row.map((room) => ({
+              position: room.position,
+              kind: room.kind,
+              discovered: room.discovered,
+              cleared: room.cleared,
+              locked: room.locked,
+              enemy: room.enemy ? { ...room.enemy } : undefined,
+              loot: room.loot,
+              legend: room.legend,
+            })),
+          ),
+        })),
+      },
     log: session.log,
     status: session.status,
     allowJoinMidgame: session.allowJoinMidgame,

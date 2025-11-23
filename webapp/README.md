@@ -37,17 +37,27 @@ This service ports the Discord AdventureBot experience to a standalone web stack
 - `GET /health` returns an immediate OK payload to verify the process is running.
 - `GET /ready` performs a lightweight database ping against the configured MariaDB instance.
 
-## Game session prototype
+## In-browser lobby prototype
+You can now try the lobby and session flows directly from the server without extra tooling. Start the dev server (`npm run dev` from `webapp/`) and open [http://localhost:3000](http://localhost:3000) to load a static UI that exercises the APIs:
+
+- Create new lobbies with difficulty, join rules, optional passwords, and max player counts.
+- Difficulty options are loaded from the database seed values (Easy, Medium, Hard, Crazy Catto) instead of hard-coded lists.
+- View the list of active rooms, copy session IDs, and prefill the join inspector.
+- Post lobby chat messages (optionally tagged to a session) and see the chat feed update.
+- Join rooms, then load a session to inspect players, recent log entries, and grid size.
+
+## Game session prototype APIs
 Early web game APIs are exposed under `/api` and use in-memory state to start experimenting with browser gameplay flows:
 
-- `POST /api/sessions` — create a new dungeon run with an owner name and optional difficulty (`easy`, `normal`, `hard`). Returns the session ID and owner player ID.
+- `GET /api/difficulties` — surface the difficulty definitions mirrored from the database (Easy, Medium, Hard, Crazy Catto) with floor sizing, enemy chances, and basement tuning.
+- `POST /api/sessions` — create a new dungeon run with an owner name and optional difficulty (`easy`, `medium`, `hard`, `crazy_catto`). Returns the session ID and owner player ID.
 - `POST /api/sessions/:sessionId/join` — join an existing run by session ID and player name. Responds with the joining player ID plus the updated session state.
 - `GET /api/sessions/:sessionId` — fetch the latest session state (players, turn order, log, and grid size).
 - `POST /api/sessions/:sessionId/actions/move` — move the active player north/south/east/west. Enforces turn order and appends a descriptive log entry for the discovered room type.
 
 Sessions now support lobby-style controls: optional passwords, configurable maximum party size, and a toggle that allows or blocks mid-dungeon joins once a run begins. Live sessions report their status (`waiting` or `in_progress`), whether a password is required, and how many seats remain.
 
-## Lobby and cyber chat prototype
+## Lobby and cyber chat prototype APIs
 The lobby surfaces an in-memory chat feed alongside the list of joinable rooms to help players coordinate:
 
 - `GET /api/lobby` — fetch the current lobby snapshot (chat messages annotated with session summaries and the live room list).
