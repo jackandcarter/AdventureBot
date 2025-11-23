@@ -8,6 +8,7 @@ export const serializeSession = (session: GameSession) => {
     difficulty: session.difficulty,
     difficultySettings: session.difficultySettings,
     ownerName: session.ownerName,
+    ownerId: session.ownerId,
     createdAt: session.createdAt,
     players: session.players.map((player) => ({
       id: player.id,

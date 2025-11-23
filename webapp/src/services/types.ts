@@ -93,6 +93,7 @@ export interface GameSession {
   difficulty: Difficulty;
   difficultySettings: DifficultyDefinition;
   ownerName: string;
+  ownerId: string;
   createdAt: string;
   players: Player[];
   turnOrder: string[];
