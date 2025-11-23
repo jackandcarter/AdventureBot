@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { lobbyStore } from '../services/lobby-store.js';
 import { serializeSession } from '../services/session-serializer.js';
-import { difficultyDefinitions, difficultyKeys } from '../services/difficulties.js';
+import { difficultyKeys, getDifficultyDefinitions } from '../services/difficulties.js';
 
 export const lobbyRouter = Router();
 
@@ -18,7 +18,8 @@ lobbyRouter.get('/lobby', (_req, res) => {
 });
 
 lobbyRouter.get('/difficulties', (_req, res) => {
-  res.json({ difficulties: difficultyKeys.map((key) => difficultyDefinitions[key]) });
+  const definitions = getDifficultyDefinitions();
+  res.json({ difficulties: difficultyKeys.map((key) => definitions[key]) });
 });
 
 lobbyRouter.post('/lobby/messages', (req, res, next) => {
