@@ -1,12 +1,16 @@
 const statusEl = document.querySelector('#status');
 const roomsEl = document.querySelector('#rooms');
-const chatEl = document.querySelector('#chat');
+const lobbyFeedEl = document.querySelector('#chat');
 const sessionViewEl = document.querySelector('#session');
 const createRoomResultEl = document.querySelector('#create-room-result');
 const joinResultEl = document.querySelector('#join-result');
 const difficultyCardsEl = document.querySelector('#difficulty-cards');
 const legendEl = document.querySelector('#legend');
 const startResultEl = document.querySelector('#start-result');
+const statRoomsEl = document.querySelector('#stat-rooms');
+const statPlayersEl = document.querySelector('#stat-players');
+const statWaitingEl = document.querySelector('#stat-waiting');
+const onlineUsersEl = document.querySelector('#online-users');
 
 let difficultyDefinitions = [];
 
@@ -113,25 +117,88 @@ const renderRooms = (rooms = []) => {
   });
 };
 
-const renderChat = (messages = []) => {
-  chatEl.innerHTML = '';
-  messages
-    .slice()
-    .reverse()
-    .forEach((message) => {
-      const container = document.createElement('div');
-      container.className = 'message';
-      const meta = document.createElement('div');
-      meta.className = 'meta';
-      meta.textContent = `${message.author} • ${new Date(message.timestamp).toLocaleTimeString()}`;
+const renderLobbyFeed = (messages = [], rooms = []) => {
+  lobbyFeedEl.innerHTML = '';
+  const feedItems = [
+    ...messages.map((message) => ({ type: 'chat', timestamp: message.timestamp, payload: message })),
+    ...rooms.map((room) => ({ type: 'room', timestamp: room.createdAt, payload: room })),
+  ].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+  if (!feedItems.length) {
+    lobbyFeedEl.textContent = 'Lobby activity will appear here once people start chatting or hosting.';
+    return;
+  }
+
+  feedItems.forEach((entry) => {
+    const container = document.createElement('div');
+    container.className = `feed-item ${entry.type}`;
+
+    const meta = document.createElement('div');
+    meta.className = 'feed-meta';
+    const time = new Date(entry.timestamp).toLocaleTimeString();
+
+    if (entry.type === 'chat') {
+      const message = entry.payload;
+      const author = document.createElement('span');
+      author.className = 'feed-tag';
+      author.textContent = message.author;
+      meta.append(author, document.createTextNode(time));
+
       if (message.sessionSummary) {
-        meta.textContent += ` • ${message.sessionSummary.ownerName}'s lobby`;
+        const badge = document.createElement('span');
+        badge.className = 'feed-pill';
+        badge.textContent = `${message.sessionSummary.ownerName}'s lobby`;
+        meta.appendChild(badge);
       }
+
       const body = document.createElement('div');
+      body.className = 'feed-body';
       body.textContent = message.body;
       container.append(meta, body);
-      chatEl.appendChild(container);
-    });
+    }
+
+    if (entry.type === 'room') {
+      const room = entry.payload;
+      const label = document.createElement('span');
+      label.className = 'feed-tag';
+      label.textContent = `${room.ownerName} started a lobby`;
+      const badge = document.createElement('span');
+      badge.className = 'feed-pill';
+      badge.textContent = `${formatDifficulty(room.difficulty)} • ${room.playerCount}/${room.maxPlayers}`;
+      meta.append(label, document.createTextNode(time), badge);
+
+      const body = document.createElement('div');
+      body.className = 'feed-body';
+      body.textContent = room.allowJoinMidgame ? 'Mid-dungeon joins allowed' : 'Locks after the run begins';
+
+      const actions = document.createElement('div');
+      actions.className = 'feed-actions';
+      const copyButton = document.createElement('button');
+      copyButton.className = 'pill-button ghost';
+      copyButton.textContent = 'Copy Session ID';
+      copyButton.addEventListener('click', async () => {
+        await navigator.clipboard.writeText(room.sessionId);
+        document.querySelector('#join-session-id').value = room.sessionId;
+        document.querySelector('#session-id').value = room.sessionId;
+        alert(`Session ID copied: ${room.sessionId}`);
+      });
+
+      const joinButton = document.createElement('button');
+      joinButton.className = 'pill-button';
+      joinButton.textContent = 'Join lobby';
+      joinButton.addEventListener('click', () => {
+        document.querySelector('#join-session-id').value = room.sessionId;
+        document.querySelector('#session-id').value = room.sessionId;
+        document.querySelector('#chat-session').value = room.sessionId;
+        window.scrollTo({ top: document.querySelector('#join-form').offsetTop - 20, behavior: 'smooth' });
+      });
+
+      actions.append(copyButton, joinButton);
+      container.append(meta, body, actions);
+    }
+
+    lobbyFeedEl.appendChild(container);
+  });
 };
 
 const renderSession = (state) => {
@@ -208,12 +275,55 @@ const renderSession = (state) => {
   sessionViewEl.appendChild(wrapper);
 };
 
+const renderStats = (rooms = []) => {
+  const totalRooms = rooms.length;
+  const filledSeats = rooms.reduce((sum, room) => sum + (room.playerCount || 0), 0);
+  const maxSeats = rooms.reduce((sum, room) => sum + (room.maxPlayers || 0), 0);
+  const waitingRooms = rooms.filter((room) => room.status === 'waiting').length;
+
+  if (statRoomsEl) {
+    statRoomsEl.querySelector('strong').textContent = totalRooms;
+    statRoomsEl.querySelector('span').textContent = 'Active sessions';
+  }
+
+  if (statPlayersEl) {
+    statPlayersEl.querySelector('strong').textContent = maxSeats ? `${filledSeats}/${maxSeats}` : '—';
+    statPlayersEl.querySelector('span').textContent = 'Adventurers seated';
+  }
+
+  if (statWaitingEl) {
+    statWaitingEl.querySelector('strong').textContent = waitingRooms;
+    statWaitingEl.querySelector('span').textContent = 'Waiting rooms';
+  }
+};
+
+const renderOnlineUsers = (rooms = []) => {
+  if (!onlineUsersEl) return;
+  onlineUsersEl.innerHTML = '';
+
+  const hosts = rooms.map((room) => room.ownerName).filter(Boolean);
+  const uniqueHosts = Array.from(new Set(hosts));
+
+  if (!uniqueHosts.length) {
+    onlineUsersEl.textContent = 'Waiting for hosts to appear.';
+    return;
+  }
+
+  uniqueHosts.forEach((host) => {
+    const item = document.createElement('div');
+    item.textContent = host;
+    onlineUsersEl.appendChild(item);
+  });
+};
+
 const refreshLobby = async () => {
   try {
     statusEl.textContent = 'Loading lobby...';
     const snapshot = await api('/lobby');
     renderRooms(snapshot.rooms);
-    renderChat(snapshot.messages);
+    renderLobbyFeed(snapshot.messages, snapshot.rooms);
+    renderStats(snapshot.rooms);
+    renderOnlineUsers(snapshot.rooms);
     statusEl.textContent = `Lobby loaded at ${new Date().toLocaleTimeString()}`;
   } catch (error) {
     statusEl.textContent = error.message;
@@ -368,6 +478,15 @@ const refreshSession = async (sessionId) => {
 
 const refreshButton = document.querySelector('#refresh-lobby');
 refreshButton?.addEventListener('click', () => refreshLobby());
+
+document.querySelectorAll('[data-scroll]').forEach((button) => {
+  button.addEventListener('click', (event) => {
+    const target = document.querySelector(event.currentTarget.dataset.scroll);
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+});
 
 loadDifficulties().then(() => refreshLobby());
 renderLegend();
