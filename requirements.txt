@@ -1,4 +1,0 @@
-discord.py
-mysql-connector-python
-aiomysql
-pylint
