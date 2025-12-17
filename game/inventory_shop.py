@@ -141,14 +141,27 @@ class InventoryShop(commands.Cog):
         if hub_mgr and interaction.channel.id == hub_mgr.hub_channel_id:
             return
 
+        cid = interaction.data.get("custom_id", "")
+
+        handled_prefixes = (
+            "shop_main_",
+            "shop_buy_",
+            "shop_sell_",
+            "action_shop_",
+            "buy_",
+            "sell_",
+            "use_item_",
+        )
+        handled_exacts = {"back_from_use", "shop_back_room"}
+        if not (cid.startswith(handled_prefixes) or cid in handled_exacts):
+            return
+
         # Always defer so edits/followups are possible; ignore if already acknowledged
         try:
             if not interaction.response.is_done():
                 await interaction.response.defer()
         except discord.errors.HTTPException as e:
             logger.debug("Deferred interaction failed (already acknowledged): %s", e)
-
-        cid = interaction.data.get("custom_id", "")
 
         try:
             # ---------------- Shop main ----------------
