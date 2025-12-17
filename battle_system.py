@@ -26,6 +26,17 @@ class BattleSystem(commands.Cog):
         # AbilityEngine handles ALL ability logic & damage formulas
         self.ability = AbilityEngine(self.db_connect, self.config.get("damage_variance", 0.0))
 
+    async def _send_ephemeral(self, interaction: discord.Interaction, message: str) -> None:
+        """Safely send an ephemeral response, even if the interaction was already deferred."""
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message(message, ephemeral=True)
+            else:
+                await interaction.followup.send(message, ephemeral=True)
+        except discord.errors.HTTPException as e:
+            if getattr(e, "code", None) != 40060:
+                raise
+
     # --------------------------------------------------------------------- #
     #                               Helpers                                 #
     # --------------------------------------------------------------------- #
@@ -440,10 +451,10 @@ class BattleSystem(commands.Cog):
                             enemy: Dict[str, Any]) -> None:
         mgr = self.bot.get_cog("SessionManager")
         if not mgr:
-            return await interaction.response.send_message("❌ SessionManager not available.", ephemeral=True)
+            return await self._send_ephemeral(interaction, "❌ SessionManager not available.")
         session = mgr.get_session(interaction.channel.id)
         if not session:
-            return await interaction.response.send_message("❌ No session found.", ephemeral=True)
+            return await self._send_ephemeral(interaction, "❌ No session found.")
 
         session.battle_state     = {"enemy": enemy, "player_effects": [], "enemy_effects": []}
 
@@ -620,12 +631,12 @@ class BattleSystem(commands.Cog):
         mgr = self.bot.get_cog("SessionManager")
         embed_mgr = self.bot.get_cog("EmbedManager")
         if not mgr or not embed_mgr:
-            return await interaction.response.send_message("❌ SessionManager or EmbedManager unavailable.", ephemeral=True)
+            return await self._send_ephemeral(interaction, "❌ SessionManager or EmbedManager unavailable.")
         self.embed_manager = embed_mgr
 
         session = mgr.get_session(interaction.channel.id)
         if not session:
-            return await interaction.response.send_message("❌ No active session.", ephemeral=True)
+            return await self._send_ephemeral(interaction, "❌ No active session.")
 
         pid = session.current_turn
         in_battle = bool(session.battle_state)
@@ -635,7 +646,7 @@ class BattleSystem(commands.Cog):
         players = SessionPlayerModel.get_player_states(session.session_id)
         me = next((p for p in players if p["player_id"] == pid), None)
         if not me:
-            return await interaction.response.send_message("❌ Could not find your player data.", ephemeral=True)
+            return await self._send_ephemeral(interaction, "❌ Could not find your player data.")
         class_id, level = me["class_id"], me["level"]
 
         # load unlocked abilities
@@ -668,8 +679,12 @@ class BattleSystem(commands.Cog):
         for a in abilities:
             a["current_cooldown"] = cds.get(a["ability_id"], 0)
         
-        if not interaction.response.is_done():
-            await interaction.response.defer()
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer()
+        except discord.errors.HTTPException as e:
+            if getattr(e, "code", None) != 40060:
+                raise
         await embed_mgr.send_skill_menu_embed(interaction, abilities)
 
     async def display_trance_menu(self, interaction: discord.Interaction) -> None:
@@ -679,12 +694,12 @@ class BattleSystem(commands.Cog):
         """
         session = self.get_session(interaction.channel.id)
         if not session:
-            return await interaction.response.send_message("❌ No session found.", ephemeral=True)
+            return await self._send_ephemeral(interaction, "❌ No session found.")
 
         pid = session.current_turn
         ts = getattr(session, "trance_states", {}).get(pid)
         if not ts:
-            return await interaction.response.send_message("❌ You have no active Trance.", ephemeral=True)
+            return await self._send_ephemeral(interaction, "❌ You have no active Trance.")
 
         # Load the abilities for this trance_id
         conn = self.db_connect()
@@ -703,7 +718,7 @@ class BattleSystem(commands.Cog):
         cursor.close(); conn.close()
 
         if not abilities:
-            return await interaction.response.send_message("⚠️ This Trance has no abilities.", ephemeral=True)
+            return await self._send_ephemeral(interaction, "⚠️ This Trance has no abilities.")
 
         # Annotate cooldowns
         cds = session.ability_cooldowns.get(pid, {})
@@ -727,11 +742,11 @@ class BattleSystem(commands.Cog):
     async def handle_skill_use(self, interaction: discord.Interaction, ability_id: int) -> None:
         mgr = self.bot.get_cog("SessionManager")
         if not mgr or not self.embed_manager:
-            return await interaction.response.send_message("❌ SessionManager or EmbedManager unavailable.", ephemeral=True)
+            return await self._send_ephemeral(interaction, "❌ SessionManager or EmbedManager unavailable.")
 
         session = mgr.get_session(interaction.channel.id)
         if not session:
-            return await interaction.response.send_message("❌ No active session.", ephemeral=True)
+            return await self._send_ephemeral(interaction, "❌ No active session.")
 
         # 1) fetch ability metadata up‑front so we know its target_type
         conn = self.db_connect()
@@ -740,14 +755,12 @@ class BattleSystem(commands.Cog):
         ability_meta = cur.fetchone()
         cur.close(); conn.close()
         if not ability_meta:
-            return await interaction.response.send_message("❌ Ability not found.", ephemeral=True)
+            return await self._send_ephemeral(interaction, "❌ Ability not found.")
 
         # 2) If it’s an enemy‑target skill but we’re not in a battle, block it
         in_battle = bool(session.current_enemy)
         if ability_meta["target_type"] == "enemy" and not in_battle:
-            return await interaction.response.send_message(
-                "❌ That ability can only be used in battle.", ephemeral=True
-            )
+            return await self._send_ephemeral(interaction, "❌ That ability can only be used in battle.")
 
         # 3) Ensure we always have buckets for status effects (so self‑buffs work outside battle)
         if not hasattr(session, "battle_state") or session.battle_state is None:
@@ -770,7 +783,7 @@ class BattleSystem(commands.Cog):
         player = cur.fetchone()
         cur.close(); conn.close()
         if not player:
-            return await interaction.response.send_message("❌ Could not retrieve your stats.", ephemeral=True)
+            return await self._send_ephemeral(interaction, "❌ Could not retrieve your stats.")
         
 
         # 3) resolve via AbilityEngine
@@ -1097,24 +1110,13 @@ class BattleSystem(commands.Cog):
     async def handle_attack(self, interaction: discord.Interaction) -> None:
         mgr = self.bot.get_cog("SessionManager")
         if not mgr or not self.embed_manager:
-            # safe‐exit without double‑respond
-            if not interaction.response.is_done():
-                await interaction.response.send_message(
-                    "❌ SessionManager or EmbedManager not available.", ephemeral=True
-                )
-            else:
-                await interaction.followup.send(
-                    "❌ SessionManager or EmbedManager not available.", ephemeral=True
-                )
-            return
+            return await self._send_ephemeral(
+                interaction, "❌ SessionManager or EmbedManager not available."
+            )
 
         session = mgr.get_session(interaction.channel.id)
         if not session or not session.battle_state or not session.battle_state.get("enemy"):
-            if not interaction.response.is_done():
-                await interaction.response.send_message("❌ No active battle found.", ephemeral=True)
-            else:
-                await interaction.followup.send("❌ No active battle found.", ephemeral=True)
-            return
+            return await self._send_ephemeral(interaction, "❌ No active battle found.")
 
         enemy = session.current_enemy
         pid = session.current_turn
@@ -1216,15 +1218,15 @@ class BattleSystem(commands.Cog):
         if inv:
             return await inv.display_use_item_menu(interaction)
         else:
-            await interaction.response.send_message("❌ Inventory system not available.", ephemeral=True)
+            await self._send_ephemeral(interaction, "❌ Inventory system not available.")
 
     async def handle_flee(self, interaction: discord.Interaction) -> None:
         mgr = self.bot.get_cog("SessionManager")
         if not mgr or not self.embed_manager:
-            return await interaction.response.send_message("❌ SessionManager or EmbedManager not available.", ephemeral=True)
+            return await self._send_ephemeral(interaction, "❌ SessionManager or EmbedManager not available.")
         session = mgr.get_session(interaction.channel.id)
         if not session:
-            return await interaction.response.send_message("❌ No active session found.", ephemeral=True)
+            return await self._send_ephemeral(interaction, "❌ No active session found.")
         session.clear_battle_state()
         session.game_log.append("You fled the battle!")
         await mgr.refresh_current_state(interaction)
@@ -1237,6 +1239,17 @@ class BattleSystem(commands.Cog):
         if interaction.type != discord.InteractionType.component:
             return
         cid = interaction.data.get("custom_id", "")
+
+        # Only claim battle-related component IDs
+        if cid not in {"battle_victory_continue"} and not cid.startswith("combat_"):
+            return
+
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.defer()
+        except discord.errors.HTTPException as e:
+            if getattr(e, "code", None) != 40060:
+                raise
 
         mgr = self.bot.get_cog("SessionManager")
         session = mgr.get_session(interaction.channel.id) if mgr else None
