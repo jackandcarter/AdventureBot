@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from utils.ui_helpers import create_progress_bar, create_cooldown_bar, format_status_effects, get_emoji_for_room_type
 from models.session_models import SessionPlayerModel
 from game.illusion_logic import IllusionEngine
+from models.async_db import fetch_one, get_pool
 
 logger = logging.getLogger("BattleSystem")
 logger.setLevel(logging.DEBUG)
@@ -27,6 +28,7 @@ class BattleSystem(commands.Cog):
         # AbilityEngine handles ALL ability logic & damage formulas
         self.ability = AbilityEngine(self.db_connect, self.config.get("damage_variance", 0.0))
         self.illusion = IllusionEngine(self.db_connect)
+        self._db_pool = None
 
     # --------------------------------------------------------------------- #
     #                               Helpers                                 #
@@ -35,6 +37,13 @@ class BattleSystem(commands.Cog):
         """Called by StatusEffectEngine to append a line to the battle log."""
         gm = self.bot.get_cog("GameMaster")
         gm.append_game_log(session_id, line)
+
+    async def _get_pool(self):
+        """Lazily initialise and return the shared aiomysql pool."""
+
+        if self._db_pool is None:
+            self._db_pool = await get_pool(self.db_config)
+        return self._db_pool
 
     def db_connect(self):
         try:
@@ -97,20 +106,16 @@ class BattleSystem(commands.Cog):
     # --------------------------------------------------------------------- #
     async def _get_random_safe_template(self) -> Optional[Dict[str, Any]]:
         try:
-            conn = self.db_connect()
-            cursor = conn.cursor(dictionary=True, buffered=True)
-            cursor.execute(
+            template = await fetch_one(
                 """
                 SELECT image_url, description
                 FROM room_templates
                 WHERE room_type = 'safe'
                 ORDER BY RAND()
                 LIMIT 1
-                """
+                """,
+                config=self.db_config,
             )
-            template = cursor.fetchone()
-            cursor.close()
-            conn.close()
             logger.debug("Random safe template fetched: %s", template)
             return template
         except Exception as e:
@@ -119,9 +124,7 @@ class BattleSystem(commands.Cog):
 
     async def _replace_monster_room_with_safe(self, session: Any, floor_id: int, x: int, y: int) -> int:
         try:
-            conn = self.db_connect()
-            cursor = conn.cursor(dictionary=True, buffered=True)
-            cursor.execute(
+            old_room = await fetch_one(
                 """
                 SELECT room_id, floor_id, exits
                 FROM rooms
@@ -132,12 +135,11 @@ class BattleSystem(commands.Cog):
                   AND room_type IN ('monster','miniboss','boss')
                 """,
                 (session.session_id, floor_id, x, y),
+                config=self.db_config,
             )
-            old_room = cursor.fetchone()
             if not old_room:
-                cursor.close(); conn.close(); return 0
+                return 0
             old_exits, old_room_id = old_room["exits"], old_room["room_id"]
-            cursor.close(); conn.close()
         except Exception as e:
             logger.error("Error fetching old room: %s", e)
             return 0
@@ -148,32 +150,30 @@ class BattleSystem(commands.Cog):
             return 0
 
         try:
-            conn = self.db_connect()
-            cursor = conn.cursor(buffered=True)
-            cursor.execute("DELETE FROM rooms WHERE room_id = %s", (old_room_id,))
-            cursor.execute(
-                """
-                INSERT INTO rooms (
-                    session_id, floor_id, coord_x, coord_y,
-                    room_type, image_url, description, exits
-                ) VALUES (
-                    %s, %s, %s, %s,
-                    'safe', %s, %s, %s
-                )
-                """,
-                (
-                    session.session_id,
-                    floor_id,
-                    x,
-                    y,
-                    template["image_url"],
-                    template["description"],
-                    old_exits,
-                ),
-            )
-            conn.commit()
-            cursor.close()
-            conn.close()
+            pool = await self._get_pool()
+            async with pool.acquire() as conn:
+                async with conn.cursor() as cursor:
+                    await cursor.execute("DELETE FROM rooms WHERE room_id = %s", (old_room_id,))
+                    await cursor.execute(
+                        """
+                        INSERT INTO rooms (
+                            session_id, floor_id, coord_x, coord_y,
+                            room_type, image_url, description, exits
+                        ) VALUES (
+                            %s, %s, %s, %s,
+                            'safe', %s, %s, %s
+                        )
+                        """,
+                        (
+                            session.session_id,
+                            floor_id,
+                            x,
+                            y,
+                            template["image_url"],
+                            template["description"],
+                            old_exits,
+                        ),
+                    )
             logger.debug("Replaced monster room (id=%s) with safe room.", old_room_id)
             return 1
         except Exception as e:
@@ -182,17 +182,16 @@ class BattleSystem(commands.Cog):
 
     async def get_enemy_for_room(self, session: Any, floor_id: int, x: int, y: int) -> Optional[dict]:
         try:
-            conn = self.db_connect()
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute(
+            row = await fetch_one(
                 "SELECT difficulty FROM sessions WHERE session_id = %s LIMIT 1",
                 (session.session_id,),
+                config=self.db_config,
             )
-            row = cursor.fetchone()
-            if not row: cursor.close(); conn.close(); return None
+            if not row:
+                return None
             difficulty = (row["difficulty"] or "").capitalize()
 
-            cursor.execute(
+            room = await fetch_one(
                 """
                 SELECT room_type
                 FROM rooms
@@ -202,13 +201,14 @@ class BattleSystem(commands.Cog):
                   AND coord_y = %s
                 """,
                 (session.session_id, floor_id, x, y),
+                config=self.db_config,
             )
-            room = cursor.fetchone()
-            if not room: cursor.close(); conn.close(); return None
+            if not room:
+                return None
 
             expected_role = "miniboss" if room["room_type"] == "miniboss" else "normal"
 
-            cursor.execute(
+            enemy = await fetch_one(
                 """
                 SELECT
                     enemy_id, enemy_name, hp, max_hp,
@@ -222,9 +222,8 @@ class BattleSystem(commands.Cog):
                 LIMIT 1
                 """,
                 (difficulty, expected_role),
+                config=self.db_config,
             )
-            enemy = cursor.fetchone()
-            cursor.close(); conn.close()
             logger.debug("Selected enemy for %s (%s): %s", room["room_type"], expected_role, enemy)
             return enemy
         except Exception as e:
