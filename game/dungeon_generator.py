@@ -175,7 +175,7 @@ class DungeonGenerator(commands.Cog):
                     """
                     SELECT template_id
                       FROM room_templates
-                     WHERE room_type NOT IN ('locked','safe','chest_unlocked','boss','exit','illusion')
+                     WHERE room_type NOT IN ('locked','safe','chest_unlocked','boss','exit','illusion','entrance')
                      ORDER BY RAND()
                      LIMIT 1
                     """
@@ -487,6 +487,8 @@ class DungeonGenerator(commands.Cog):
         rules     = self.fetch_floor_rules(difficulty, floor_number)
         remaining = {r["room_type"]: r["max_per_floor"] for r in rules}
         weights   = {r["room_type"]: r["chance"]      for r in rules}
+        remaining.pop("entrance", None)
+        weights.pop("entrance", None)
 
         def choose_type(exclude_locked=False, exclude_item=False) -> str:
             avail = [
@@ -514,7 +516,7 @@ class DungeonGenerator(commands.Cog):
                 elif coord == exit_coord:
                     rtype = "exit"
                 elif coord == (start_x, start_y):
-                    rtype = "safe" if floor_number == 1 else "staircase_down"
+                    rtype = "entrance" if floor_number == 1 else "staircase_down"
                 elif coord in shop_positions:
                     rtype = "shop"
                 else:

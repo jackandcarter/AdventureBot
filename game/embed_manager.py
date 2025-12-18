@@ -348,7 +348,7 @@ class EmbedManager(commands.Cog):
         embed.add_field(
             name="__**Legend**__",
             value=(
-                "**🤺 You**  **🟨 Visited**  **🟩 Safe**  **🟥 Monster**  **⬛ Unknown**\n"
+                "**🤺 You**  **🟨 Visited**  **⬜ Entrance**  **🟩 Safe**  **🟥 Monster**  **⬛ Unknown**\n"
                 "**🟦 Item**  **👤 Quest**  **🔼 Up**  **🔽 Down**\n"
                 "**🟧 Trap**  **🔒 Locked**  **🟪 Shop**  **🔮 Illusion**\n"
                 "**💀 Boss**  **🚪 Exit**  **⚰️ Fallen Player**"
