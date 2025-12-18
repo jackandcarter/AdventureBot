@@ -105,14 +105,16 @@ class SessionManager(commands.Cog):
         conn = db.get_connection()
         try:
             cur = conn.cursor(dictionary=True)
-            for item_id, qty in inv.items():
-                if qty <= 0:
-                    continue
-                cur.execute("SELECT type FROM items WHERE item_id=%s", (item_id,))
-                row = cur.fetchone()
-                if row and row.get("type") == "quest":
-                    return True
-            return False
+            item_ids = [int(i) for i, qty in inv.items() if qty and qty > 0]
+            if not item_ids:
+                return False
+
+            placeholders = ",".join(["%s"] * len(item_ids))
+            cur.execute(
+                f"SELECT 1 FROM items WHERE item_id IN ({placeholders}) AND type = 'quest' LIMIT 1",
+                tuple(item_ids),
+            )
+            return cur.fetchone() is not None
         finally:
             cur.close()
             conn.close()
