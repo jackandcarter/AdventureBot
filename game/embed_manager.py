@@ -498,6 +498,7 @@ class EmbedManager(commands.Cog):
         has_key: bool = False,
         is_stair_up: bool = False,
         is_stair_down: bool = False,
+        is_illusion: bool = False,
     ) -> List[Tuple[str, discord.ButtonStyle, str, int, bool]]:
         """
         Always returns 4 move‑buttons in the exact order: North, South, West, East.
@@ -543,6 +544,8 @@ class EmbedManager(commands.Cog):
         btns.extend(action_row)
 
         # ── Row 2: shop / unlock / stairs (optional) ────────────
+        if is_illusion:
+            btns.append(("Enter Illusion Room", discord.ButtonStyle.success, "illusion_enter", 2, False))
         if include_shop and vendor_id is not None:
             btns.append(("Shop", discord.ButtonStyle.secondary, f"action_shop_{vendor_id}", 2, False))
         if is_locked and has_key:
@@ -599,23 +602,93 @@ class EmbedManager(commands.Cog):
     # Illusion room embed
     # ──────────────────────────────────────────────────────────────────
     async def send_illusion_embed(self, interaction: discord.Interaction, room_info: Dict[str, Any]):
-        embed = discord.Embed(
-            title="🔮 Illusion Challenge",
-            description=(
-                f"{room_info.get('description','The room appears dark and mysterious.')}\n\n"
-                "What do you think is hidden here?\n"
-                "Choose wisely: Enemy, Treasure, Vendor, or an Empty room."
-            ),
-            color=discord.Color.purple(),
-        )
-        if room_info.get("image_url"):
-            embed.set_image(url=f"{room_info['image_url']}?t={int(time.time())}")
-        buttons = [
-            ("Enemy",    discord.ButtonStyle.primary,   "illusion_enemy",    0),
-            ("Treasure", discord.ButtonStyle.success,   "illusion_treasure", 0),
-            ("Vendor",   discord.ButtonStyle.primary,   "illusion_vendor",   0),
-            ("Empty",    discord.ButtonStyle.secondary, "illusion_empty",    0),
-        ]
+        crystals = room_info.get("crystals") or []
+        base_desc = room_info.get("description", "The room appears dark and mysterious.")
+        prompt = room_info.get("prompt") or "Each crystal must be shattered with an opposing element."
+
+        element_icons = {
+            "fire": "🔥",
+            "ice": "❄️",
+            "water": "💧",
+            "lightning": "⚡",
+            "holy": "✨",
+            "earth": "🌿",
+            "wind": "🌪️",
+            "death": "💀",
+        }
+        status_icons = {"shattered": "✅", "failed": "⚠️", "intact": "🔹", "empowered": "💥"}
+
+        if crystals:
+            all_shattered = all((c.get("status") or "intact").lower() == "shattered" for c in crystals)
+            active_idx = room_info.get("active_crystal_index")
+            if active_idx is None:
+                active_idx = next(
+                    (
+                        idx
+                        for idx, c in enumerate(crystals)
+                        if (c.get("status") or "intact").lower() != "shattered"
+                    ),
+                    len(crystals) - 1 if all_shattered else 0,
+                )
+            active_idx = max(0, min(active_idx, len(crystals) - 1))
+            active = crystals[active_idx]
+            element = (active.get("element") or "?").lower()
+            icon = element_icons.get(element, "🔹")
+            status_label = (active.get("status") or "Intact").title()
+
+            title = room_info.get("title") or "🔮 Crystal Shard Trial"
+            description = (
+                f"{base_desc}\n\n{prompt}\nLeaving early will reactivate the illusion and teleport you elsewhere."
+                if not all_shattered
+                else f"{base_desc}\n\nThe illusion wavers as every shard lies shattered. A reward is revealed."
+            )
+            embed = discord.Embed(title=title, description=description, color=discord.Color.purple())
+
+            hint = (
+                active.get("hint")
+                or ("Cast an opposing element to shatter the shard." if not all_shattered else "The crystal fragments dissolve; collect your prize.")
+            )
+            if (active.get("status") or "").lower() == "empowered":
+                hint = "The shard is empowered by the wrong magic. The runes are primed to teleport you away."
+            embed.add_field(
+                name=f"Active Crystal ({active_idx + 1} of {len(crystals)})",
+                value=f"{icon} **{active.get('label', 'Unknown Shard')}**\nElement: {element.title()}\nStatus: {status_label}\n\n{hint}",
+                inline=False,
+            )
+
+            progress_lines = []
+            for idx, crystal in enumerate(crystals, start=1):
+                state = (crystal.get("status") or "intact").lower()
+                progress_icon = status_icons.get(state, "🔹")
+                progress_lines.append(f"{progress_icon} Crystal {idx}")
+            embed.add_field(name="Progress", value="\n".join(progress_lines), inline=False)
+
+            image_url = active.get("image_url") or room_info.get("image_url")
+            if image_url:
+                embed.set_image(url=f"{image_url}?t={int(time.time())}")
+
+            buttons = [
+                ("Leave Room", discord.ButtonStyle.danger,    "illusion_leave",     0),
+                ("Use",        discord.ButtonStyle.success,   "action_use",        0),
+                ("Skill",      discord.ButtonStyle.primary,   "action_skill",      0),
+                ("Look Around", discord.ButtonStyle.secondary, "action_look_around",0),
+                ("Menu",       discord.ButtonStyle.secondary, "action_menu",       0),
+            ]
+        else:
+            embed = discord.Embed(
+                title="🔮 Illusion Chamber",
+                description=(
+                    f"{base_desc}\n\nThis illusion awaits crystal shards to be configured before the trial begins."
+                ),
+                color=discord.Color.purple(),
+            )
+            if room_info.get("image_url"):
+                embed.set_image(url=f"{room_info['image_url']}?t={int(time.time())}")
+            buttons = [
+                ("Leave Room", discord.ButtonStyle.danger,    "illusion_leave",     0),
+                ("Menu",       discord.ButtonStyle.secondary, "action_menu",       0),
+            ]
+
         await self.send_or_update_embed(interaction, _ZWSP, _ZWSP, embed_override=embed, buttons=buttons)
 
 

@@ -324,6 +324,18 @@ TABLES = {
             created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''',
+    # ---------- element_relationships ----------
+    'element_relationships': '''
+        CREATE TABLE IF NOT EXISTS element_relationships (
+            element_id          INT NOT NULL,
+            counter_element_id  INT NOT NULL,
+            relation_type ENUM('opposes','weakens','empowers') DEFAULT 'opposes',
+            created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (element_id, counter_element_id, relation_type),
+            FOREIGN KEY (element_id)         REFERENCES elements(element_id) ON DELETE CASCADE,
+            FOREIGN KEY (counter_element_id) REFERENCES elements(element_id) ON DELETE CASCADE
+        )
+    ''',
     # ---------- abilities ----------
     'abilities': '''
         CREATE TABLE IF NOT EXISTS abilities (
@@ -357,6 +369,55 @@ TABLES = {
             image_url           VARCHAR(255),
             creator_id          BIGINT,
             created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''',
+    # ---------- temp_abilities ----------
+    'temp_abilities': '''
+        CREATE TABLE IF NOT EXISTS temp_abilities (
+            temp_ability_id  INT AUTO_INCREMENT PRIMARY KEY,
+            ability_id       INT NOT NULL,
+            allowed_class_id INT NOT NULL,
+            duration_turns   INT DEFAULT 1,
+            reward_image_url VARCHAR(255),
+            created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (ability_id) REFERENCES abilities(ability_id) ON DELETE CASCADE,
+            FOREIGN KEY (allowed_class_id) REFERENCES classes(class_id) ON DELETE CASCADE
+        )
+    ''',
+    # ---------- illusion_reward_options ----------
+    'illusion_reward_options': '''
+        CREATE TABLE IF NOT EXISTS illusion_reward_options (
+            reward_option_id   INT AUTO_INCREMENT PRIMARY KEY,
+            template_id        INT NOT NULL,
+            reward_label       VARCHAR(150),
+            reward_type        ENUM('temp_ability','item','gil','chest','none') DEFAULT 'none',
+            drop_chance        FLOAT NOT NULL DEFAULT 1.0,
+            temp_ability_id    INT DEFAULT NULL,
+            item_id            INT DEFAULT NULL,
+            item_quantity      INT DEFAULT 1,
+            gil_amount         INT DEFAULT 0,
+            chest_id           INT DEFAULT NULL,
+            reward_image_url   VARCHAR(255),
+            created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (template_id)     REFERENCES room_templates(template_id)    ON DELETE CASCADE,
+            FOREIGN KEY (temp_ability_id) REFERENCES temp_abilities(temp_ability_id) ON DELETE SET NULL,
+            FOREIGN KEY (item_id)         REFERENCES items(item_id)                ON DELETE SET NULL,
+            FOREIGN KEY (chest_id)        REFERENCES treasure_chests(chest_id)     ON DELETE SET NULL
+        )
+    ''',
+    # ---------- illusion_crystal_templates ----------
+    'illusion_crystal_templates': '''
+        CREATE TABLE IF NOT EXISTS illusion_crystal_templates (
+            template_id           INT AUTO_INCREMENT PRIMARY KEY,
+            template_name         VARCHAR(100) NOT NULL,
+            element_id            INT NOT NULL,
+            counter_element_id    INT,
+            image_url             VARCHAR(255),
+            reward_image_url      VARCHAR(255),
+            prompt_text           VARCHAR(255),
+            created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (element_id)         REFERENCES elements(element_id) ON DELETE CASCADE,
+            FOREIGN KEY (counter_element_id) REFERENCES elements(element_id) ON DELETE SET NULL
         )
     ''',
     # ---------- levels ----------
@@ -576,6 +637,61 @@ TABLES = {
             FOREIGN KEY (floor_id)   REFERENCES floors(floor_id)     ON DELETE CASCADE,
             FOREIGN KEY (vendor_id)  REFERENCES session_vendor_instances(session_vendor_id) ON DELETE SET NULL,
             FOREIGN KEY (inner_template_id) REFERENCES room_templates(template_id) ON DELETE SET NULL
+        )
+    ''',
+    # ---------- illusion_room_states ----------
+    'illusion_room_states': '''
+        CREATE TABLE IF NOT EXISTS illusion_room_states (
+            room_state_id        INT AUTO_INCREMENT PRIMARY KEY,
+            room_id              INT NOT NULL UNIQUE,
+            session_id           INT NOT NULL,
+            active_crystal_index INT DEFAULT 0,
+            empowered            BOOLEAN DEFAULT FALSE,
+            pending_teleport     BOOLEAN DEFAULT FALSE,
+            updated_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (room_id)    REFERENCES rooms(room_id)    ON DELETE CASCADE,
+            FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+        )
+    ''',
+    # ---------- illusion_crystal_instances ----------
+    'illusion_crystal_instances': '''
+        CREATE TABLE IF NOT EXISTS illusion_crystal_instances (
+            instance_id     INT AUTO_INCREMENT PRIMARY KEY,
+            room_id         INT NOT NULL,
+            session_id      INT NOT NULL,
+            template_id     INT NOT NULL,
+            sequence_order  INT NOT NULL DEFAULT 0,
+            status ENUM('intact','shattered','empowered') DEFAULT 'intact',
+            updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (room_id)    REFERENCES rooms(room_id) ON DELETE CASCADE,
+            FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE,
+            FOREIGN KEY (template_id) REFERENCES illusion_crystal_templates(template_id) ON DELETE CASCADE
+        )
+    ''',
+    # ---------- illusion_reward_instances ----------
+    'illusion_reward_instances': '''
+        CREATE TABLE IF NOT EXISTS illusion_reward_instances (
+            instance_id           INT AUTO_INCREMENT PRIMARY KEY,
+            room_id               INT NOT NULL,
+            session_id            INT NOT NULL,
+            reward_option_id      INT DEFAULT NULL,
+            granted_to_player_id  BIGINT,
+            reward_label          VARCHAR(150),
+            reward_type           ENUM('temp_ability','item','gil','chest','none') DEFAULT 'none',
+            reward_image_url      VARCHAR(255),
+            resolved_temp_ability_id INT DEFAULT NULL,
+            resolved_item_id      INT DEFAULT NULL,
+            resolved_item_qty     INT DEFAULT 0,
+            resolved_gil_amount   INT DEFAULT 0,
+            resolved_chest_id     INT DEFAULT NULL,
+            created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (room_id)          REFERENCES rooms(room_id)               ON DELETE CASCADE,
+            FOREIGN KEY (session_id)       REFERENCES sessions(session_id)         ON DELETE CASCADE,
+            FOREIGN KEY (reward_option_id) REFERENCES illusion_reward_options(reward_option_id) ON DELETE SET NULL,
+            FOREIGN KEY (resolved_temp_ability_id) REFERENCES temp_abilities(temp_ability_id) ON DELETE SET NULL,
+            FOREIGN KEY (resolved_item_id) REFERENCES items(item_id) ON DELETE SET NULL,
+            FOREIGN KEY (resolved_chest_id) REFERENCES treasure_chests(chest_id) ON DELETE SET NULL
         )
     ''',
     # ---------- key_items ----------
@@ -851,10 +967,12 @@ TABLE_ORDER = [
     'difficulties',
     'floor_room_rules',
     'elements',
+    'element_relationships',
     'abilities',
     'classes',
     'levels',
     'class_abilities',
+    'temp_abilities',
     'sessions',
     'session_players',
     'players',
@@ -866,8 +984,13 @@ TABLE_ORDER = [
     'session_vendor_instances',
     'session_vendor_items',
     'rooms',
-    'key_items',
+    'illusion_room_states',
+    'illusion_crystal_templates',
+    'illusion_crystal_instances',
     'treasure_chests',
+    'illusion_reward_options',
+    'illusion_reward_instances',
+    'key_items',
     'chest_def_rewards',
     'treasure_chest_instances',
     'chest_instance_rewards',

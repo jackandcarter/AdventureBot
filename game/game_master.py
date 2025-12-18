@@ -809,6 +809,7 @@ class GameMaster(commands.Cog):
             has_key=has_key,
             is_stair_up=(room.get("room_type") == "staircase_up"),
             is_stair_down=(room.get("room_type") == "staircase_down"),
+            is_illusion=(room.get("room_type") == "illusion"),
         )
 
         # Chest logic: check if chest is still locked
