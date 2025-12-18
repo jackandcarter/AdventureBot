@@ -14,7 +14,7 @@ from discord.ext import commands
 import mysql.connector
 from utils.status_engine  import StatusEffectEngine
 from utils.helpers        import load_config
-from utils.ui_helpers     import get_emoji_for_room_type  # For minimap icons, if needed
+from utils.ui_helpers     import create_progress_bar, get_emoji_for_room_type  # For minimap icons, if needed
 from core.game_session    import GameSession
 from models.session_models import (
     SessionModel,
@@ -746,10 +746,7 @@ class GameMaster(commands.Cog):
         )
 
         def _bar(curr, mx, ln=10):
-            if not mx:
-                return "[-]"
-            filled = int(round(ln * curr / mx))
-            return f"[{'█'*filled}{'░'*(ln-filled)}] {curr}/{mx}"
+            return create_progress_bar(curr, mx, length=ln, colorize=True)
 
         header = ""
         if p:
