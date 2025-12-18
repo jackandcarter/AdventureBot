@@ -1283,25 +1283,35 @@ class BattleSystem(commands.Cog):
             return await self.handle_item_menu(interaction)
         if not cid.startswith("combat_"):
             return
+
+        # Anything from the combat_* namespace should acknowledge missing context early
+        if not session:
+            return await interaction.response.send_message("❌ No active session found.", ephemeral=True)
+
         if cid == "combat_trance_back":
-            if session and session.current_enemy:
+            if session.current_enemy:
                 return await self.update_battle_embed(interaction, session.current_turn, session.current_enemy)
-            return
-        if session and session.current_enemy and session.current_turn != interaction.user.id:
+            return await interaction.response.send_message("❌ No active battle to return to.", ephemeral=True)
+
+        if session.current_enemy and session.current_turn != interaction.user.id:
+            if interaction.response.is_done():
+                await interaction.followup.send("❌ It isn't your turn.", ephemeral=True)
+            else:
+                await interaction.response.send_message("❌ It isn't your turn.", ephemeral=True)
             return
         if cid.startswith("combat_skill_") and cid != "combat_skill_back":
-           aid = int(cid.split("_", 2)[2])
-           # fetch its target_type
-           conn = self.db_connect()
-           cur  = conn.cursor(dictionary=True)
-           cur.execute("SELECT target_type FROM abilities WHERE ability_id=%s", (aid,))
-           meta = cur.fetchone()
-           cur.close(); conn.close()
-           # allow “self” or “any” outside battle
-           if meta and meta["target_type"] in ("self", "any") and not (session and session.current_enemy):
-               return await self.handle_skill_use(interaction, aid)
-           # otherwise fall back
-           return await self.handle_skill_use(interaction, aid)
+            aid = int(cid.split("_", 2)[2])
+            # fetch its target_type
+            conn = self.db_connect()
+            cur = conn.cursor(dictionary=True)
+            cur.execute("SELECT target_type FROM abilities WHERE ability_id=%s", (aid,))
+            meta = cur.fetchone()
+            cur.close(); conn.close()
+            # allow “self” or “any” outside battle
+            if meta and meta["target_type"] in ("self", "any") and not (session and session.current_enemy):
+                return await self.handle_skill_use(interaction, aid)
+            # otherwise fall back
+            return await self.handle_skill_use(interaction, aid)
         
 
         try:
