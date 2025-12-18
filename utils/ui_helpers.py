@@ -59,6 +59,7 @@ def get_emoji_for_room_type(room_type: str) -> str:
     """
     mapping = {
         "safe":           "🟩",
+        "entrance":       "⬜",
         "monster":        "🟥",
         "boss":           "💀",
         "illusion":       "🔮",
