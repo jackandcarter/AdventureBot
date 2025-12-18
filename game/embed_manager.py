@@ -473,7 +473,14 @@ class EmbedManager(commands.Cog):
                 label = f"{icon} {ab['ability_name']} {cd_bar}".strip()
                 if len(label) > 80:
                     label = label[:77] + "..."
-                view.add_item(Button(label=label, style=discord.ButtonStyle.primary, custom_id=f"combat_skill_{ab['ability_id']}", row=r))
+                disabled = cur_cd > 0
+                view.add_item(Button(
+                    label=label,
+                    style=discord.ButtonStyle.primary if not disabled else discord.ButtonStyle.secondary,
+                    custom_id=f"combat_skill_{ab['ability_id']}",
+                    row=r,
+                    disabled=disabled,
+                ))
         view.add_item(Button(label="Back", style=discord.ButtonStyle.secondary, custom_id="combat_skill_back", row=4))
         await self.send_or_update_embed(interaction, _ZWSP, _ZWSP, embed_override=embed, view_override=view)
 
