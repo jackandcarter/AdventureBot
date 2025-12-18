@@ -487,6 +487,8 @@ class DungeonGenerator(commands.Cog):
         rules     = self.fetch_floor_rules(difficulty, floor_number)
         remaining = {r["room_type"]: r["max_per_floor"] for r in rules}
         weights   = {r["room_type"]: r["chance"]      for r in rules}
+        remaining.pop("entrance", None)
+        weights.pop("entrance", None)
 
         def choose_type(exclude_locked=False, exclude_item=False) -> str:
             avail = [

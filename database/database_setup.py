@@ -153,6 +153,8 @@ MERGED_INTRO_STEPS: List[Tuple] = [
 
 # --- room templates -----------------------------------------------------------
 MERGED_ROOM_TEMPLATES: List[Tuple] = [
+    (19, 'entrance',      'Dungeon Entrance',   'Fresh air lingers here; beyond this threshold, danger awaits.',
+                   'https://the-demiurge.com/DemiDevUnit/images/rooms/entrance.png', None, '2025-04-25 12:00:00'),
     (1,  'safe',          'Moss Room',          'You do not notice anything of importance, the area appears to be safe.',                          'https://the-demiurge.com/DemiDevUnit/images/rooms/roomtypemoss.png',            None,'2025-03-31 02:40:47'),
     (2,  'safe',          'Mystic Room',        'You do not notice anything of importance, the area appears to be safe.',                          'https://the-demiurge.com/DemiDevUnit/images/rooms/roomtypemystic.png',          None,'2025-03-31 02:40:47'),
     (3,  'safe',          'Crystal Tunnel',     'You do not notice anything of importance, the area appears to be safe.',                          'https://the-demiurge.com/DemiDevUnit/images/rooms/crystals.png',                None,'2025-03-31 02:40:47'),
@@ -265,6 +267,7 @@ MERGED_STATUS_EFFECTS: List[Tuple] = [
 # (difficulty_name, floor_number, room_type, chance, max_per_floor)
 MERGED_FLOOR_ROOM_RULES: List[Tuple[str, int, str, float, int]] = [
     # Example entries; replace these with your real tuning values:
+    ("Easy",  1, "entrance",       1.00, 1),
     ("Easy",  1, "safe",           0.50, 20),
     ("Easy",  1, "monster",        0.30, 10),
     ("Easy",  1, "item",           0.10,  5),
@@ -306,7 +309,7 @@ TABLES = {
             floor_number      INT,
             room_type ENUM(
                 'safe','monster','item','shop','boss','trap','illusion',
-                'staircase_up','staircase_down','exit','locked'
+                'staircase_up','staircase_down','exit','locked','entrance'
             ) NOT NULL,
             chance            FLOAT   NOT NULL,
             max_per_floor     INT     NOT NULL,
@@ -529,7 +532,7 @@ TABLES = {
             template_id   INT AUTO_INCREMENT PRIMARY KEY,
             room_type ENUM(
                 'safe','monster','item','shop','boss','trap','illusion',
-                'staircase_up','staircase_down','exit','locked','chest_unlocked'
+                'staircase_up','staircase_down','exit','locked','chest_unlocked','entrance'
             ) NOT NULL,
             template_name VARCHAR(100) NOT NULL,
             description   TEXT,
@@ -618,7 +621,7 @@ TABLES = {
             description TEXT,
             room_type ENUM(
                 'safe','monster','item','shop','boss','trap','illusion',
-                'staircase_up','staircase_down','exit','locked','chest_unlocked'
+                'staircase_up','staircase_down','exit','locked','chest_unlocked','entrance'
             ) NOT NULL,
             image_url VARCHAR(255),
             default_enemy_id INT,
