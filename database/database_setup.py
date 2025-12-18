@@ -709,18 +709,6 @@ TABLES = {
             chest_id       INT AUTO_INCREMENT PRIMARY KEY,
             chest_name     VARCHAR(100) NOT NULL,
             spawn_weight   FLOAT NOT NULL,
-            template_id    room_templates.template_id,
-            created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (template_id)
-                REFERENCES room_templates(template_id) ON DELETE CASCADE
-        )
-    ''',
-            # in TABLES:
-    'treasure_chests': '''
-        CREATE TABLE IF NOT EXISTS treasure_chests (
-            chest_id       INT AUTO_INCREMENT PRIMARY KEY,
-            chest_name     VARCHAR(100) NOT NULL,
-            spawn_weight   FLOAT NOT NULL,
             template_id    INT NOT NULL,
             created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (template_id)
