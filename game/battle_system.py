@@ -53,12 +53,7 @@ class BattleSystem(commands.Cog):
             raise
 
     def create_bar(self, current: int, maximum: int, length: int = 10) -> str:
-        current = max(current, 0)
-        if maximum <= 0:
-            return "[No Data]"
-        filled = int(round(length * current / float(maximum)))
-        bar = "█" * filled + "░" * (length - filled)
-        return f"[{bar}] {current}/{maximum}"
+        return create_progress_bar(current, maximum, length=length, colorize=True)
 
     def _get_player_room(self, session_id: int, player_id: int) -> Optional[Dict[str, Any]]:
         """Fetch the player's current room (type + id)."""

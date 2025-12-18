@@ -5,15 +5,37 @@ import random
 from typing import Any, Dict, List
 
 
-def create_progress_bar(current: int, maximum: int, length: int = 10) -> str:
+def _get_health_color_ratio(ratio: float) -> str:
+    """Return the appropriate square emoji for the given health ratio."""
+    if ratio < 0.25:
+        return "🟥"
+    if ratio < 0.5:
+        return "🟨"
+    return "🟩"
+
+
+def create_progress_bar(current: int, maximum: int, length: int = 10, *, colorize: bool = False) -> str:
     """
     Build a simple █ / ░ progress bar  (e.g. HP, EXP).
+
+    When ``colorize`` is True, the filled portion uses square emojis that shift
+    from green → yellow → red as the percentage decreases.
     """
     if maximum <= 0:
         return "[No Data]"
 
-    filled = int(round(length * current / float(maximum)))
-    bar    = "█" * filled + "░" * (length - filled)
+    current = max(0, current)
+    ratio = min(max(current / float(maximum), 0.0), 1.0)
+    filled = int(round(length * ratio))
+
+    if colorize:
+        filled_char = _get_health_color_ratio(ratio)
+        empty_char = "⬜"
+    else:
+        filled_char = "█"
+        empty_char = "░"
+
+    bar = filled_char * filled + empty_char * (length - filled)
     return f"[{bar}] {current}/{maximum}"
 
 
