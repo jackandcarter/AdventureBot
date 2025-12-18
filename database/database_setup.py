@@ -144,37 +144,320 @@ MERGED_DIFFICULTIES: List[Tuple] = [
 
 # --- intro steps --------------------------------------------------------------
 MERGED_INTRO_STEPS: List[Tuple] = [
-    (1, 1, 'An Unexpected Discovery', 'During what began as an ordinary raid, Sophia paused...',                           'https://the-demiurge.com/DemiDevUnit/images/intro/step1.png', '2025-03-31 02:40:47'),
-    (2, 2, "Mog's Bold Venture",     'As the group hesitated, a tiny figure fluttered forward...',                        'https://the-demiurge.com/DemiDevUnit/images/intro/step2.png', '2025-03-31 02:40:47'),
-    (3, 3, 'The Moogle Returns',     'Moments felt like hours as the group waited anxiously...',                           'https://the-demiurge.com/DemiDevUnit/images/intro/step3.png', '2025-03-31 02:40:47'),
-    (4, 4, "Sophia's Decision",      'Sophia nodded solemnly...',                                                          'https://the-demiurge.com/DemiDevUnit/images/intro/step4.png', '2025-04-09 09:37:27'),
-    (5, 5, 'The Call to Adventure',  'Returning to their Free Company house, Sophia gathered everyone...',                'https://the-demiurge.com/DemiDevUnit/images/intro/step5.png', '2025-04-09 09:37:27')
+    (
+        1,
+        1,
+        "An Unexpected Discovery",
+        "During what began as an ordinary raid, Sophia paused. The usual golden glow marking the entrance "
+        "to familiar realms was absent, replaced instead by a strange portal shimmering with dark, "
+        "translucent crystals. Curious murmurs rippled through the raid group…\n\nSophia:\u2028\"This... "
+        "isn't the gate we're used to. Has anyone seen anything like this before?\"",
+        "https://cdn.discordapp.com/attachments/1362832151485354065/1364793339538440232/step1.png?"
+        "ex=680f9398&is=680e4218&hm=7832e0e8397c563e8c86ab6846989f63af51cd786cf8c2c8427d3c5d5f8b3466&",
+        "2025-03-31 07:40:47",
+    ),
+    (
+        2,
+        2,
+        "Mog's Bold Venture",
+        "As the group hesitated, Mog, the courageous Moogle companion, hovered near the mysterious "
+        "entrance, eyes wide with intrigue.\n\nMog:\u2028\"Let me scout it out, Kupo! Moogles portal hop "
+        "all the time! If there's trouble, I'll zip right back!\"\n\nWithout another word, Mog vanished "
+        "through the darkened portal.",
+        "https://cdn.discordapp.com/attachments/1362832151485354065/1364793340331298897/step2.png?"
+        "ex=680f9398&is=680e4218&hm=50cb0c034376bb47248d7e4c495cd482280dae41d394938288aa6ad1774b6c3f&",
+        "2025-03-31 07:40:47",
+    ),
+    (
+        3,
+        3,
+        "The Moogle Returns",
+        "Moments felt like hours as the group waited anxiously. With a burst of light, Mog reappeared, "
+        "fur ruffled and eyes gleaming.\n\nMog:\u2028\"Kupo! That portal leads somewhere strange... somewhere "
+        "new! I didn't see anyone, but I heard whispers and saw shadows.\"\n\nHe looked both nervous "
+        "and excited.",
+        "https://cdn.discordapp.com/attachments/1362832151485354065/1364793340956444712/step3.png?"
+        "ex=680f9398&is=680e4218&hm=8840246c658b6c4635befbaf6ce72ea4583d75b1f778068d57c0f090f83259d9&",
+        "2025-03-31 07:40:47",
+    ),
+    (
+        4,
+        4,
+        "Sophia's Decision",
+        "Sophia nodded solemnly, weighing the risk and opportunity. The team exchanged glances, some "
+        "anxious, others eager.\n\nSophia:\u2028\"Alright, team. This is uncharted territory, but it might "
+        "be exactly the challenge we've been waiting for. Gear up. We're going in.\"",
+        "https://cdn.discordapp.com/attachments/1362832151485354065/1364793340792877003/step4.png?"
+        "ex=680f9398&is=680e4218&hm=46792e348b39a7064b44c54c9ee118d71f212711fe6cb3c2e4c873e3adfc3d5d&",
+        "2025-04-09 16:37:27",
+    ),
+    (
+        5,
+        5,
+        "The Call to Adventure",
+        "Returning to their Free Company house, Sophia gathered everyone to plan the expedition. Maps "
+        "were spread out; gear was prepared. Excitement buzzed through the air as word spread of the "
+        "unknown portal.\n\nSophia:\u2028\"This isn't just another raid. It's a chance to discover "
+        "something new, maybe even change everything we know. Let's make history, everyone.\"",
+        "https://cdn.discordapp.com/attachments/1362832151485354065/1364793342256752711/step5.png?"
+        "ex=680f9398&is=680e4218&hm=2c8bba266e80e4b78598307b1e9e890030c078df6e03c09486de1d6306c3ada7&",
+        "2025-04-09 16:37:27",
+    ),
 ]
 
 # --- room templates -----------------------------------------------------------
 MERGED_ROOM_TEMPLATES: List[Tuple] = [
-    (19, 'entrance',      'Dungeon Entrance',   'Fresh air lingers here; beyond this threshold, danger awaits.',
-                   'https://the-demiurge.com/DemiDevUnit/images/rooms/entrance.png', None, '2025-04-25 12:00:00'),
-    (1,  'safe',          'Moss Room',          'You do not notice anything of importance, the area appears to be safe.',                          'https://the-demiurge.com/DemiDevUnit/images/rooms/roomtypemoss.png',            None,'2025-03-31 02:40:47'),
-    (2,  'safe',          'Mystic Room',        'You do not notice anything of importance, the area appears to be safe.',                          'https://the-demiurge.com/DemiDevUnit/images/rooms/roomtypemystic.png',          None,'2025-03-31 02:40:47'),
-    (3,  'safe',          'Crystal Tunnel',     'You do not notice anything of importance, the area appears to be safe.',                          'https://the-demiurge.com/DemiDevUnit/images/rooms/crystals.png',                None,'2025-03-31 02:40:47'),
-    (4,  'safe',          'Bridge',             'You do not notice anything of importance, the area appears to be safe.',                          'https://the-demiurge.com/DemiDevUnit/images/rooms/roomtypebridge.png',          None,'2025-04-09 20:22:14'),
-    (5,  'safe',          'Magicite',           'You do not notice anything of importance, the area appears to be safe.',                          'https://the-demiurge.com/DemiDevUnit/images/rooms/roomtypemagicite.png',        None,'2025-04-09 20:22:19'),
-    (6,  'safe',          'Rainbow Crystal',    'You do not notice anything of importance, the area appears to be safe.',                          'https://the-demiurge.com/DemiDevUnit/images/rooms/rainbowcrystal.png',          None,'2025-04-09 20:22:27'),
-    (7,  'safe',          'Aetheryte',          'You do not notice any hostile presence; instead you see a naturally growing Aetheryte cluster.',   'https://the-demiurge.com/DemiDevUnit/images/rooms/roomtypeaetheryte.png',       None,'2025-04-09 20:22:27'),
-    (8,  'monster',       'You Sense A Hostile Presence...', 'An enemy appears upon entering the area...',                                         '', None,'2025-03-31 02:40:47'),
-    (9,  'staircase_up',  'Staircase Up',       'A staircase leading upward to the next level.',                                                   'https://the-demiurge.com/DemiDevUnit/images/rooms/stairs_up.png',               None,'2025-04-19 13:55:00'),
-    (10, 'staircase_down','Staircase Down',     'A staircase leading downward to the lower level.',                                               'https://the-demiurge.com/DemiDevUnit/images/rooms/stairs_down.png',             None,'2025-04-19 13:55:00'),
-    (11, 'exit',          'Dungeon Exit',       '(Implemented in next patch)',                                                                    'https://the-demiurge.com/DemiDevUnit/images/backintro.png',                     None,'2025-03-30 21:40:47'),
-    (12, 'item',          'Treasure Room',      'A treasure chest sits in the corner.',                                                            'https://the-demiurge.com/DemiDevUnit/images/backintro.png',                     None,'2025-03-30 21:40:47'),
-    (13, 'boss',          'Boss Lair',          'A grand chamber with ominous decorations.',                                                       'https://the-demiurge.com/DemiDevUnit/images/backintro.png',                     None,'2025-03-30 21:40:47'),
-    (14, 'trap',          'Trap Room',          'The floor is riddled with hidden traps.',                                                         'https://the-demiurge.com/DemiDevUnit/images/backintro.png',                     None,'2025-03-30 21:40:47'),
-    (15, 'shop',          'Shop Room',          'A traveling moogle is seen hiding...',                                                            'https://the-demiurge.com/DemiDevUnit/images/shop/stiltzkin.gif',                None,'2025-03-30 21:40:47'),
-    (16, 'illusion',      'Illusion Chamber',   'The room shimmers mysteriously...',                                                               'https://the-demiurge.com/DemiDevUnit/images/rooms/roomtypeillusion.png',        None,'2025-03-30 21:40:47'),
-    (17, 'locked',        'Locked Door',        'A heavy locked door. You need a key.',                                                            'https://the-demiurge.com/DemiDevUnit/images/rooms/locked.png',                  None,'2025-04-19 13:55:00'),
-    (18, 'chest_unlocked','Unlocked Chest',     'The chest lies open, its contents revealed.', 'https://your.cdn/path/chest_unlocked.png', None, '2025-04-23 18:00:00')
+    (
+        1,
+        "safe",
+        "Moss Room",
+        "You do not notice anything of importance, the area appears to be safe.",
+        "https://cdn.discordapp.com/attachments/1362832151485354065/1362833775637303336/roomtypemoss.png?"
+        "ex=680c671c&is=680b159c&hm=3dc79f7a87ce268e9d54deae12bee18fa98b37a69caa1644257023135acfee8e&",
+        None,
+        "2025-03-31 07:40:47",
+        None,
+        None,
+    ),
+    (
+        2,
+        "safe",
+        "Mystic Room",
+        "You do not notice anything of importance, the area appears to be safe.",
+        "https://cdn.discordapp.com/attachments/1362832151485354065/1362833776446673227/roomtypemystic.png?"
+        "ex=680c671c&is=680b159c&hm=bc397f1f43a2317102e1f4216333b331c31dcbac9ffd8078f61c0c43171841a1&",
+        None,
+        "2025-03-31 07:40:47",
+        None,
+        None,
+    ),
+    (
+        3,
+        "safe",
+        "Crystal Tunnel",
+        "You do not notice anything of importance, the area appears to be safe.",
+        "https://cdn.discordapp.com/attachments/1362832151485354065/1362833695169576981/crystals.png?"
+        "ex=680c6709&is=680b1589&hm=2c0977deb61f6e286646aeddab3a54cf048c6043dbd398c15f5ebbe7a1d5e8f6&",
+        None,
+        "2025-03-31 07:40:47",
+        None,
+        None,
+    ),
+    (
+        4,
+        "safe",
+        "Bridge",
+        "You do not notice anything of importance, the area appears to be safe.",
+        "https://cdn.discordapp.com/attachments/1362832151485354065/1362833699648966726/roomtypebridge.png?"
+        "ex=680c670a&is=680b158a&hm=88011ac41a9c277ce6ecc855a7cb3099d9c35a0d648caa944397718741c2d5c0&",
+        None,
+        "2025-04-10 01:22:14",
+        None,
+        None,
+    ),
+    (
+        5,
+        "safe",
+        "Magicite",
+        "You do not notice anything of importance, the area appears to be safe.",
+        "https://cdn.discordapp.com/attachments/1362832151485354065/1362833774844313750/roomtypemagicite.png?"
+        "ex=680c671c&is=680b159c&hm=07b6f7a5c5f95e556e7adb11a013cb9d546489d7a64954d15f5c99d11acf9847&",
+        None,
+        "2025-04-10 01:22:19",
+        None,
+        None,
+    ),
+    (
+        6,
+        "safe",
+        "Rainbow Crystal",
+        "You do not notice anything of importance, the area appears to be safe.",
+        "https://cdn.discordapp.com/attachments/1362832151485354065/1362833696519885081/rainbowcrystal.png?"
+        "ex=680c6709&is=680b1589&hm=efecc1cf0d3a6e9f30364b1e4731697a65ab5745807ba1cb30574569cf10be16&",
+        None,
+        "2025-04-10 01:22:27",
+        None,
+        None,
+    ),
+    (
+        7,
+        "safe",
+        "Aetheryte",
+        "You do not notice any hostile presence; instead you see a naturally growing Aetheryte cluster.\n\n"
+        "Perhaps this will be useful in the future...",
+        "https://cdn.discordapp.com/attachments/1362832151485354065/1362833698168508496/roomtypeaetheryte.png?"
+        "ex=680c6709&is=680b1589&hm=29873e0d2dea2ecbd63a66c0d18825c5954f80965e19309827e18a8f77459052&",
+        None,
+        "2025-04-10 01:22:27",
+        None,
+        None,
+    ),
+    (
+        8,
+        "monster",
+        "You Sense A Hostile Presence...",
+        "An enemy appears upon entering the area...",
+        "",
+        None,
+        "2025-03-31 07:40:47",
+        None,
+        None,
+    ),
+    (
+        9,
+        "staircase_up",
+        "Staircase Up",
+        "You notice a staircase leading up to the next level.",
+        "https://cdn.discordapp.com/attachments/1362832151485354065/1362832388677308516/stairs.png?"
+        "ex=680c65d1&is=680b1451&hm=8b5d73c9b00898e7913c5d661d2f107731817084c19a8f938f7ce9ec3637340d&",
+        None,
+        "2025-04-19 18:55:00",
+        None,
+        None,
+    ),
+    (
+        10,
+        "staircase_down",
+        "Staircase Down",
+        "You notice a staircase leading down to the next level.",
+        "https://cdn.discordapp.com/attachments/1362832151485354065/1365404303161950388/stairs_down_2.png?"
+        "ex=680d2f59&is=680bddd9&hm=94fbe622374098bfcb2d17b5c79a63542853d7ee574c5c93ef98dfea92e6780b&",
+        None,
+        "2025-04-19 18:55:00",
+        None,
+        None,
+    ),
+    (
+        11,
+        "exit",
+        "Dungeon Exit",
+        "(Implemented in next patch)",
+        "https://the-demiurge.com/DemiDevUnit/images/backintro.png",
+        None,
+        "2025-03-31 02:40:47",
+        None,
+        None,
+    ),
+    (
+        12,
+        "item",
+        "Treasure Room",
+        "You do not notice any hostile presence, instead you see a treasure chest waiting to be unlocked.",
+        "https://cdn.discordapp.com/attachments/1362832151485354065/1362832389629284544/treasurechest.png?"
+        "ex=680c65d1&is=680b1451&hm=e1971818f32f4e0b0f43cfcbf5283fc1c3f36f80b1af2bcfacbfd7ba8ecf3ace&",
+        None,
+        "2025-03-31 02:40:47",
+        None,
+        None,
+    ),
+    (
+        13,
+        "boss",
+        "Boss Lair",
+        "A grand chamber with ominous decorations.",
+        None,
+        17,
+        "2025-03-31 02:40:47",
+        None,
+        None,
+    ),
+    (
+        15,
+        "shop",
+        "Shop Room",
+        "You do not notice any hostile presence.\n\nInstead you find a Moogle hiding in the corner...",
+        "https://cdn.discordapp.com/attachments/1362832151485354065/1376308720144748554/Shop_Entrance.gif?"
+        "ex=6834dae1&is=68338961&hm=5370f37045df11803229a217bc984ce52b910b64c59a6ede123468567b6d1991&",
+        None,
+        "2025-03-31 02:40:47",
+        None,
+        None,
+    ),
+    (
+        16,
+        "illusion",
+        "Illusion Chamber",
+        "The room shimmers mysteriously...",
+        "https://cdn.discordapp.com/attachments/1362832151485354065/1362832385040711930/Illusion.png?"
+        "ex=680c65d0&is=680b1450&hm=17f9b558f22f2738b576bb373eec18b161c8df67c8f2bcfff86a1ddc6d604eed&",
+        None,
+        "2025-03-31 02:40:47",
+        None,
+        None,
+    ),
+    (
+        17,
+        "locked",
+        "Locked Door",
+        "A heavy door with a glowing symbol and what appears to be a lock. It seems you need a key.",
+        "https://cdn.discordapp.com/attachments/1362832151485354065/1362832387742109886/lockedroom.png?"
+        "ex=680d0e91&is=680bbd11&hm=d3b19049954366cd7d625e5592a6cffbf7242aa3462ea107525c4919c371bee3&",
+        None,
+        "2025-04-19 18:55:00",
+        None,
+        None,
+    ),
+    (
+        18,
+        "chest_unlocked",
+        "Unlocked Chest",
+        "You notice an empty chest and nothing else of importance.",
+        "https://cdn.discordapp.com/attachments/1362832151485354065/1365404301488291880/chestopen.png?"
+        "ex=680d2f59&is=680bddd9&hm=df9e2742340f802058c078a816d17d0ffaaadeca5cfafa526db4273c28c02faf&",
+        None,
+        "2025-04-23 23:00:00",
+        None,
+        None,
+    ),
+    (
+        19,
+        "safe",
+        "Lake Room",
+        "You do not notice anything of importance, the area appears to be safe.",
+        "https://cdn.discordapp.com/attachments/1362832151485354065/1362832385829244948/Lake2.png?"
+        "ex=680c65d0&is=680b1450&hm=bbf00040b5390f13ae4c8eedd2ea32dc08a0510e150879ae30cfc4b6e0a13ff0&",
+        None,
+        "2025-04-25 12:29:10",
+        None,
+        None,
+    ),
+    (
+        20,
+        "safe",
+        "Lake Room 2",
+        "You do not notice anything of importance, the area appears to be safe.",
+        "https://cdn.discordapp.com/attachments/1362832151485354065/1362832386416443683/Lake3.png?"
+        "ex=680c65d1&is=680b1451&hm=1dc65d458458bb0e73e417850bc66973c79921757193b7d85d5849923cb3624a&",
+        None,
+        "2025-04-25 12:29:10",
+        None,
+        None,
+    ),
+    (
+        21,
+        "miniboss",
+        "Mimic",
+        "As you approach the locked chest it springs to life and bares it's fangs!",
+        "https://cdn.discordapp.com/attachments/1362832151485354065/1365786181417177148/2.png?"
+        "ex=68113600&is=680fe480&hm=a35ce81d097c19b34c06338bb678627ec9b16061ba867cb0d72be0d84075a927&",
+        16,
+        "2025-04-29 00:24:47",
+        None,
+        None,
+    ),
+    (
+        22,
+        "death",
+        "Death",
+        "Your health as fallen to 0 and have fainted.",
+        "https://cdn.discordapp.com/attachments/1362832151485354065/1370837025665712178/output.gif?"
+        "ex=6820f2f7&is=681fa177&hm=5c0ff142cc94ff7dd4050fb0be0cb1821580e251f6c5e8cb2f31384170afbd52&",
+        None,
+        "2025-05-09 16:59:31",
+        None,
+        None,
+    ),
 ]
-
 # --- items --------------------------------------------------------------------
 MERGED_ITEMS: List[Tuple] = [
     (1, 'Potion',       'Heals 50 HP.',                                                 '{"heal": 50}',                 'consumable', 1, 100, 10, 'self', 'https://example.com/icons/potion.png',        None,'2025-03-30 21:40:47'),
@@ -247,7 +530,53 @@ MERGED_NPC_VENDOR_ITEMS: List[Tuple] = [
 
 # --- hub embeds/buttons -------------------------------------------------------
 MERGED_HUB_EMBEDS: List[Tuple] = [
-    (1, 'main', '', 'Welcome to AdventureBot, a classic turn based dungeon crawler...', 'https://the-demiurge.com/DemiDevUnit/images/embed.png', 'AdventureBot v3.0.2 is now Live!', None, '2025-03-31 03:43:19')
+    (
+        1,
+        "main",
+        "",
+        "***Step into an unexplored reality and find meaning and hidden truth behind its existence.\n\nAssemble your "
+        "party and compete with other players, or enter alone.\n\nChoose your class + difficulty level, and "
+        "experience turn-based combat that challenges your strategy at every turn.***",
+        "https://cdn.discordapp.com/attachments/1362832151485354065/1367115629408292974/12346.png?"
+        "ex=68136925&is=681217a5&hm=dd0bfd5013c7add42b3a4033f1bad6367b99b54ecb70b43a0e1d0071678091a0&",
+        "**AdventureBot v3.0.9 is now Live!**\n\nYou can see the current https://discord.com/channels/1337786582996095036/1376040430445133895 here.\n\n"
+        "__——————————————————__\n**Beta Testers:**\n\nPatch 3.1 features have been partially implemented for testing.\n\nPlease see the "
+        "https://discord.com/channels/1337786582996095036/1360683660365529300 channel if you come across any issues.\n",
+        None,
+        "2025-03-31 08:43:19",
+    ),
+    (
+        2,
+        "tutorial",
+        "Starting A Game",
+        "Simply click the **New Game** button to create a new game thread.\n\nThis will add you to the **Queue** system "
+        "inside the thread, along with anyone else who wants to join.\n\n- Only the players who join the game session will "
+        "see the private thread and be added to it automatically.\n- Up to 6 players can join via the LFG post in the "
+        "Game Channel by clicking the Join button.\n- Additional players will be shown in the **Queue List** in the "
+        "thread.\n\nWhen the creator is ready they may click **Start Game** to lock in the amount of players playing.\n",
+        "https://cdn.discordapp.com/attachments/1362832151485354065/1373622234865733652/Screenshot_2025-05-18_at_6.14.47_AM.png?"
+        "ex=682b14e5&is=6829c365&hm=b91a3c24ed88f1f493db9a8f61473923e316e284782ab15bd565f6a82ac25966&",
+        "Coming Soon...",
+        1,
+        "2025-04-15 02:50:10",
+    ),
+    (
+        3,
+        "tutorial",
+        "Choose Class and Difficulty",
+        "Once the Session Creator clicks the Start Game button they can choose their class and difficulty level.\n- Selecting "
+        "**Easy** will generate up to 2 floors with a rare chance to spawn a basement floor. In this mode most harder enemies "
+        "are removed from generation.\n- Choosing **Medium** difficulty will generate up to 4 floors with at least 2 and a rare "
+        "chance to spawn a basement. In this mode harder enemies spawn alongside easy ones during generation.\n- Selecting "
+        "**Hard** is exactly what you think it is. With up to 4 floors and higher spawn chances on more difficult enemies and "
+        "fewer vendor shops and item drops.\n- **Crazy Catto** is the most difficult of challenges and well... you'd be a crazy "
+        "catto to try it.",
+        "https://cdn.discordapp.com/attachments/1362832151485354065/1373622403455778848/Screenshot_2025-05-18_at_6.19.11_AM.png?"
+        "ex=682b150d&is=6829c38d&hm=045419693ca1ecd758f7ecf5c7208ca4da321622636b908da9e15c99f97dde61&",
+        "Coming Soon...",
+        2,
+        "2025-04-17 03:45:05",
+    ),
 ]
 MERGED_HUB_BUTTONS: List[Tuple] = []
 
@@ -309,7 +638,8 @@ TABLES = {
             floor_number      INT,
             room_type ENUM(
                 'safe','monster','item','shop','boss','trap','illusion',
-                'staircase_up','staircase_down','exit','locked','entrance'
+                'staircase_up','staircase_down','exit','locked','entrance',
+                'chest_unlocked','miniboss','death'
             ) NOT NULL,
             chance            FLOAT   NOT NULL,
             max_per_floor     INT     NOT NULL,
@@ -532,13 +862,18 @@ TABLES = {
             template_id   INT AUTO_INCREMENT PRIMARY KEY,
             room_type ENUM(
                 'safe','monster','item','shop','boss','trap','illusion',
-                'staircase_up','staircase_down','exit','locked','chest_unlocked','entrance'
+                'staircase_up','staircase_down','exit','locked','chest_unlocked','entrance',
+                'miniboss','death'
             ) NOT NULL,
             template_name VARCHAR(100) NOT NULL,
             description   TEXT,
             image_url     VARCHAR(255),
             default_enemy_id INT,
-            created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            trap_type ENUM('spike','gil_snatcher','mimic') DEFAULT NULL,
+            trap_payload JSON,
+            FOREIGN KEY (default_enemy_id) REFERENCES enemies(enemy_id)
+                ON DELETE SET NULL
         )
     ''',
     # ---------- npc_vendors ----------
@@ -1130,8 +1465,8 @@ def insert_room_templates(cur):
         """
         INSERT INTO room_templates
           (room_type, template_name, description, image_url,
-           default_enemy_id, created_at)
-        VALUES (%s,%s,%s,%s,%s,%s)
+           default_enemy_id, created_at, trap_type, trap_payload)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
         """,
         [row[1:] for row in MERGED_ROOM_TEMPLATES]
     )
