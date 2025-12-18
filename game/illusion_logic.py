@@ -61,7 +61,7 @@ class IllusionEngine:
               FROM illusion_crystal_instances ic
               JOIN illusion_crystal_templates ict ON ict.template_id = ic.template_id
              WHERE ic.room_id = %s AND ic.session_id = %s
-               AND ic.status != 'shattered'
+               AND ic.status = 'intact'
              ORDER BY ic.sequence_order ASC
              LIMIT 1
             """,
@@ -70,26 +70,6 @@ class IllusionEngine:
         row = cur.fetchone()
         cur.close(); conn.close()
         return row
-
-    def _opposing_element_for(self, element_id: Optional[int]) -> Optional[int]:
-        if not element_id:
-            return None
-        conn = self.db_connect()
-        cur = conn.cursor()
-        cur.execute(
-            """
-            SELECT counter_element_id
-              FROM element_relationships
-             WHERE element_id=%s AND relation_type='opposes'
-             LIMIT 1
-            """,
-            (element_id,),
-        )
-        row = cur.fetchone()
-        cur.close(); conn.close()
-        if not row:
-            return None
-        return row[0]
 
     def _room_template_for_rewards(self, room_id: int) -> Optional[Dict[str, Any]]:
         conn = self.db_connect()
@@ -248,6 +228,73 @@ class IllusionEngine:
             pending_teleport=False,
         )
 
+    def teleport_player_from_illusion(
+        self,
+        *,
+        session_id: int,
+        player_id: int,
+        min_distance: int = 5,
+    ) -> Optional[Dict[str, Any]]:
+        """Send a player to a random safe room at least ``min_distance`` away."""
+
+        conn = self.db_connect()
+        cur = conn.cursor(dictionary=True)
+        cur.execute(
+            """
+            SELECT coord_x, coord_y, current_floor_id
+              FROM players
+             WHERE player_id=%s AND session_id=%s
+             LIMIT 1
+            """,
+            (player_id, session_id),
+        )
+        pos = cur.fetchone()
+        if not pos:
+            cur.close(); conn.close()
+            return None
+
+        cur.execute(
+            """
+            SELECT room_id, floor_id, room_type, coord_x, coord_y, description, image_url
+              FROM rooms
+             WHERE session_id=%s AND floor_id=%s AND room_type='safe'
+            """,
+            (session_id, pos["current_floor_id"]),
+        )
+        safe_rooms = cur.fetchall()
+
+        def _distance(room):
+            return abs(room["coord_x"] - pos["coord_x"]) + abs(room["coord_y"] - pos["coord_y"])
+
+        far_enough = [r for r in safe_rooms if _distance(r) >= min_distance]
+        candidates = far_enough or safe_rooms
+        if not candidates:
+            cur.close(); conn.close()
+            return None
+
+        dest = random.choice(candidates)
+
+        cur.execute(
+            """
+            UPDATE players
+               SET coord_x=%s, coord_y=%s, current_floor_id=%s
+             WHERE player_id=%s AND session_id=%s
+            """,
+            (
+                dest["coord_x"],
+                dest["coord_y"],
+                dest["floor_id"],
+                player_id,
+                session_id,
+            ),
+        )
+        conn.commit()
+        cur.close(); conn.close()
+
+        dest_copy = dict(dest)
+        dest_copy.update({"coord_x": dest["coord_x"], "coord_y": dest["coord_y"]})
+        return dest_copy
+
     def _update_room_state(
         self,
         room_id: int,
@@ -328,7 +375,7 @@ class IllusionEngine:
                 "image_url": active.get("image_url"),
             }
 
-        required_element = active.get("counter_element_id") or self._opposing_element_for(active.get("crystal_element_id"))
+        required_element = active.get("counter_element_id") or active.get("crystal_element_id")
         ability_element = ability.get("element_id")
 
         # Track which crystal index the player just attempted
@@ -354,7 +401,7 @@ class IllusionEngine:
             cur.execute(
                 """
                 SELECT COUNT(*) FROM illusion_crystal_instances
-                 WHERE room_id=%s AND session_id=%s AND status!='shattered'
+                 WHERE room_id=%s AND session_id=%s AND status='intact'
                 """,
                 (room_id, session_id),
             )

@@ -811,6 +811,30 @@ class BattleSystem(commands.Cog):
             if outcome.get("log"):
                 await interaction.followup.send(outcome["log"], ephemeral=True)
 
+            gm = self.bot.get_cog("GameMaster")
+            if outcome.get("should_teleport"):
+                dest = self.illusion.teleport_player_from_illusion(
+                    session_id=session.session_id,
+                    player_id=session.current_turn,
+                    min_distance=5,
+                )
+                if gm and dest:
+                    gm.append_game_log(
+                        session.session_id,
+                        f"✨ <@{session.current_turn}> is whisked away to a distant safe room!",
+                    )
+                    # Refresh the new room view and end turn for multiplayer runs
+                    await gm.update_room_view(
+                        interaction,
+                        dest,
+                        dest.get("coord_x", 0),
+                        dest.get("coord_y", 0),
+                        force_end_turn=False,
+                    )
+                    if len(session.players) > 1:
+                        await gm.end_player_turn(interaction)
+                    return
+
             sm = self.bot.get_cog("SessionManager")
             if sm:
                 await sm.refresh_current_state(interaction)
