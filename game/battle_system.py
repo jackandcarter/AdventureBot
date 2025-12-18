@@ -627,6 +627,10 @@ class BattleSystem(commands.Cog):
         if not session:
             return await interaction.response.send_message("❌ No active session.", ephemeral=True)
 
+        # Ensure cooldown buckets exist
+        if not hasattr(session, "ability_cooldowns") or session.ability_cooldowns is None:
+            session.ability_cooldowns = {}
+
         pid = session.current_turn
         in_battle = bool(session.battle_state)
 
@@ -686,6 +690,8 @@ class BattleSystem(commands.Cog):
         if not ts:
             return await interaction.response.send_message("❌ You have no active Trance.", ephemeral=True)
 
+        session.ability_cooldowns = getattr(session, "ability_cooldowns", {}) or {}
+
         # Load the abilities for this trance_id
         conn = self.db_connect()
         cursor = conn.cursor(dictionary=True)
@@ -712,7 +718,7 @@ class BattleSystem(commands.Cog):
             cd_now = int(cds.get(a["ability_id"], 0))
             bar = create_cooldown_bar(cd_now, a["cooldown"], length=6)
             style = discord.ButtonStyle.secondary if cd_now > 0 else discord.ButtonStyle.primary
-            buttons.append((f"{a['ability_name']} {bar}", style, f"combat_trance_{a['ability_id']}", 0))
+            buttons.append((f"{a['ability_name']} {bar}", style, f"combat_trance_{a['ability_id']}", 0, cd_now > 0))
 
         # ← Back
         buttons.append(("← Back", discord.ButtonStyle.secondary, "combat_trance_back", 0))
@@ -733,6 +739,8 @@ class BattleSystem(commands.Cog):
         if not session:
             return await interaction.response.send_message("❌ No active session.", ephemeral=True)
 
+        session.ability_cooldowns = getattr(session, "ability_cooldowns", {}) or {}
+
         # 1) fetch ability metadata up‑front so we know its target_type
         conn = self.db_connect()
         cur = conn.cursor(dictionary=True)
@@ -741,6 +749,14 @@ class BattleSystem(commands.Cog):
         cur.close(); conn.close()
         if not ability_meta:
             return await interaction.response.send_message("❌ Ability not found.", ephemeral=True)
+
+        # Block usage if this ability is still cooling down
+        current_cd = session.ability_cooldowns.get(session.current_turn, {}).get(ability_id, 0)
+        if current_cd > 0:
+            msg = f"⏳ {ability_meta.get('ability_name', 'That ability')} is cooling down (remaining: {current_cd:.1f})."
+            if interaction.response.is_done():
+                return await interaction.followup.send(msg, ephemeral=True)
+            return await interaction.response.send_message(msg, ephemeral=True)
 
         # 2) If it’s an enemy‑target skill but we’re not in a battle, block it
         in_battle = bool(session.current_enemy)
