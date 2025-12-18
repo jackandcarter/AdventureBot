@@ -551,8 +551,9 @@ class InventoryShop(commands.Cog):
             conn.commit()
 
         await interaction.followup.send("✅ Purchase successful!", ephemeral=True)
-        if mgr:
-            await mgr.refresh_current_state(interaction)
+
+        # Stay in the buy menu after purchase instead of bouncing back to the room
+        await self.display_buy_menu(interaction, vendor_id)
 
     async def process_sale(self, interaction: Interaction, vendor_id: int, item_id: int) -> None:
         mgr = self.bot.get_cog("SessionManager")
