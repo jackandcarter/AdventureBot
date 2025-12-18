@@ -12,6 +12,7 @@ from utils.helpers import load_config
 from typing import Any, Dict, List, Optional, Set, Tuple
 from utils.ui_helpers import create_progress_bar, create_cooldown_bar, format_status_effects, get_emoji_for_room_type
 from models.session_models import SessionPlayerModel
+from game.illusion_logic import IllusionEngine
 
 logger = logging.getLogger("BattleSystem")
 logger.setLevel(logging.DEBUG)
@@ -25,6 +26,7 @@ class BattleSystem(commands.Cog):
         self.embed_manager: Optional[commands.Cog] = self.bot.get_cog("EmbedManager")
         # AbilityEngine handles ALL ability logic & damage formulas
         self.ability = AbilityEngine(self.db_connect, self.config.get("damage_variance", 0.0))
+        self.illusion = IllusionEngine(self.db_connect)
 
     # --------------------------------------------------------------------- #
     #                               Helpers                                 #
@@ -48,6 +50,29 @@ class BattleSystem(commands.Cog):
         filled = int(round(length * current / float(maximum)))
         bar = "█" * filled + "░" * (length - filled)
         return f"[{bar}] {current}/{maximum}"
+
+    def _get_player_room(self, session_id: int, player_id: int) -> Optional[Dict[str, Any]]:
+        """Fetch the player's current room (type + id)."""
+        conn = self.db_connect()
+        cur = conn.cursor(dictionary=True)
+        cur.execute(
+            """
+            SELECT r.room_id, r.room_type, r.image_url, r.inner_template_id,
+                   p.coord_x, p.coord_y, p.current_floor_id
+              FROM players p
+              JOIN rooms r
+                ON r.session_id = p.session_id
+               AND r.floor_id   = p.current_floor_id
+               AND r.coord_x    = p.coord_x
+               AND r.coord_y    = p.coord_y
+             WHERE p.player_id = %s AND p.session_id = %s
+             LIMIT 1
+            """,
+            (player_id, session_id),
+        )
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        return row
     
     def _normalize_se(self, raw: Dict[str,Any]) -> Dict[str,Any]:
         """
@@ -740,6 +765,8 @@ class BattleSystem(commands.Cog):
             return await interaction.response.send_message("❌ No active session.", ephemeral=True)
 
         session.ability_cooldowns = getattr(session, "ability_cooldowns", {}) or {}
+        player_room = self._get_player_room(session.session_id, session.current_turn)
+        in_illusion = bool(player_room and player_room.get("room_type") == "illusion")
 
         # 1) fetch ability metadata up‑front so we know its target_type
         conn = self.db_connect()
@@ -758,12 +785,36 @@ class BattleSystem(commands.Cog):
                 return await interaction.followup.send(msg, ephemeral=True)
             return await interaction.response.send_message(msg, ephemeral=True)
 
-        # 2) If it’s an enemy‑target skill but we’re not in a battle, block it
+        # 2) If it’s an enemy‑target skill but we’re not in a battle, block it (except illusion trials)
         in_battle = bool(session.current_enemy)
-        if ability_meta["target_type"] == "enemy" and not in_battle:
+        if ability_meta["target_type"] == "enemy" and not in_battle and not in_illusion:
             return await interaction.response.send_message(
                 "❌ That ability can only be used in battle.", ephemeral=True
             )
+
+        # 3) Illusion crystal handling happens before normal resolution
+        if in_illusion and not in_battle and player_room:
+            outcome = self.illusion.cast_on_active_crystal(
+                session_id=session.session_id,
+                room_id=player_room["room_id"],
+                ability_id=ability_id,
+                player_id=session.current_turn,
+            )
+
+            gm = self.bot.get_cog("GameMaster")
+            if gm and outcome.get("log"):
+                gm.append_game_log(session.session_id, outcome["log"])
+
+            if not interaction.response.is_done():
+                await interaction.response.defer()
+
+            if outcome.get("log"):
+                await interaction.followup.send(outcome["log"], ephemeral=True)
+
+            sm = self.bot.get_cog("SessionManager")
+            if sm:
+                await sm.refresh_current_state(interaction)
+            return
 
         # 3) Ensure we always have buckets for status effects (so self‑buffs work outside battle)
         if not hasattr(session, "battle_state") or session.battle_state is None:
