@@ -222,6 +222,12 @@ class AbilityEngine:
             except json.JSONDecodeError:
                 effect_data = {}
 
+            # flat, defense‑ignoring damage (e.g., Cactuar's Needles)
+            if result is None and "flat_damage" in effect_data:
+                dmg = int(effect_data.get("flat_damage", 0))
+                logs.append(f"{name} deals {dmg} damage.")
+                result = AbilityResult(type="damage", amount=dmg, logs=logs)
+
             # stat‑scaled base damage from JSON
             if result is None and ("base_damage" in effect_data or "damage" in effect_data):
                 base = effect_data.get("base_damage", effect_data.get("damage", 0))
