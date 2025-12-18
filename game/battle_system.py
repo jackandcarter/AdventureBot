@@ -667,8 +667,9 @@ class BattleSystem(commands.Cog):
         cds = session.ability_cooldowns.get(pid, {})
         for a in abilities:
             a["current_cooldown"] = cds.get(a["ability_id"], 0)
-        
-        await interaction.response.defer()
+
+        if not interaction.response.is_done():
+            await interaction.response.defer()
         await embed_mgr.send_skill_menu_embed(interaction, abilities)
 
     async def display_trance_menu(self, interaction: discord.Interaction) -> None:
@@ -757,6 +758,9 @@ class BattleSystem(commands.Cog):
 
         pid = session.current_turn
         enemy = session.current_enemy if in_battle else None
+
+        if not interaction.response.is_done():
+            await interaction.response.defer()
 
 
         # 2) fetch player stats
