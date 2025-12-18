@@ -92,6 +92,16 @@ class EmbedManager(commands.Cog):
         target = channel or interaction.channel
         cid = target.id
 
+        # Always acknowledge the interaction before doing any work so users
+        # don’t see “Interaction Failed” while we fetch/update messages.
+        if not interaction.response.is_done():
+            try:
+                # A plain defer is safe even when we later edit a different
+                # message via the webhook/message API.
+                await interaction.response.defer()
+            except Exception as e:  # pragma: no cover - defensive guard
+                logger.debug("send_or_update_embed: defer failed: %s", e)
+
         # Obtain or create the per-channel lock
         lock = self._update_locks.setdefault(cid, asyncio.Lock())
 
