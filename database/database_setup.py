@@ -316,7 +316,8 @@ MERGED_ROOM_TEMPLATES: List[Tuple] = [
     (19, 'safe', 'Lake Room', 'You do not notice anything of importance, the area appears to be safe.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362832385829244948/Lake2.png?ex=680c65d0&is=680b1450&hm=bbf00040b5390f13ae4c8eedd2ea32dc08a0510e150879ae30cfc4b6e0a13ff0&', None, '2025-04-25 12:29:10', None, None),
     (20, 'safe', 'Lake Room 2', 'You do not notice anything of importance, the area appears to be safe.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362832386416443683/Lake3.png?ex=680c65d1&is=680b1451&hm=1dc65d458458bb0e73e417850bc66973c79921757193b7d85d5849923cb3624a&', None, '2025-04-25 12:29:10', None, None),
     (21, 'miniboss', 'Mimic', "As you approach the locked chest it springs to life and bares it's fangs!", 'https://cdn.discordapp.com/attachments/1362832151485354065/1365786181417177148/2.png?ex=68113600&is=680fe480&hm=a35ce81d097c19b34c06338bb678627ec9b16061ba867cb0d72be0d84075a927&', 16, '2025-04-29 00:24:47', None, None),
-    (22, 'death', 'Death', 'Your health as fallen to 0 and have fainted.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1370837025665712178/output.gif?ex=6820f2f7&is=681fa177&hm=5c0ff142cc94ff7dd4050fb0be0cb1821580e251f6c5e8cb2f31384170afbd52&', None, '2025-05-09 16:59:31', None, None)
+    (22, 'death', 'Death', 'Your health as fallen to 0 and have fainted.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1370837025665712178/output.gif?ex=6820f2f7&is=681fa177&hm=5c0ff142cc94ff7dd4050fb0be0cb1821580e251f6c5e8cb2f31384170afbd52&', None, '2025-05-09 16:59:31', None, None),
+    (23, 'entrance', 'Dungeon Entrance', 'You arrive at the dungeon entrance. The air is calm, and the path ahead beckons you forward.', 'https://the-demiurge.com/DemiDevUnit/images/backintro.png', None, '2025-06-23 12:00:00', None, None)
 ]
 
 # --- items --------------------------------------------------------------------
@@ -682,7 +683,7 @@ TABLES = {
             difficulty_name   VARCHAR(50) NOT NULL,
             floor_number      INT,
             room_type ENUM(
-                'safe','monster','item','shop','boss','trap','illusion',
+                'safe','entrance','monster','item','shop','boss','trap','illusion',
                 'staircase_up','staircase_down','exit','locked'
             ) NOT NULL,
             chance            FLOAT   NOT NULL,
@@ -920,7 +921,7 @@ TABLES = {
         CREATE TABLE IF NOT EXISTS room_templates (
             template_id   INT AUTO_INCREMENT PRIMARY KEY,
             room_type ENUM(
-                'safe','monster','item','shop','boss','trap','illusion',
+                'safe','entrance','monster','item','shop','boss','trap','illusion',
                 'staircase_up','staircase_down','exit','locked','chest_unlocked',
                 'miniboss','death'
             ) NOT NULL DEFAULT 'safe',
