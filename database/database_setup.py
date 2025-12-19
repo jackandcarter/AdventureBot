@@ -356,7 +356,7 @@ MERGED_ROOM_TEMPLATES: List[Tuple] = [
         "Boss Lair",
         "A grand chamber with ominous decorations.",
         None,
-        17,
+        None,
         "2025-03-31 02:40:47",
         None,
         None,
@@ -440,7 +440,7 @@ MERGED_ROOM_TEMPLATES: List[Tuple] = [
         "As you approach the locked chest it springs to life and bares it's fangs!",
         "https://cdn.discordapp.com/attachments/1362832151485354065/1365786181417177148/2.png?"
         "ex=68113600&is=680fe480&hm=a35ce81d097c19b34c06338bb678627ec9b16061ba867cb0d72be0d84075a927&",
-        16,
+        None,
         "2025-04-29 00:24:47",
         None,
         None,
@@ -1385,12 +1385,15 @@ def insert_floor_room_rules(cur):
 
 def insert_elements(cur):
     logger.info("Checking elements seed data…")
-    if not table_is_empty(cur, "elements"):
+    cur.execute("SELECT element_id FROM elements")
+    existing_ids = {row[0] for row in cur.fetchall()}
+    rows_to_insert = [row for row in MERGED_ELEMENTS if row[0] not in existing_ids]
+    if not rows_to_insert:
         logger.info("elements already populated – skipping")
         return
     cur.executemany(
-        "INSERT INTO elements (element_name, created_at) VALUES (%s, %s)",
-        [row[1:] for row in MERGED_ELEMENTS]
+        "INSERT INTO elements (element_id, element_name, created_at) VALUES (%s, %s, %s)",
+        rows_to_insert
     )
     logger.info("Inserted elements.")
 
@@ -1654,10 +1657,10 @@ def main() -> None:
                 insert_abilities_and_classes(cur)
                 insert_levels(cur)
                 insert_intro_steps(cur)
-                insert_room_templates(cur)
                 insert_npc_vendors(cur)
                 insert_items(cur)
                 insert_enemies_and_abilities(cur)
+                insert_room_templates(cur)
                 insert_enemy_drops(cur)
                 insert_enemy_resistances(cur)
                 insert_npc_vendor_items(cur)
