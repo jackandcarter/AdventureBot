@@ -14,6 +14,7 @@ from models.database import Database
 from utils.helpers import load_config
 from utils.ui_helpers import (
     create_cooldown_bar,
+    create_health_bar,
     create_progress_bar,
     get_emoji_for_room_type,
     format_status_effects,
@@ -597,12 +598,9 @@ class EmbedManager(commands.Cog):
     # Boss battle embed
     # ──────────────────────────────────────────────────────────────────
     async def send_boss_embed(self, interaction: discord.Interaction, boss_info: Dict[str, Any], battle_log: str):
-        def bar(cur: int, max_: int, length: int = 10) -> str:
-            filled = int(round(length * cur / float(max_))) if max_ else 0
-            return f"[{'█'*filled}{'░'*(length-filled)}] {cur}/{max_}"
         desc = (
             f"{boss_info.get('description','A fearsome boss stands before you.')}\n\n"
-            f"**Boss HP:** {bar(boss_info['hp'], boss_info['max_hp'])}\n\n{battle_log}"
+            f"**Boss HP:** {create_health_bar(boss_info['hp'], boss_info['max_hp'])}\n\n{battle_log}"
         )
         embed = discord.Embed(title=f"🔥 Boss Battle: {boss_info['enemy_name']}", description=desc, color=discord.Color.dark_orange())
         if boss_info.get("image_url"):

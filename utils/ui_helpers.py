@@ -30,6 +30,31 @@ def create_cooldown_bar(current_cd: float, max_cd: float, length: int = 10) -> s
     return f"[{bar}]"
 
 
+def create_health_bar(current: int, maximum: int, length: int = 10) -> str:
+    """
+    Build a colored health bar using square emojis and percentage thresholds.
+    """
+    if maximum <= 0:
+        return "[No Data]"
+
+    current = max(0, min(current, maximum))
+    percent = current / float(maximum)
+
+    if percent >= 0.75:
+        fill = "🟩"
+    elif percent >= 0.50:
+        fill = "🟨"
+    elif percent >= 0.25:
+        fill = "🟧"
+    else:
+        fill = "🟥"
+
+    filled = int(round(length * percent))
+    empty = "⬛"
+    bar = f"{fill * filled}{empty * (length - filled)}"
+    return f"[{bar}] {current}/{maximum}"
+
+
 def get_emoji_for_room_type(room_type: str) -> str:
     """
     Return an emoji representing the supplied room type (case‑insensitive).
