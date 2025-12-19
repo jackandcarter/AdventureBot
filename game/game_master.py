@@ -301,15 +301,27 @@ class GameMaster(commands.Cog):
         if not result:
             return
         thread, session_id = result
+        em = self.bot.get_cog("EmbedManager")
+        if em:
+            await em.send_difficulty_selection(interaction, channel=thread)
+        else:
+            await interaction.followup.send(
+                "❌ EmbedManager unavailable.", ephemeral=True
+            )
 
-        # Send the queue embed into the private thread
+    async def send_queue_and_lfg(self,
+                                 interaction: discord.Interaction,
+                                 thread: discord.Thread,
+                                 session_id: int,
+                                 difficulty: str) -> None:
         em = self.bot.get_cog("EmbedManager")
         embed = build_queue_embed(interaction.user, session_id)
-        view  = _build_queue_view()
+        view = _build_queue_view()
         if em:
             await em.send_or_update_embed(
                 interaction,
-                "", "",
+                "",
+                "",
                 embed_override=embed,
                 view_override=view,
                 channel=thread
@@ -317,10 +329,60 @@ class GameMaster(commands.Cog):
         else:
             await thread.send(embed=embed, view=view)
 
-        # Post LFG in the hub
         hub = self.bot.get_cog("HubManager")
         if hub and hasattr(hub, "post_lfg_post"):
-            await hub.post_lfg_post(interaction, thread, session_id)
+            await hub.post_lfg_post(
+                interaction,
+                thread,
+                session_id,
+                difficulty
+            )
+
+    async def handle_difficulty_selection(self,
+                                          interaction: discord.Interaction,
+                                          difficulty: str) -> None:
+        if not interaction.response.is_done():
+            await interaction.response.defer()
+        sm = self.bot.get_cog("SessionManager")
+        session = sm.get_session(interaction.channel.id) if sm else None
+        if not session:
+            return await interaction.followup.send(
+                "❌ No session.", ephemeral=True
+            )
+
+        if not SessionModel.is_owner(session.session_id, interaction.user.id):
+            return await interaction.followup.send(
+                "❌ Only the session creator can choose the difficulty.",
+                ephemeral=True
+            )
+
+        if getattr(session, "queue_posted", False):
+            return await interaction.followup.send(
+                "⚠️ Difficulty already set for this session.", ephemeral=True
+            )
+
+        conn = self.db_connect()
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE sessions SET difficulty=%s WHERE session_id=%s",
+                (difficulty, session.session_id)
+            )
+        conn.commit()
+        conn.close()
+
+        session.difficulty = difficulty
+        session.queue_posted = True
+        self.append_game_log(
+            session.session_id,
+            f"Difficulty set to **{difficulty}**."
+        )
+
+        await self.send_queue_and_lfg(
+            interaction,
+            interaction.channel,
+            session.session_id,
+            difficulty
+        )
 
     # ────────────────────────────────────────────────────────────────────────────
     #  2. Class selection → difficulty
@@ -351,10 +413,24 @@ class GameMaster(commands.Cog):
         if em:
             await em.send_class_selection_embed(interaction, total_players)
 
-        # If everyone has chosen, go to difficulty
+        # If everyone has chosen, proceed to intro flow
         if all(p["class_id"]
                for p in SessionPlayerModel.get_player_states(session.session_id)):
-            await self.send_difficulty_selection(interaction)
+            conn = self.db_connect()
+            with conn.cursor(dictionary=True) as cur:
+                cur.execute(
+                    "SELECT difficulty FROM sessions WHERE session_id=%s",
+                    (session.session_id,)
+                )
+                diff_row = cur.fetchone()
+            conn.close()
+
+            difficulty = diff_row["difficulty"] if diff_row else None
+            if not difficulty:
+                return await interaction.followup.send(
+                    "❌ Difficulty missing for this session.", ephemeral=True
+                )
+            await self.start_session(interaction, difficulty)
 
     async def send_difficulty_selection(self,
                                         interaction: discord.Interaction) -> None:
@@ -2082,7 +2158,7 @@ class GameMaster(commands.Cog):
                 )
 
             if cid.startswith("difficulty_"):
-                return await self.start_session(
+                return await self.handle_difficulty_selection(
                     interaction, cid.split("_",1)[1]
                 )
 

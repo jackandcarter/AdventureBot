@@ -271,7 +271,12 @@ class EmbedManager(commands.Cog):
     # ──────────────────────────────────────────────────────────────────
     # Difficulty selection embed
     # ──────────────────────────────────────────────────────────────────
-    async def send_difficulty_selection(self, interaction: discord.Interaction):
+    async def send_difficulty_selection(
+        self,
+        interaction: discord.Interaction,
+        *,
+        channel: Optional[discord.abc.Messageable] = None,
+    ):
         conn = self.db_connect()
         with conn.cursor(dictionary=True) as cur:
             cur.execute("SELECT name FROM difficulties ORDER BY difficulty_id ASC")
@@ -280,7 +285,13 @@ class EmbedManager(commands.Cog):
             await interaction.followup.send("❌ No difficulties found!", ephemeral=True)
             return
         buttons = [(d["name"], discord.ButtonStyle.primary, f"difficulty_{d['name']}", 0) for d in diffs]
-        await self.send_or_update_embed(interaction, "⚖️ Select Difficulty", "Choose the dungeon difficulty.", buttons=buttons)
+        await self.send_or_update_embed(
+            interaction,
+            "⚖️ Select Difficulty",
+            "Choose the dungeon difficulty.",
+            buttons=buttons,
+            channel=channel,
+        )
 
     # ──────────────────────────────────────────────────────────────────
     # Intro slideshow embed
