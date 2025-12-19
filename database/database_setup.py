@@ -1128,6 +1128,19 @@ TABLES = {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''',
+    # ---------- session_saves ----------
+    'session_saves': '''
+        CREATE TABLE IF NOT EXISTS session_saves (
+            session_id INT NOT NULL,
+            slot INT NOT NULL,
+            save_title VARCHAR(100) NOT NULL,
+            is_auto_save BOOLEAN NOT NULL DEFAULT FALSE,
+            saved_state JSON NOT NULL,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (session_id, slot),
+            FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE
+        )
+    ''',
     # ---------- intro_steps ----------
     'intro_steps': '''
         CREATE TABLE IF NOT EXISTS intro_steps (
@@ -1277,6 +1290,7 @@ TABLE_ORDER = [
     'enemy_resistances',
     'game_events',
     'game_saves',
+    'session_saves',
     'intro_steps',
     'ability_status_effects',
     'item_effects',
