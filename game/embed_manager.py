@@ -480,15 +480,25 @@ class EmbedManager(commands.Cog):
                 icon = self.get_ability_icon(ab)
                 cd = ab.get("cooldown", 0)
                 cur_cd = ab.get("current_cooldown", 0)
+                duration = ab.get("remaining_duration")
+                duration_max = ab.get("duration_turns")
+                duration_bar = ""
+                if duration is not None and duration_max:
+                    duration_bar = create_progress_bar(int(duration), int(duration_max), length=6)
                 cd_bar = create_cooldown_bar(cur_cd, cd) if cd and cur_cd else ("[Ready]" if cd else "")
-                label = f"{icon} {ab['ability_name']} {cd_bar}".strip()
+                label_parts = [icon, ab["ability_name"]]
+                if duration_bar:
+                    label_parts.append(duration_bar)
+                if cd_bar:
+                    label_parts.append(cd_bar)
+                label = " ".join(part for part in label_parts if part).strip()
                 if len(label) > 80:
                     label = label[:77] + "..."
                 disabled = cur_cd > 0
                 view.add_item(Button(
                     label=label,
                     style=discord.ButtonStyle.primary if not disabled else discord.ButtonStyle.secondary,
-                    custom_id=f"combat_skill_{ab['ability_id']}",
+                    custom_id=ab.get("custom_id", f"combat_skill_{ab['ability_id']}"),
                     row=r,
                     disabled=disabled,
                 ))
@@ -573,7 +583,7 @@ class EmbedManager(commands.Cog):
         "battle":   lambda self, i, d: self.send_battle_menu(i, d.get("enemy_name"), d.get("enemy_hp"), d.get("enemy_max_hp")),
         "death":    lambda self, i, d: self.send_death_embed(i, d["description"], d.get("image_url"), d["view"]),
         "boss":     lambda self, i, d: self.send_boss_embed(i, d.get("boss_info"), d.get("battle_log",_ZWSP)),
-        "illusion": lambda self, i, d: self.send_illusion_embed(i, d.get("room_info")),
+        "illusion": lambda self, i, d: self.send_illusion_embed(i, d.get("room_info"), d.get("challenge_state")),
     }
 
     async def send_or_update_embed_for_state(self, interaction: discord.Interaction, state: str, data: Dict[str, Any]):
@@ -609,23 +619,48 @@ class EmbedManager(commands.Cog):
     # ──────────────────────────────────────────────────────────────────
     # Illusion room embed
     # ──────────────────────────────────────────────────────────────────
-    async def send_illusion_embed(self, interaction: discord.Interaction, room_info: Dict[str, Any]):
+    async def send_illusion_embed(
+        self,
+        interaction: discord.Interaction,
+        room_info: Dict[str, Any],
+        challenge_state: Optional[Dict[str, Any]] = None
+    ):
+        if not challenge_state or not challenge_state.get("sequence"):
+            embed = discord.Embed(
+                title="🔮 Illusion Chamber",
+                description=room_info.get("description", "The room shimmers with strange energy."),
+                color=discord.Color.purple(),
+            )
+            if room_info.get("image_url"):
+                embed.set_image(url=f"{room_info['image_url']}?t={int(time.time())}")
+            buttons = [
+                ("Skill", discord.ButtonStyle.primary, "action_skill", 0),
+                ("Menu", discord.ButtonStyle.secondary, "action_menu", 0),
+            ]
+            await self.send_or_update_embed(interaction, _ZWSP, _ZWSP, embed_override=embed, buttons=buttons)
+            return
+
+        sequence = challenge_state["sequence"]
+        current_index = challenge_state.get("current_index", 0)
+        failures = challenge_state.get("failures", 0)
+        total_steps = len(sequence)
+        crystal = sequence[current_index]
+
         embed = discord.Embed(
-            title="🔮 Illusion Challenge",
+            title=f"🔮 Illusion Trial ({current_index + 1}/{total_steps})",
             description=(
-                f"{room_info.get('description','The room appears dark and mysterious.')}\n\n"
-                "What do you think is hidden here?\n"
-                "Choose wisely: Enemy, Treasure, Vendor, or an Empty room."
+                f"**{crystal['name']}**\n"
+                f"{crystal['description']}\n\n"
+                "Use a skill with the opposing element to shatter the crystal.\n"
+                f"Failures: {failures}/2"
             ),
             color=discord.Color.purple(),
         )
-        if room_info.get("image_url"):
-            embed.set_image(url=f"{room_info['image_url']}?t={int(time.time())}")
+        if crystal.get("image_url"):
+            embed.set_image(url=f"{crystal['image_url']}?t={int(time.time())}")
         buttons = [
-            ("Enemy",    discord.ButtonStyle.primary,   "illusion_enemy",    0),
-            ("Treasure", discord.ButtonStyle.success,   "illusion_treasure", 0),
-            ("Vendor",   discord.ButtonStyle.primary,   "illusion_vendor",   0),
-            ("Empty",    discord.ButtonStyle.secondary, "illusion_empty",    0),
+            ("Skill", discord.ButtonStyle.primary, "action_skill", 0),
+            ("Menu", discord.ButtonStyle.secondary, "action_menu", 0),
         ]
         await self.send_or_update_embed(interaction, _ZWSP, _ZWSP, embed_override=embed, buttons=buttons)
 

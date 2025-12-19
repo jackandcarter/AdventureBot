@@ -652,7 +652,8 @@ class BattleSystem(commands.Cog):
                    a.effect,
                    a.cooldown,
                    a.icon_url,
-                   a.target_type
+                   a.target_type,
+                   a.element_id
               FROM class_abilities ca
               JOIN abilities a USING (ability_id)
              WHERE ca.class_id    = %s
@@ -661,16 +662,55 @@ class BattleSystem(commands.Cog):
             (class_id, level),
         )
         abilities = cur.fetchall()
-        cur.close(); conn.close()
+        cur.close()
+
+        cur = conn.cursor(dictionary=True)
+        cur.execute(
+            """
+            SELECT pta.temp_ability_id,
+                   pta.remaining_turns,
+                   ta.ability_name,
+                   ta.description,
+                   ta.effect,
+                   ta.cooldown_turns,
+                   ta.duration_turns,
+                   ta.icon_url,
+                   ta.target_type,
+                   ta.element_id
+              FROM player_temporary_abilities pta
+              JOIN temporary_abilities ta
+                ON ta.temp_ability_id = pta.temp_ability_id
+             WHERE pta.session_id = %s
+               AND pta.player_id = %s
+               AND pta.remaining_turns > 0
+            """,
+            (session.session_id, pid),
+        )
+        temp_abilities = cur.fetchall()
+        cur.close()
+        conn.close()
 
         # filter by context
         allowed = {"self", "any"} | ({"enemy"} if in_battle else {"ally"})
         abilities = [a for a in abilities if a["target_type"] in allowed]
+        temp_abilities = [a for a in temp_abilities if a["target_type"] in allowed]
 
         # annotate current cooldowns
         cds = session.ability_cooldowns.get(pid, {})
         for a in abilities:
             a["current_cooldown"] = cds.get(a["ability_id"], 0)
+
+        session.temp_ability_cooldowns = getattr(session, "temp_ability_cooldowns", {}) or {}
+        temp_cds = session.temp_ability_cooldowns.get(pid, {})
+        for a in temp_abilities:
+            a["ability_id"] = a.pop("temp_ability_id")
+            a["cooldown"] = a.pop("cooldown_turns", 0)
+            a["duration_turns"] = a.pop("duration_turns", 0)
+            a["remaining_duration"] = a.pop("remaining_turns", 0)
+            a["current_cooldown"] = temp_cds.get(a["ability_id"], 0)
+            a["custom_id"] = f"combat_temp_{a['ability_id']}"
+
+        abilities.extend(temp_abilities)
 
         if not interaction.response.is_done():
             await interaction.response.defer()
@@ -760,7 +800,9 @@ class BattleSystem(commands.Cog):
 
         # 2) If it’s an enemy‑target skill but we’re not in a battle, block it
         in_battle = bool(session.current_enemy)
-        if ability_meta["target_type"] == "enemy" and not in_battle:
+        gm = self.bot.get_cog("GameMaster")
+        in_illusion = bool(gm and gm.is_player_in_illusion(session, session.current_turn))
+        if ability_meta["target_type"] == "enemy" and not in_battle and not in_illusion:
             return await interaction.response.send_message(
                 "❌ That ability can only be used in battle.", ephemeral=True
             )
@@ -777,6 +819,17 @@ class BattleSystem(commands.Cog):
 
         if not interaction.response.is_done():
             await interaction.response.defer()
+
+        if in_illusion and gm:
+            handled = await gm.handle_illusion_skill(
+                interaction,
+                ability_element_id=ability_meta.get("element_id"),
+                ability_name=ability_meta.get("ability_name", "That ability"),
+            )
+            if handled:
+                session.ability_cooldowns.setdefault(pid, {})[ability_id] = ability_meta.get("cooldown", 0)
+                self.reduce_player_cooldowns(session, pid)
+                return
 
 
         # 2) fetch player stats
@@ -964,6 +1017,199 @@ class BattleSystem(commands.Cog):
 
         
         # 8) now let the enemy take their turn, then advance back
+        await asyncio.sleep(1)
+        await self.enemy_turn(interaction, enemy)
+
+    async def handle_temp_skill_use(self, interaction: discord.Interaction, temp_ability_id: int) -> None:
+        mgr = self.bot.get_cog("SessionManager")
+        if not mgr or not self.embed_manager:
+            return await interaction.response.send_message("❌ SessionManager or EmbedManager unavailable.", ephemeral=True)
+
+        session = mgr.get_session(interaction.channel.id)
+        if not session:
+            return await interaction.response.send_message("❌ No active session.", ephemeral=True)
+
+        session.temp_ability_cooldowns = getattr(session, "temp_ability_cooldowns", {}) or {}
+        pid = session.current_turn
+
+        current_cd = session.temp_ability_cooldowns.get(pid, {}).get(temp_ability_id, 0)
+        if current_cd > 0:
+            msg = f"⏳ That ability is cooling down (remaining: {current_cd})."
+            if interaction.response.is_done():
+                return await interaction.followup.send(msg, ephemeral=True)
+            return await interaction.response.send_message(msg, ephemeral=True)
+
+        conn = self.db_connect()
+        cur = conn.cursor(dictionary=True)
+        cur.execute(
+            """
+            SELECT pta.remaining_turns,
+                   ta.temp_ability_id,
+                   ta.ability_name,
+                   ta.description,
+                   ta.effect,
+                   ta.cooldown_turns,
+                   ta.duration_turns,
+                   ta.icon_url,
+                   ta.target_type,
+                   ta.element_id
+              FROM player_temporary_abilities pta
+              JOIN temporary_abilities ta
+                ON ta.temp_ability_id = pta.temp_ability_id
+             WHERE pta.session_id = %s
+               AND pta.player_id = %s
+               AND pta.temp_ability_id = %s
+               AND pta.remaining_turns > 0
+            """,
+            (session.session_id, pid, temp_ability_id),
+        )
+        ability_meta = cur.fetchone()
+        cur.close()
+        conn.close()
+        if not ability_meta:
+            return await interaction.response.send_message("❌ Temporary ability not found.", ephemeral=True)
+
+        in_battle = bool(session.current_enemy)
+        gm = self.bot.get_cog("GameMaster")
+        in_illusion = bool(gm and gm.is_player_in_illusion(session, session.current_turn))
+        if ability_meta["target_type"] == "enemy" and not in_battle and not in_illusion:
+            return await interaction.response.send_message(
+                "❌ That ability can only be used in battle.", ephemeral=True
+            )
+
+        if not hasattr(session, "battle_state") or session.battle_state is None:
+            session.battle_state = {"player_effects": [], "enemy_effects": []}
+        else:
+            session.battle_state.setdefault("player_effects", [])
+            session.battle_state.setdefault("enemy_effects", [])
+
+        if not interaction.response.is_done():
+            await interaction.response.defer()
+
+        if in_illusion and gm:
+            handled = await gm.handle_illusion_skill(
+                interaction,
+                ability_element_id=ability_meta.get("element_id"),
+                ability_name=ability_meta.get("ability_name", "That ability"),
+            )
+            if handled:
+                session.temp_ability_cooldowns.setdefault(pid, {})[temp_ability_id] = ability_meta.get("cooldown_turns", 0)
+                return
+
+        ability_meta["ability_id"] = ability_meta["temp_ability_id"]
+        enemy = session.current_enemy if in_battle else None
+
+        conn = self.db_connect()
+        cur = conn.cursor(dictionary=True)
+        cur.execute(
+            "SELECT hp, max_hp, attack_power, magic_power, defense, magic_defense, accuracy, evasion "
+            "FROM players WHERE player_id=%s AND session_id=%s",
+            (pid, session.session_id),
+        )
+        player = cur.fetchone()
+        cur.close()
+        conn.close()
+        if not player:
+            return await interaction.response.send_message("❌ Could not retrieve your stats.", ephemeral=True)
+
+        engine_target = enemy if enemy is not None else player
+        result = self.ability.resolve(player, engine_target, ability_meta)
+        target = ability_meta.get("target_type", "self")
+
+        if not in_battle and target == "self":
+            if gm:
+                for line in result.logs:
+                    gm.append_game_log(session.session_id, line)
+
+                if "player_effects" not in session.battle_state:
+                    raw_saved = SessionPlayerModel.get_status_effects(session.session_id, pid)
+                    session.battle_state["player_effects"] = [
+                        self._normalize_se(raw) for raw in raw_saved
+                    ]
+                buffs = session.battle_state["player_effects"]
+
+                for raw_se in result.status_effects or []:
+                    se = self._normalize_se(raw_se)
+                    if not any(existing.get("effect_id") == se.get("effect_id") for existing in buffs):
+                        buffs.append(se)
+
+                SessionPlayerModel.update_status_effects(
+                    session.session_id,
+                    pid,
+                    buffs
+                )
+
+                if result.type in ("heal", "set_hp"):
+                    old_hp = self._get_player_hp(pid, session.session_id)
+                    new_hp = (result.amount
+                              if result.type == "set_hp"
+                              else min(old_hp + result.amount,
+                                       self._get_player_max_hp(pid, session.session_id)))
+                    self._update_player_hp(pid, session.session_id, new_hp)
+                    gm.append_game_log(session.session_id, f"You are healed to {new_hp} HP.")
+
+            session.temp_ability_cooldowns.setdefault(pid, {})[temp_ability_id] = ability_meta.get("cooldown_turns", 0)
+            sm = self.bot.get_cog("SessionManager")
+            return await sm.refresh_current_state(interaction)
+
+        if result.type == "damage":
+            session.game_log.append(
+                f"You use {ability_meta['ability_name']} and deal {result.amount} damage!"
+            )
+        elif result.type == "dot":
+            dot = result.dot
+            enemy.setdefault("dot_effects", []).append(dot)
+            enemy["hp"] = max(enemy["hp"] - dot["damage_per_turn"], 0)
+            session.game_log.append(
+                f"{enemy['enemy_name']} has been afflicted by {dot['effect_name']}."
+            )
+            if enemy["hp"] <= 0:
+                return await self.handle_enemy_defeat(interaction, session, enemy)
+        else:
+            session.game_log.extend(result.logs)
+
+        for raw_se in getattr(result, "status_effects", []) or []:
+            raw_se.setdefault("target", ability_meta.get("target_type", "self"))
+            se = self._normalize_se(raw_se)
+            bucket = "player_effects" if se["target"] == "self" else "enemy_effects"
+            session.battle_state[bucket].append(se)
+
+            if se["target"] == "self":
+                session.game_log.append(
+                    f"{se['effect_name']} has been applied to <@{pid}>."
+                )
+                SessionPlayerModel.update_status_effects(
+                    session.session_id, pid, session.battle_state[bucket]
+                )
+            else:
+                name = session.current_enemy.get("enemy_name", "The enemy")
+                session.game_log.append(
+                    f"{name} has been afflicted by {se['effect_name']}."
+                )
+
+        session.temp_ability_cooldowns.setdefault(pid, {})[temp_ability_id] = ability_meta.get("cooldown_turns", 0)
+
+        if result.type in ("damage", "heal", "set_hp", "dot"):
+            if result.type == "damage":
+                enemy["hp"] = max(enemy["hp"] - result.amount, 0)
+            elif result.type == "heal":
+                if target in ("self", "ally"):
+                    new_hp = min(player["hp"] + result.amount, player["max_hp"])
+                    self._update_player_hp(pid, session.session_id, new_hp)
+                    session.game_log.append(f"You restore {result.amount} HP to yourself!")
+                else:
+                    enemy["hp"] = min(enemy["hp"] + result.amount, enemy["max_hp"])
+                    session.game_log.append(f"{enemy['enemy_name']} recovers {result.amount} HP!")
+            elif result.type == "set_hp":
+                enemy["hp"] = result.amount
+            elif result.type == "dot":
+                enemy.setdefault("dot_effects", []).append(result.dot)
+                enemy["hp"] = max(enemy["hp"] - result.dot["damage_per_turn"], 0)
+
+        if enemy["hp"] <= 0:
+            return await self.handle_enemy_defeat(interaction, session, enemy)
+
+        await self.update_battle_embed(interaction, pid, enemy)
         await asyncio.sleep(1)
         await self.enemy_turn(interaction, enemy)
 
@@ -1328,6 +1574,10 @@ class BattleSystem(commands.Cog):
                 return await self.handle_skill_use(interaction, aid)
             # otherwise fall back
             return await self.handle_skill_use(interaction, aid)
+
+        if cid.startswith("combat_temp_"):
+            tid = int(cid.split("_", 2)[2])
+            return await self.handle_temp_skill_use(interaction, tid)
         
 
         try:

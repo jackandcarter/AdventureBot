@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import time
+import random
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import discord
@@ -175,6 +176,314 @@ class GameMaster(commands.Cog):
         except Exception as e:
             logger.error("fetch_intro_steps: %s", e)
             return []
+
+    def fetch_crystal_templates(self) -> List[Dict[str, Any]]:
+        try:
+            conn = self.db_connect()
+            with conn.cursor(dictionary=True) as cur:
+                cur.execute(
+                    """
+                    SELECT ct.template_id,
+                           ct.element_id,
+                           ct.name,
+                           ct.description,
+                           ct.image_url,
+                           e.element_name
+                    FROM crystal_templates ct
+                    JOIN elements e ON e.element_id = ct.element_id
+                    ORDER BY ct.template_id
+                    """
+                )
+                rows = cur.fetchall()
+            conn.close()
+            return rows
+        except Exception as e:
+            logger.error("fetch_crystal_templates: %s", e)
+            return []
+
+    def get_opposing_element_id(self, element_id: int) -> Optional[int]:
+        try:
+            conn = self.db_connect()
+            with conn.cursor(dictionary=True) as cur:
+                cur.execute(
+                    """
+                    SELECT opposing_element_id
+                    FROM element_oppositions
+                    WHERE element_id = %s
+                    LIMIT 1
+                    """,
+                    (element_id,),
+                )
+                row = cur.fetchone()
+            conn.close()
+            return row["opposing_element_id"] if row else None
+        except Exception as e:
+            logger.error("get_opposing_element_id: %s", e)
+            return None
+
+    def _get_player_room(self, session_id: int, player_id: int) -> Optional[Dict[str, Any]]:
+        conn = self.db_connect()
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute(
+                """
+                SELECT r.*, f.floor_number
+                FROM players p
+                JOIN rooms r ON r.session_id = p.session_id
+                  AND r.floor_id = p.current_floor_id
+                  AND r.coord_x = p.coord_x
+                  AND r.coord_y = p.coord_y
+                JOIN floors f ON f.floor_id = r.floor_id
+                WHERE p.session_id = %s
+                  AND p.player_id = %s
+                LIMIT 1
+                """,
+                (session_id, player_id),
+            )
+            room = cur.fetchone()
+        conn.close()
+        return room
+
+    def is_player_in_illusion(self, session: GameSession, player_id: int) -> bool:
+        room = self._get_player_room(session.session_id, player_id)
+        if not room:
+            return False
+        return room.get("room_type") == "illusion"
+
+    def _is_illusion_cleared(self, session: GameSession, player_id: int, room_id: int) -> bool:
+        cleared = set(session.illusion_cleared.get(player_id, []))
+        return room_id in cleared
+
+    def _mark_illusion_cleared(self, session: GameSession, player_id: int, room_id: int) -> None:
+        cleared = set(session.illusion_cleared.get(player_id, []))
+        cleared.add(room_id)
+        session.illusion_cleared[player_id] = list(cleared)
+
+    def _ensure_illusion_state(self, session: GameSession, player_id: int, room: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        if self._is_illusion_cleared(session, player_id, room["room_id"]):
+            return None
+
+        state = session.illusion_states.get(player_id)
+        if state and state.get("room_id") == room["room_id"] and state.get("sequence"):
+            return state
+
+        templates = self.fetch_crystal_templates()
+        if not templates:
+            return None
+
+        count = random.randint(3, 5)
+        if len(templates) < count:
+            count = len(templates)
+        sequence = random.sample(templates, count)
+        state = {
+            "room_id": room["room_id"],
+            "sequence": sequence,
+            "current_index": 0,
+            "failures": 0
+        }
+        session.illusion_states[player_id] = state
+        return state
+
+    def _clear_illusion_state(self, session: GameSession, player_id: int) -> None:
+        if player_id in session.illusion_states:
+            del session.illusion_states[player_id]
+
+    def _grant_temporary_ability(self, session: GameSession, player_id: int) -> Optional[Dict[str, Any]]:
+        conn = self.db_connect()
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute(
+                "SELECT class_id FROM players WHERE session_id = %s AND player_id = %s",
+                (session.session_id, player_id),
+            )
+            player = cur.fetchone()
+            if not player or not player.get("class_id"):
+                conn.close()
+                return None
+
+            cur.execute(
+                """
+                SELECT temp_ability_id, ability_name, duration_turns
+                FROM temporary_abilities
+                WHERE class_id = %s
+                """,
+                (player["class_id"],),
+            )
+            options = cur.fetchall()
+            if not options:
+                conn.close()
+                return None
+
+            choice = random.choice(options)
+            cur.execute(
+                """
+                INSERT INTO player_temporary_abilities
+                  (session_id, player_id, temp_ability_id, remaining_turns)
+                VALUES (%s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE remaining_turns = VALUES(remaining_turns)
+                """,
+                (session.session_id, player_id, choice["temp_ability_id"], choice["duration_turns"]),
+            )
+            conn.commit()
+        conn.close()
+
+        session.temp_ability_cooldowns = getattr(session, "temp_ability_cooldowns", {}) or {}
+        session.temp_ability_cooldowns.setdefault(player_id, {}).pop(choice["temp_ability_id"], None)
+        return choice
+
+    async def _teleport_player_to_safe_room(
+        self,
+        interaction: discord.Interaction,
+        session: GameSession,
+        floor_id: int,
+    ) -> None:
+        conn = self.db_connect()
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute(
+                """
+                SELECT coord_x, coord_y
+                FROM rooms
+                WHERE session_id = %s
+                  AND floor_id = %s
+                  AND room_type = 'safe'
+                """,
+                (session.session_id, floor_id),
+            )
+            rooms = cur.fetchall()
+        conn.close()
+        if not rooms:
+            return
+
+        dest = random.choice(rooms)
+        conn = self.db_connect()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE players
+                SET coord_x = %s, coord_y = %s, current_floor_id = %s
+                WHERE session_id = %s AND player_id = %s
+                """,
+                (dest["coord_x"], dest["coord_y"], floor_id, session.session_id, session.current_turn),
+            )
+        conn.commit()
+        conn.close()
+        await self.update_permanent_discovered_room(
+            session.current_turn,
+            session.session_id,
+            (floor_id, dest["coord_x"], dest["coord_y"]),
+        )
+
+    async def handle_illusion_skill(
+        self,
+        interaction: discord.Interaction,
+        *,
+        ability_element_id: Optional[int],
+        ability_name: str
+    ) -> bool:
+        sm = self.bot.get_cog("SessionManager")
+        session = sm.get_session(interaction.channel.id) if sm else None
+        if not session:
+            return False
+
+        room = self._get_player_room(session.session_id, session.current_turn)
+        if not room or room.get("room_type") != "illusion":
+            self._clear_illusion_state(session, session.current_turn)
+            return False
+
+        if self._is_illusion_cleared(session, session.current_turn, room["room_id"]):
+            self._clear_illusion_state(session, session.current_turn)
+            return False
+
+        state = self._ensure_illusion_state(session, session.current_turn, room)
+        if not state:
+            return False
+
+        sequence = state["sequence"]
+        current = sequence[state["current_index"]]
+        opposing_id = self.get_opposing_element_id(current["element_id"])
+        if opposing_id and ability_element_id == opposing_id:
+            self.append_game_log(session.session_id, "The crystal shatters...")
+            state["current_index"] += 1
+            if state["current_index"] >= len(sequence):
+                self.append_game_log(session.session_id, "The Illusion dissipates...")
+                self._mark_illusion_cleared(session, session.current_turn, room["room_id"])
+                self._clear_illusion_state(session, session.current_turn)
+                reward = self._grant_temporary_ability(session, session.current_turn)
+                if reward:
+                    self.append_game_log(
+                        session.session_id,
+                        f"You gained the temporary ability **{reward['ability_name']}**."
+                    )
+            await sm.refresh_current_state(interaction)
+            return True
+
+        state["failures"] += 1
+        if state["failures"] >= 3:
+            self.append_game_log(
+                session.session_id,
+                "A bright light flashes from the crystal and you feel a strange vibration..."
+            )
+            self._clear_illusion_state(session, session.current_turn)
+            await self._teleport_player_to_safe_room(interaction, session, room["floor_id"])
+            await sm.refresh_current_state(interaction)
+            return True
+
+        self.append_game_log(session.session_id, "the crystal glows brighter")
+        await sm.refresh_current_state(interaction)
+        return True
+
+    def _tick_temporary_abilities(self, session: GameSession, player_id: int) -> None:
+        session.temp_ability_cooldowns = getattr(session, "temp_ability_cooldowns", {}) or {}
+        cooldowns = session.temp_ability_cooldowns.get(player_id, {})
+        for tid in list(cooldowns):
+            cooldowns[tid] = max(cooldowns[tid] - 1, 0)
+        session.temp_ability_cooldowns[player_id] = cooldowns
+
+        conn = self.db_connect()
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute(
+                """
+                SELECT pta.temp_ability_id,
+                       pta.remaining_turns,
+                       ta.ability_name
+                FROM player_temporary_abilities pta
+                JOIN temporary_abilities ta
+                  ON ta.temp_ability_id = pta.temp_ability_id
+                WHERE pta.session_id = %s
+                  AND pta.player_id = %s
+                """,
+                (session.session_id, player_id),
+            )
+            rows = cur.fetchall()
+
+            for row in rows:
+                new_remaining = row["remaining_turns"] - 1
+                if new_remaining <= 0:
+                    cur.execute(
+                        """
+                        DELETE FROM player_temporary_abilities
+                        WHERE session_id = %s
+                          AND player_id = %s
+                          AND temp_ability_id = %s
+                        """,
+                        (session.session_id, player_id, row["temp_ability_id"]),
+                    )
+                    self.append_game_log(
+                        session.session_id,
+                        f"Temporary ability **{row['ability_name']}** fades."
+                    )
+                    session.temp_ability_cooldowns.get(player_id, {}).pop(row["temp_ability_id"], None)
+                else:
+                    cur.execute(
+                        """
+                        UPDATE player_temporary_abilities
+                        SET remaining_turns = %s
+                        WHERE session_id = %s
+                          AND player_id = %s
+                          AND temp_ability_id = %s
+                        """,
+                        (new_remaining, session.session_id, player_id, row["temp_ability_id"]),
+                    )
+        conn.commit()
+        conn.close()
 
     def append_game_log(self, session_id: int, line: str, keep: int = 10) -> None:
         """Append a line to the session's game_log JSON array."""
@@ -742,6 +1051,9 @@ class GameMaster(commands.Cog):
 
         rtype = room["room_type"]
 
+        if rtype != "illusion":
+            self._clear_illusion_state(session, session.current_turn)
+
         # 1) IMMEDIATELY trigger ANY battle (monster, miniboss or boss)
         if rtype in ("monster","miniboss","boss") and room.get("default_enemy_id"):
             bs = self.bot.get_cog("BattleSystem")
@@ -769,6 +1081,14 @@ class GameMaster(commands.Cog):
                     room["image_url"]   = tpl["image_url"]
             finally:
                 conn.close()
+
+        if rtype == "illusion" and not self._is_illusion_cleared(session, session.current_turn, room["room_id"]):
+            state = self._ensure_illusion_state(session, session.current_turn, room)
+            em = self.bot.get_cog("EmbedManager")
+            if not em:
+                return await interaction.followup.send("❌ EmbedManager unavailable.", ephemeral=True)
+            await em.send_illusion_embed(interaction, room, state)
+            return
 
         # 3) All of your existing “pull player stats, build buttons,
         #    redraw embed” comes *after* both of the above.
@@ -1833,6 +2153,8 @@ class GameMaster(commands.Cog):
                     session.game_log.append(
                         f"✨ <@{prev_pid}>'s **{ts['name']}** has {ts['remaining']} turn(s) remaining."
                     )
+
+        self._tick_temporary_abilities(session, prev_pid)
 
         # 2️⃣ Advance to the next alive player
         await self.advance_turn(interaction, interaction.channel.id)

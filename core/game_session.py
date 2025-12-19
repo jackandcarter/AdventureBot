@@ -56,9 +56,17 @@ class GameSession:
         # ── ability cooldowns ────────────────────────────────────────────
         # { player_id: { ability_id: remaining_seconds } }
         self.ability_cooldowns: Dict[int, Dict[int, float]] = {}
+        # ── temporary ability cooldowns ──────────────────────────────────
+        # { player_id: { temp_ability_id: remaining_turns } }
+        self.temp_ability_cooldowns: Dict[int, Dict[int, int]] = {}
         # ── status effects ───────────────────────────────────────────────
         # { player_id: [ { "effect_id": int, "remaining": int }, … ] }
         self.status_effects: Dict[int, List[Dict[str, Any]]] = {}
+        # ── illusion rooms ───────────────────────────────────────────────
+        # { player_id: {"room_id": int, "sequence": [...], "current_index": int, "failures": int} }
+        self.illusion_states: Dict[int, Dict[str, Any]] = {}
+        # { player_id: [room_id, ...] }
+        self.illusion_cleared: Dict[int, List[int]] = {}
 
     def add_player(self, player_id: int) -> None:
         if player_id in self.players or len(self.players) >= 6:
@@ -125,9 +133,12 @@ class GameSession:
             "game_state": self.game_state,
             "battle_state": self.battle_state,
             "ability_cooldowns": self.ability_cooldowns,
+            "temp_ability_cooldowns": self.temp_ability_cooldowns,
             "trance_states": self.trance_states,
             "status_effects": self.status_effects,
-            "current_enemy": self.current_enemy
+            "current_enemy": self.current_enemy,
+            "illusion_states": self.illusion_states,
+            "illusion_cleared": self.illusion_cleared
         }
 
     @classmethod
@@ -150,9 +161,12 @@ class GameSession:
         gs.current_turn      = data.get("current_turn")
         gs.battle_state      = data.get("battle_state")
         gs.ability_cooldowns = data.get("ability_cooldowns", {})
+        gs.temp_ability_cooldowns = data.get("temp_ability_cooldowns", {})
         gs.trance_states     = data.get("trance_states", {})
         gs.status_effects    = data.get("status_effects", {})
         gs.current_enemy     = data.get("current_enemy")
+        gs.illusion_states   = data.get("illusion_states", {})
+        gs.illusion_cleared  = data.get("illusion_cleared", {})
         return gs
 
     def __repr__(self) -> str:
