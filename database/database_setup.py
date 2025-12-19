@@ -45,6 +45,38 @@ def table_is_empty(cur, table_name: str) -> bool:
     cur.execute(f"SELECT COUNT(*) FROM {table_name}")
     return cur.fetchone()[0] == 0
 
+
+def column_exists(cur, table_name: str, column_name: str) -> bool:
+    cur.execute(
+        """
+        SELECT COUNT(*)
+        FROM information_schema.columns
+        WHERE table_schema = %s AND table_name = %s AND column_name = %s
+        """,
+        (DB_CONFIG["database"], table_name, column_name),
+    )
+    return cur.fetchone()[0] > 0
+
+
+def add_column_if_missing(cur, table_name: str, column_name: str, column_definition: str) -> None:
+    if column_exists(cur, table_name, column_name):
+        return
+    cur.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}")
+    logger.info("Added %s.%s column.", table_name, column_name)
+
+
+def migrate_column_data(cur, table_name: str, source_column: str, target_column: str) -> None:
+    if not (column_exists(cur, table_name, source_column) and column_exists(cur, table_name, target_column)):
+        return
+    cur.execute(
+        f"""
+        UPDATE {table_name}
+        SET {target_column} = {source_column}
+        WHERE {source_column} IS NOT NULL
+        """
+    )
+    logger.info("Copied %s.%s values into %s.%s.", table_name, source_column, table_name, target_column)
+
 # ═══════════════════════════════════════════════════════════════════════════
 #  SEED DATA
 # ═══════════════════════════════════════════════════════════════════════════
@@ -843,7 +875,7 @@ TABLES = {
             speed            INT DEFAULT 10,
             coord_x          INT DEFAULT 0,
             coord_y          INT DEFAULT 0,
-            current_floor    INT DEFAULT 1,
+            current_floor_id INT DEFAULT 1,
             inventory        JSON,
             discovered_rooms JSON,
             gil              INT DEFAULT 0,
@@ -975,10 +1007,10 @@ TABLES = {
             exits JSON,
             has_encounter BOOLEAN DEFAULT FALSE,
             vendor_id INT,
-            stair_up_floor   INT,
+            stair_up_floor_id   INT,
             stair_up_x       INT,
             stair_up_y       INT,
-            stair_down_floor INT,
+            stair_down_floor_id INT,
             stair_down_x     INT,
             stair_down_y     INT,
             inner_template_id INT NULL,
@@ -1637,6 +1669,16 @@ def insert_hub_embeds(cur):
     )
     logger.info("Inserted hub_embeds.")
 
+
+def ensure_schema_columns(cur) -> None:
+    add_column_if_missing(cur, "players", "current_floor_id", "INT DEFAULT 1")
+    migrate_column_data(cur, "players", "current_floor", "current_floor_id")
+
+    add_column_if_missing(cur, "rooms", "stair_up_floor_id", "INT")
+    add_column_if_missing(cur, "rooms", "stair_down_floor_id", "INT")
+    migrate_column_data(cur, "rooms", "stair_up_floor", "stair_up_floor_id")
+    migrate_column_data(cur, "rooms", "stair_down_floor", "stair_down_floor_id")
+
 # ═══════════════════════════════════════════════════════════════════════════
 #  MAIN
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1649,6 +1691,8 @@ def main() -> None:
                 for tbl in TABLE_ORDER:
                     cur.execute(TABLES[tbl])
                     logger.debug("Table `%s` ready.", tbl)
+
+                ensure_schema_columns(cur)
 
                 # ── seed data (order matters) ──────────────────────────────────
                 insert_difficulties(cur)
