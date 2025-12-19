@@ -198,7 +198,7 @@ MERGED_INTRO_STEPS: List[Tuple] = [
         "Returning to their Free Company house, Sophia gathered everyone to plan the expedition. "
         "Maps were spread out; gear was prepared. Excitement buzzed through the air as word spread "
         "of the unknown portal.\n\nSophia:\u2028\"This isn't just another raid. It's a chance to "
-        "discover something new, maybe even change everything we know. Let's make history, everyone."",
+        "discover something new, maybe even change everything we know. Let's make history, everyone.\"",
         "https://cdn.discordapp.com/attachments/1362832151485354065/1364793342256752711/step5.png?"
         "ex=680f9398&is=680e4218&hm=2c8bba266e80e4b78598307b1e9e890030c078df6e03c09486de1d6306c3ada7&",
         "2025-04-09 16:37:27",
@@ -283,10 +283,7 @@ MERGED_ROOM_TEMPLATES: List[Tuple] = [
         7,
         "safe",
         "Aetheryte",
-        "You do not notice any hostile presence;
-instead you see a naturally growing Aetheryte cluster.
-
-"
+        "You do not notice any hostile presence; instead you see a naturally growing Aetheryte cluster.",
         "Perhaps this will be useful in the future...",
         "https://cdn.discordapp.com/attachments/1362832151485354065/1362833698168508496/roomtypeaetheryte.png?"
         "ex=680c6709&is=680b1589&hm=29873e0d2dea2ecbd63a66c0d18825c5954f80965e19309827e18a8f77459052&",
@@ -345,8 +342,7 @@ instead you see a naturally growing Aetheryte cluster.
         12,
         "item",
         "Treasure Room",
-        "You do not notice any hostile presence,
-instead you see a treasure chest waiting to be unlocked.",
+        "You do not notice any hostile presence, instead you see a treasure chest waiting to be unlocked.",
         "https://cdn.discordapp.com/attachments/1362832151485354065/1362832389629284544/treasurechest.png?"
         "ex=680c65d1&is=680b1451&hm=e1971818f32f4e0b0f43cfcbf5283fc1c3f36f80b1af2bcfacbfd7ba8ecf3ace&",
         None,
@@ -369,9 +365,7 @@ instead you see a treasure chest waiting to be unlocked.",
         15,
         "shop",
         "Shop Room",
-        "You do not notice any hostile presence.
-
-Instead you find a Moogle hiding in the corner...",
+        "You do not notice any hostile presence. Instead you find a Moogle hiding in the corner...",
         "https://cdn.discordapp.com/attachments/1362832151485354065/1376308720144748554/Shop_Entrance.gif?"
         "ex=6834dae1&is=68338961&hm=5370f37045df11803229a217bc984ce52b910b64c59a6ede123468567b6d1991&",
         None,
@@ -535,34 +529,28 @@ MERGED_NPC_VENDOR_ITEMS: List[Tuple] = [
 ]
 
 # --- hub embeds/buttons -------------------------------------------------------
+
+
 MERGED_HUB_EMBEDS: List[Tuple] = [
     (
         1,
         "main",
         "",
-        "***Step into an unexplored reality and find meaning and hidden truth behind it's existence.
-
-"
-        "Assemble your party and compete with other players, or enter alone. 
-
-Choose your class + difficulty level, and "
-        "experience turn-based combat that challenges your strategy at every turn.***",
+        (
+            "***Step into an unexplored reality and find meaning and hidden truth behind its existence. "
+            "Assemble your party and compete with other players, or enter alone. "
+            "Choose your class + difficulty level, and experience turn-based combat that challenges your strategy at every turn.***"
+        ),
         "https://cdn.discordapp.com/attachments/1362832151485354065/1367115629408292974/12346.png?"
         "ex=68136925&is=681217a5&hm=dd0bfd5013c7add42b3a4033f1bad6367b99b54ecb70b43a0e1d0071678091a0&",
-        "**AdventureBot v3.0.9 is now Live!**
-
-You can see the current https://discord.com/channels/1337786582996095036/"
-        "1376040430445133895 here.
-
-__——————————————————__
-**Beta Testers:**
-
-Patch 3.1 features have been partially "
-        "implemented for testing.
-
-Please see the https://discord.com/channels/1337786582996095036/1360683660365529300 channel "
-        "if you come across any issues.
-",
+        (
+            "**AdventureBot v3.0.9 is now Live!**\n\n"
+            "You can see the current https://discord.com/channels/1337786582996095036/1376040430445133895 here.\n\n"
+            "__——————————————————__\n"
+            "**Beta Testers:**\n\n"
+            "Patch 3.1 features have been partially implemented for testing.\n\n"
+            "Please see the https://discord.com/channels/1337786582996095036/1360683660365529300 channel if you come across any issues."
+        ),
         None,
         "2025-03-31 08:43:19",
     ),
@@ -570,25 +558,14 @@ Please see the https://discord.com/channels/1337786582996095036/1360683660365529
         2,
         "tutorial",
         "Starting A Game",
-        "
-Simply click the **New Game** button to create a new game thread.
-
-This will add you to the **Queue** system inside "
-        "the thread, along with anyone else who wants to join.
-
-- Only the players who join the game session will see the "
-        "private thread and be added to it automatically.
-
-- Up to 6 players can join via the LFG post in the Game Channel "
-        "by clicking the Join button. 
-
-- Additional players will be shown in the **Queue List** in the thread.
-
-When the "
-        "creator is ready they may click **Start Game** to lock in the emount of players playing.
-
-
-",
+        (
+            "Simply click the **New Game** button to create a new game thread.\n\n"
+            "This will add you to the **Queue** system inside the thread, along with anyone else who wants to join.\n\n"
+            "- Only the players who join the game session will see the private thread and be added to it automatically.\n\n"
+            "- Up to 6 players can join via the LFG post in the Game Channel by clicking the Join button.\n\n"
+            "- Additional players will be shown in the **Queue List** in the thread.\n\n"
+            "When the creator is ready they may click **Start Game** to lock in the amount of players playing."
+        ),
         "https://cdn.discordapp.com/attachments/1362832151485354065/1373622234865733652/Screenshot_2025-05-18_at_6.14.47_AM.png?"
         "ex=682b14e5&is=6829c365&hm=b91a3c24ed88f1f493db9a8f61473923e316e284782ab15bd565f6a82ac25966&",
         "Coming Soon...",
@@ -599,21 +576,13 @@ When the "
         3,
         "tutorial",
         "Choose Class and Difficulty",
-        "Once the Session Creator clicks the Start Game button they can choose their class and difficulty level.
-
-- Selecting "
-        "**Easy** will generate up to 2 floors with a rare chance to spawn a basement floor. In this mode most harder enemeis "
-        "are removed from generation.
-
-- Choosing **Medium** difficulty will generate up to 4 floors with at least 2 and a "
-        "rare chance to spawn a basement. In this mode harder enemies spawn along side easy ones during generation.
-
-- "
-        "Selecting **Hard** is exactly what you think it is. With up to 4 floors and higher spawn chances on more difficult "
-        "enemies and less vendor shops and item drops.
-
-- **Crazy Catto** is the most difficult of challenges and well... "
-        "you'd be a crazy catto to try it.",
+        (
+            "Once the Session Creator clicks the Start Game button they can choose their class and difficulty level.\n\n"
+            "- Selecting **Easy** will generate up to 2 floors with a rare chance to spawn a basement floor. In this mode most harder enemies are removed from generation.\n\n"
+            "- Choosing **Medium** difficulty will generate up to 4 floors with at least 2 and a rare chance to spawn a basement. In this mode harder enemies spawn alongside easy ones during generation.\n\n"
+            "- Selecting **Hard** is exactly what you think it is. With up to 4 floors and higher spawn chances on more difficult enemies and fewer vendor shops and item drops.\n\n"
+            "- **Crazy Catto** is the most difficult of challenges and well... you'd be a crazy catto to try it."
+        ),
         "https://cdn.discordapp.com/attachments/1362832151485354065/1373622403455778848/Screenshot_2025-05-18_at_6.19.11_AM.png?"
         "ex=682b150d&is=6829c38d&hm=045419693ca1ecd758f7ecf5c7208ca4da321622636b908da9e15c99f97dde61&",
         "Coming Soon...",
