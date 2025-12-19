@@ -238,6 +238,21 @@ MERGED_CLASSES: List[Tuple] = [
     (11, 'Gun Mage', 'A mage clad in blue armor who holds a magic-infused pistol.', 600, 30, 15, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1372162446311165983/out.gif?ex=6825c55c&is=682473dc&hm=1e03aac8f24a02d80ee1f48c84a204d43207a75b55259d5bb8c461bb7af6f35e&', None, '2025-04-03 07:05:45', 5)
 ]
 
+# --- temporary abilities ------------------------------------------------------
+MERGED_TEMPORARY_ABILITIES: List[Tuple] = [
+    (1, 1, 'Pray', 'Heals you for 50% of your current HP.', '{"heal_current_pct": 0.5}', 3, 5, 'self', None, None, '2025-06-21 18:00:00'),
+    (2, 2, 'Pray', 'Heals you for 50% of your current HP.', '{"heal_current_pct": 0.5}', 3, 5, 'self', None, None, '2025-06-21 18:00:00'),
+    (3, 3, 'Pray', 'Heals you for 50% of your current HP.', '{"heal_current_pct": 0.5}', 3, 5, 'self', None, None, '2025-06-21 18:00:00'),
+    (4, 4, 'Pray', 'Heals you for 50% of your current HP.', '{"heal_current_pct": 0.5}', 3, 5, 'self', None, None, '2025-06-21 18:00:00'),
+    (5, 5, 'Pray', 'Heals you for 50% of your current HP.', '{"heal_current_pct": 0.5}', 3, 5, 'self', None, None, '2025-06-21 18:00:00'),
+    (6, 6, 'Pray', 'Heals you for 50% of your current HP.', '{"heal_current_pct": 0.5}', 3, 5, 'self', None, None, '2025-06-21 18:00:00'),
+    (7, 7, 'Pray', 'Heals you for 50% of your current HP.', '{"heal_current_pct": 0.5}', 3, 5, 'self', None, None, '2025-06-21 18:00:00'),
+    (8, 8, 'Pray', 'Heals you for 50% of your current HP.', '{"heal_current_pct": 0.5}', 3, 5, 'self', None, None, '2025-06-21 18:00:00'),
+    (9, 9, 'Pray', 'Heals you for 50% of your current HP.', '{"heal_current_pct": 0.5}', 3, 5, 'self', None, None, '2025-06-21 18:00:00'),
+    (10, 10, 'Pray', 'Heals you for 50% of your current HP.', '{"heal_current_pct": 0.5}', 3, 5, 'self', None, None, '2025-06-21 18:00:00'),
+    (11, 11, 'Pray', 'Heals you for 50% of your current HP.', '{"heal_current_pct": 0.5}', 3, 5, 'self', None, None, '2025-06-21 18:00:00')
+]
+
 # --- elements -----------------------------------------------------------------
 MERGED_ELEMENTS: List[Tuple] = [
     (1, 'Fire', '2025-03-31 02:40:47'),
@@ -248,6 +263,18 @@ MERGED_ELEMENTS: List[Tuple] = [
     (6, 'Lightning', '2025-06-17 21:39:35'),
     (7, 'Water', '2025-06-17 21:39:35'),
     (8, 'Earth', '2025-06-18 01:38:26')
+]
+
+# --- element oppositions ------------------------------------------------------
+MERGED_ELEMENT_OPPOSITIONS: List[Tuple] = [
+    (1, 1, 2),
+    (2, 2, 1),
+    (3, 3, 4),
+    (4, 4, 3),
+    (5, 5, 8),
+    (6, 6, 7),
+    (7, 7, 6),
+    (8, 8, 5)
 ]
 
 # --- difficulties -------------------------------------------------------------
@@ -674,6 +701,18 @@ TABLES = {
             created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''',
+    # ---------- element_oppositions ----------
+    'element_oppositions': '''
+        CREATE TABLE IF NOT EXISTS element_oppositions (
+            opposition_id INT AUTO_INCREMENT PRIMARY KEY,
+            element_id INT NOT NULL,
+            opposing_element_id INT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_element_opposition (element_id),
+            FOREIGN KEY (element_id) REFERENCES elements(element_id) ON DELETE CASCADE,
+            FOREIGN KEY (opposing_element_id) REFERENCES elements(element_id) ON DELETE CASCADE
+        )
+    ''',
     # ---------- abilities ----------
     'abilities': '''
         CREATE TABLE IF NOT EXISTS abilities (
@@ -712,6 +751,24 @@ TABLES = {
             creator_id          BIGINT,
             created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             atb_max             INT DEFAULT 5
+        )
+    ''',
+    # ---------- temporary_abilities ----------
+    'temporary_abilities': '''
+        CREATE TABLE IF NOT EXISTS temporary_abilities (
+            temp_ability_id INT AUTO_INCREMENT PRIMARY KEY,
+            class_id INT NOT NULL,
+            ability_name VARCHAR(100) NOT NULL,
+            description TEXT,
+            effect JSON,
+            cooldown_turns INT DEFAULT 0,
+            duration_turns INT DEFAULT 1,
+            target_type ENUM('self','enemy','ally','any') DEFAULT 'self',
+            icon_url VARCHAR(255),
+            element_id INT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (class_id) REFERENCES classes(class_id) ON DELETE CASCADE,
+            FOREIGN KEY (element_id) REFERENCES elements(element_id) ON DELETE SET NULL
         )
     ''',
     # ---------- levels ----------
@@ -829,6 +886,20 @@ TABLES = {
             PRIMARY KEY (player_id, session_id),
             FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE,
             FOREIGN KEY (class_id)   REFERENCES classes(class_id)   ON DELETE SET NULL
+        )
+    ''',
+    # ---------- player_temporary_abilities ----------
+    'player_temporary_abilities': '''
+        CREATE TABLE IF NOT EXISTS player_temporary_abilities (
+            session_id INT NOT NULL,
+            player_id BIGINT NOT NULL,
+            temp_ability_id INT NOT NULL,
+            remaining_turns INT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (session_id, player_id, temp_ability_id),
+            FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE,
+            FOREIGN KEY (temp_ability_id) REFERENCES temporary_abilities(temp_ability_id) ON DELETE CASCADE,
+            FOREIGN KEY (player_id, session_id) REFERENCES players(player_id, session_id) ON DELETE CASCADE
         )
     ''',
     # ---------- floors ----------
@@ -1260,9 +1331,11 @@ TABLE_ORDER = [
     'difficulties',
     'floor_room_rules',
     'elements',
+    'element_oppositions',
     'status_effects',
     'abilities',
     'classes',
+    'temporary_abilities',
     'levels',
     'class_abilities',
     'class_trances',
@@ -1270,6 +1343,7 @@ TABLE_ORDER = [
     'sessions',
     'session_players',
     'players',
+    'player_temporary_abilities',
     'floors',
     'room_templates',
     'crystal_templates',
@@ -1346,6 +1420,21 @@ def insert_elements(cur):
     )
     logger.info("Inserted elements.")
 
+def insert_element_oppositions(cur):
+    logger.info("Checking element_oppositions seed data…")
+    if not table_is_empty(cur, "element_oppositions"):
+        logger.info("element_oppositions already populated – skipping")
+        return
+    cur.executemany(
+        """
+        INSERT INTO element_oppositions
+          (element_id, opposing_element_id)
+        VALUES (%s, %s)
+        """,
+        [row[1:] for row in MERGED_ELEMENT_OPPOSITIONS]
+    )
+    logger.info("Inserted element_oppositions.")
+
 def insert_abilities_and_classes(cur):
     logger.info("Checking abilities seed data…")
     if table_is_empty(cur, "abilities"):
@@ -1388,6 +1477,22 @@ def insert_abilities_and_classes(cur):
         logger.info("Inserted class_abilities links.")
     else:
         logger.info("class_abilities already populated – skipping")
+
+def insert_temporary_abilities(cur):
+    logger.info("Checking temporary_abilities seed data…")
+    if not table_is_empty(cur, "temporary_abilities"):
+        logger.info("temporary_abilities already populated – skipping")
+        return
+    cur.executemany(
+        """
+        INSERT INTO temporary_abilities
+          (class_id, ability_name, description, effect, cooldown_turns,
+           duration_turns, target_type, icon_url, element_id, created_at)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """,
+        [row[1:] for row in MERGED_TEMPORARY_ABILITIES]
+    )
+    logger.info("Inserted temporary_abilities.")
 
 def insert_levels(cur):
     logger.info("Checking levels seed data…")
@@ -1684,9 +1789,11 @@ def main() -> None:
                 insert_difficulties(cur)
                 insert_floor_room_rules(cur)
                 insert_elements(cur)
+                insert_element_oppositions(cur)
                 insert_status_effects(cur)
                 insert_levels(cur)
                 insert_abilities_and_classes(cur)
+                insert_temporary_abilities(cur)
                 insert_class_trances(cur)
                 insert_trance_abilities(cur)
                 insert_intro_steps(cur)
