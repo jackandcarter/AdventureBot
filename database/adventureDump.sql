@@ -1,2 +1,0 @@
-(92,'50 Needles','Deals 50 damage with 100% hit rate and ignores defense.','{\"flat_damage\": 50}',0,NULL,'any',NULL,NULL,NULL,NULL,'2025-05-22 15:21:04','attack_power'),
-(93,'1,000 Needles','Deals 1,000 damage with 100% hit rate and ignores defense.','{\"flat_damage\": 1000}',0,NULL,'any',NULL,NULL,NULL,NULL,'2025-05-22 15:21:04','attack_power');
