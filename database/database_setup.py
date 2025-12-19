@@ -283,7 +283,7 @@ MERGED_ROOM_TEMPLATES: List[Tuple] = [
         7,
         "safe",
         "Aetheryte",
-        "You do not notice any hostile presence; instead you see a naturally growing Aetheryte cluster.",
+        "You do not notice any hostile presence; instead you see a naturally growing Aetheryte cluster. "
         "Perhaps this will be useful in the future...",
         "https://cdn.discordapp.com/attachments/1362832151485354065/1362833698168508496/roomtypeaetheryte.png?"
         "ex=680c6709&is=680b1589&hm=29873e0d2dea2ecbd63a66c0d18825c5954f80965e19309827e18a8f77459052&",
