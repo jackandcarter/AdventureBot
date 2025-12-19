@@ -10,7 +10,13 @@ from utils.status_engine   import StatusEffectEngine
 from utils.ability_engine import AbilityEngine
 from utils.helpers import load_config
 from typing import Any, Dict, List, Optional, Set, Tuple
-from utils.ui_helpers import create_progress_bar, create_cooldown_bar, format_status_effects, get_emoji_for_room_type
+from utils.ui_helpers import (
+    create_cooldown_bar,
+    create_health_bar,
+    create_progress_bar,
+    format_status_effects,
+    get_emoji_for_room_type,
+)
 from models.session_models import SessionPlayerModel
 
 logger = logging.getLogger("BattleSystem")
@@ -41,14 +47,6 @@ class BattleSystem(commands.Cog):
             logger.error("DB connection error in BattleSystem: %s", e)
             raise
 
-    def create_bar(self, current: int, maximum: int, length: int = 10) -> str:
-        current = max(current, 0)
-        if maximum <= 0:
-            return "[No Data]"
-        filled = int(round(length * current / float(maximum)))
-        bar = "█" * filled + "░" * (length - filled)
-        return f"[{bar}] {current}/{maximum}"
-    
     def _normalize_se(self, raw: Dict[str,Any]) -> Dict[str,Any]:
         """
         Turn raw engine output into exactly the 3 keys our UI helper wants:
@@ -492,14 +490,14 @@ class BattleSystem(commands.Cog):
         eb = discord.Embed(title=title, color=color)
         # show enemy HP + effects
         enemy_line = format_status_effects(session.battle_state["enemy_effects"])
-        val = f"❤️ HP: {self.create_bar(enemy['hp'], enemy['max_hp'])}"
+        val = f"❤️ HP: {create_health_bar(enemy['hp'], enemy['max_hp'])}"
         if enemy_line:
             val += f" {enemy_line}"
         eb.add_field(name=f"Enemy: {enemy['enemy_name']}", value=val, inline=False)
 
         # show player HP + effects
         player_line = format_status_effects(session.battle_state["player_effects"])
-        stats_text = f"❤️ HP: {self.create_bar(player['hp'], player['max_hp'])}"
+        stats_text = f"❤️ HP: {create_health_bar(player['hp'], player['max_hp'])}"
         if player_line:
             stats_text += f" {player_line}"
         stats_text += f"\n⚔️ ATK: {player['attack_power']}\n🛡️ DEF: {player['defense']}"
@@ -567,13 +565,13 @@ class BattleSystem(commands.Cog):
 
         eb = discord.Embed(title=title, color=color)
         enemy_line  = format_status_effects(session.battle_state.get("enemy_effects", []))
-        val = f"❤️ HP: {self.create_bar(enemy['hp'], enemy['max_hp'])}"
+        val = f"❤️ HP: {create_health_bar(enemy['hp'], enemy['max_hp'])}"
         if enemy_line:
             val += f" {enemy_line}"
         eb.add_field(name=f"Enemy: {enemy['enemy_name']}", value=val, inline=False)
 
         player_line = format_status_effects(session.battle_state.get("player_effects", []))
-        stats_text = f"❤️ HP: {self.create_bar(player['hp'], player['max_hp'])}"
+        stats_text = f"❤️ HP: {create_health_bar(player['hp'], player['max_hp'])}"
         if player_line:
             stats_text += f" {player_line}"
         stats_text += (

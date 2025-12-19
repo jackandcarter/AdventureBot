@@ -15,7 +15,7 @@ from discord.ext import commands
 import mysql.connector
 from utils.status_engine  import StatusEffectEngine
 from utils.helpers        import load_config
-from utils.ui_helpers     import get_emoji_for_room_type  # For minimap icons, if needed
+from utils.ui_helpers     import create_health_bar, get_emoji_for_room_type  # For minimap icons, if needed
 from core.game_session    import GameSession
 from models.session_models import (
     SessionModel,
@@ -1141,16 +1141,10 @@ class GameMaster(commands.Cog):
             visible
         )
 
-        def _bar(curr, mx, ln=10):
-            if not mx:
-                return "[-]"
-            filled = int(round(ln * curr / mx))
-            return f"[{'█'*filled}{'░'*(ln-filled)}] {curr}/{mx}"
-
         header = ""
         if p:
             # 1) HP bar
-            header += f"**HP:** {_bar(p['hp'], p['max_hp'])}\n"
+            header += f"**HP:** {create_health_bar(p['hp'], p['max_hp'])}\n"
 
             # 2) Status‐effects line (one per effect)
             from utils.ui_helpers import format_status_effects
@@ -1934,7 +1928,7 @@ class GameMaster(commands.Cog):
         conn.close()
 
         xp_bar = _bar(pd["experience"], nxt["required_exp"] if nxt else None)
-        hp_bar = _bar(pd["hp"], pd["max_hp"])
+        hp_bar = create_health_bar(pd["hp"], pd["max_hp"])
 
         c_name  = ClassModel.get_class_name(pd["class_id"]) or "Unknown"
         c_thumb = ClassModel.get_class_image_url(pd["class_id"])
