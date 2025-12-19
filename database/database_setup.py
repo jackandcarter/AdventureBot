@@ -1403,11 +1403,11 @@ def insert_abilities_and_classes(cur):
         cur.executemany(
             """
             INSERT INTO abilities
-              (ability_name, description, effect, cooldown, icon_url,
+              (ability_id, ability_name, description, effect, cooldown, icon_url,
                target_type, special_effect, element_id, created_at)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """,
-            [row[1:] for row in MERGED_ABILITIES]
+            MERGED_ABILITIES
         )
         logger.info("Inserted abilities.")
     else:
@@ -1418,12 +1418,12 @@ def insert_abilities_and_classes(cur):
         cur.executemany(
             """
             INSERT INTO classes
-              (class_name, description, base_hp, base_attack, base_magic,
+              (class_id, class_name, description, base_hp, base_attack, base_magic,
                base_defense, base_magic_defense, base_accuracy,
                base_evasion, base_speed, image_url, creator_id, created_at)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             """,
-            [row[1:] for row in MERGED_CLASSES]
+            MERGED_CLASSES
         )
         logger.info("Inserted classes.")
     else:
