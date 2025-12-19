@@ -817,11 +817,10 @@ class GameMaster(commands.Cog):
                     cur.execute("""
                         SELECT tci.instance_id, tci.is_unlocked
                         FROM treasure_chest_instances tci
-                        JOIN rooms r ON r.room_id = tci.room_id
                         WHERE tci.session_id = %s
-                        AND r.floor_id = %s
-                        AND r.coord_x = %s
-                        AND r.coord_y = %s
+                        AND tci.floor_id = %s
+                        AND tci.coord_x = %s
+                        AND tci.coord_y = %s
                         LIMIT 1
                     """, (
                         session.session_id,
