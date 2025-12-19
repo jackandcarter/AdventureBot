@@ -343,7 +343,7 @@ class GameMaster(commands.Cog):
                 FROM rooms
                 WHERE session_id = %s
                   AND floor_id = %s
-                  AND room_type = 'safe'
+                  AND room_type IN ('safe', 'entrance')
                 """,
                 (session.session_id, floor_id),
             )
