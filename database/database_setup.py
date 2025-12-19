@@ -841,6 +841,7 @@ TABLES = {
             message_id    BIGINT,
             game_log      JSON,
             game_state    JSON,
+            saved         BOOLEAN DEFAULT FALSE,
             created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         )
@@ -879,6 +880,7 @@ TABLES = {
             inventory        JSON,
             discovered_rooms JSON,
             gil              INT DEFAULT 0,
+            is_dead          BOOLEAN DEFAULT FALSE,
             status_effects   JSON,
             created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -1000,7 +1002,8 @@ TABLES = {
             description TEXT,
             room_type ENUM(
                 'safe','monster','item','shop','boss','trap','illusion',
-                'staircase_up','staircase_down','exit','locked','chest_unlocked','entrance'
+                'staircase_up','staircase_down','exit','locked','chest_unlocked','entrance',
+                'miniboss','death'
             ) NOT NULL,
             image_url VARCHAR(255),
             default_enemy_id INT,
@@ -1186,6 +1189,7 @@ TABLES = {
             xp_reward INT,
             loot_item_id INT,
             loot_quantity INT DEFAULT 1,
+            role VARCHAR(20) DEFAULT 'normal',
             creator_id BIGINT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (loot_item_id) REFERENCES items(item_id) ON DELETE SET NULL
@@ -1673,11 +1677,29 @@ def insert_hub_embeds(cur):
 def ensure_schema_columns(cur) -> None:
     add_column_if_missing(cur, "players", "current_floor_id", "INT DEFAULT 1")
     migrate_column_data(cur, "players", "current_floor", "current_floor_id")
+    add_column_if_missing(cur, "players", "is_dead", "BOOLEAN DEFAULT FALSE")
+    cur.execute("UPDATE players SET is_dead = FALSE WHERE is_dead IS NULL")
+
+    add_column_if_missing(cur, "sessions", "saved", "BOOLEAN DEFAULT FALSE")
+    cur.execute("UPDATE sessions SET saved = FALSE WHERE saved IS NULL")
 
     add_column_if_missing(cur, "rooms", "stair_up_floor_id", "INT")
     add_column_if_missing(cur, "rooms", "stair_down_floor_id", "INT")
     migrate_column_data(cur, "rooms", "stair_up_floor", "stair_up_floor_id")
     migrate_column_data(cur, "rooms", "stair_down_floor", "stair_down_floor_id")
+    cur.execute(
+        """
+        ALTER TABLE rooms
+        MODIFY COLUMN room_type ENUM(
+            'safe','monster','item','shop','boss','trap','illusion',
+            'staircase_up','staircase_down','exit','locked','chest_unlocked','entrance',
+            'miniboss','death'
+        ) NOT NULL
+        """
+    )
+
+    add_column_if_missing(cur, "enemies", "role", "VARCHAR(20) DEFAULT 'normal'")
+    cur.execute("UPDATE enemies SET role = 'normal' WHERE role IS NULL")
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  MAIN
