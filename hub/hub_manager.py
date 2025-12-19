@@ -108,7 +108,13 @@ class HubManager(commands.Cog):
             ephemeral=True
         )
 
-    async def post_lfg_post(self, interaction: discord.Interaction, thread: discord.Thread, session_id: int):
+    async def post_lfg_post(
+        self,
+        interaction: discord.Interaction,
+        thread: discord.Thread,
+        session_id: int,
+        difficulty: str,
+    ):
         """
         Posts an LFG (Join Game) message into the hub channel.
         """
@@ -126,6 +132,11 @@ class HubManager(commands.Cog):
                 "Once everyone has joined, this join message will be removed."
             ),
             color=discord.Color.green()
+        )
+        lfg_embed.add_field(
+            name="Difficulty",
+            value=f"**{difficulty}**",
+            inline=False
         )
         lfg_embed.set_footer(text=(
             f"Session Thread: {thread.name} | "
