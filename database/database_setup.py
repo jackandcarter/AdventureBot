@@ -1385,12 +1385,15 @@ def insert_floor_room_rules(cur):
 
 def insert_elements(cur):
     logger.info("Checking elements seed data…")
-    if not table_is_empty(cur, "elements"):
+    cur.execute("SELECT element_id FROM elements")
+    existing_ids = {row[0] for row in cur.fetchall()}
+    rows_to_insert = [row for row in MERGED_ELEMENTS if row[0] not in existing_ids]
+    if not rows_to_insert:
         logger.info("elements already populated – skipping")
         return
     cur.executemany(
-        "INSERT INTO elements (element_name, created_at) VALUES (%s, %s)",
-        [row[1:] for row in MERGED_ELEMENTS]
+        "INSERT INTO elements (element_id, element_name, created_at) VALUES (%s, %s, %s)",
+        rows_to_insert
     )
     logger.info("Inserted elements.")
 
