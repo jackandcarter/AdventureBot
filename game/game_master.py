@@ -270,6 +270,15 @@ class GameMaster(commands.Cog):
         if not templates:
             return None
 
+        available_elements = self._get_player_element_ids(session, player_id)
+        if available_elements:
+            usable_templates = [
+                template
+                for template in templates
+                if self.get_opposing_element_id(template["element_id"]) in available_elements
+            ]
+            templates = usable_templates or templates
+
         count = random.randint(3, 5)
         if len(templates) < count:
             count = len(templates)
@@ -289,6 +298,51 @@ class GameMaster(commands.Cog):
     def _clear_illusion_state(self, session: GameSession, player_id: int) -> None:
         if player_id in session.illusion_states:
             del session.illusion_states[player_id]
+
+    def _get_player_element_ids(self, session: GameSession, player_id: int) -> Set[int]:
+        conn = self.db_connect()
+        available_elements: Set[int] = set()
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute(
+                "SELECT class_id, level FROM players WHERE session_id = %s AND player_id = %s",
+                (session.session_id, player_id),
+            )
+            player = cur.fetchone()
+            if not player or not player.get("class_id"):
+                conn.close()
+                return available_elements
+
+            cur.execute(
+                """
+                SELECT a.element_id
+                FROM class_abilities ca
+                JOIN abilities a USING (ability_id)
+                WHERE ca.class_id = %s
+                  AND ca.unlock_level <= %s
+                  AND a.element_id IS NOT NULL
+                """,
+                (player["class_id"], player["level"]),
+            )
+            for row in cur.fetchall():
+                available_elements.add(row["element_id"])
+
+            cur.execute(
+                """
+                SELECT ta.element_id
+                FROM player_temporary_abilities pta
+                JOIN temporary_abilities ta
+                  ON ta.temp_ability_id = pta.temp_ability_id
+                WHERE pta.session_id = %s
+                  AND pta.player_id = %s
+                  AND pta.remaining_turns > 0
+                  AND ta.element_id IS NOT NULL
+                """,
+                (session.session_id, player_id),
+            )
+            for row in cur.fetchall():
+                available_elements.add(row["element_id"])
+        conn.close()
+        return available_elements
 
     def _grant_temporary_ability(self, session: GameSession, player_id: int) -> Optional[Dict[str, Any]]:
         conn = self.db_connect()
