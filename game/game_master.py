@@ -501,7 +501,7 @@ class GameMaster(commands.Cog):
 
         self.append_game_log(
             session.session_id,
-            "You retreat from the illusion chamber."
+            "The dungeon shifts, you have been sent to a new location via the crystal's teleport magicks."
         )
         self._clear_illusion_state(session, session.current_turn)
         await self._teleport_player_to_safe_room(interaction, session, room["floor_id"])
