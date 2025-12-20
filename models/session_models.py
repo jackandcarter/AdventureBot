@@ -634,6 +634,132 @@ class SessionPlayerModel:
         conn.commit()
         conn.close()
 
+    @staticmethod
+    def get_mp(session_id: int, player_id: int) -> Optional[Dict[str, int]]:
+        conn = Database().get_connection()
+        try:
+            cur = conn.cursor(dictionary=True)
+            cur.execute(
+                "SELECT mp, max_mp FROM players WHERE session_id=%s AND player_id=%s",
+                (session_id, player_id),
+            )
+            return cur.fetchone()
+        except Exception:
+            logger.exception("Error fetching player MP")
+            return None
+        finally:
+            cur.close()
+            conn.close()
+
+    @staticmethod
+    def update_mp(session_id: int, player_id: int, mp: int) -> None:
+        conn = Database().get_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE players SET mp=%s WHERE session_id=%s AND player_id=%s",
+                (mp, session_id, player_id),
+            )
+            conn.commit()
+        except Exception:
+            logger.exception("Error updating player MP")
+        finally:
+            cur.close()
+            conn.close()
+
+    @staticmethod
+    def get_unlocked_eidolons(session_id: int, player_id: int) -> List[Dict[str, Any]]:
+        conn = Database().get_connection()
+        try:
+            cur = conn.cursor(dictionary=True)
+            cur.execute(
+                """
+                SELECT pe.eidolon_id, pe.level, pe.experience,
+                       e.name, e.description, e.required_level, e.summon_mp_cost
+                  FROM player_eidolons pe
+                  JOIN eidolons e ON e.eidolon_id = pe.eidolon_id
+                 WHERE pe.session_id = %s
+                   AND pe.player_id = %s
+                 ORDER BY pe.eidolon_id
+                """,
+                (session_id, player_id),
+            )
+            return cur.fetchall()
+        except Exception:
+            logger.exception("Error fetching unlocked eidolons")
+            return []
+        finally:
+            cur.close()
+            conn.close()
+
+    @staticmethod
+    def unlock_eidolon(session_id: int, player_id: int, eidolon_id: int) -> None:
+        conn = Database().get_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                INSERT IGNORE INTO player_eidolons (session_id, player_id, eidolon_id)
+                VALUES (%s,%s,%s)
+                """,
+                (session_id, player_id, eidolon_id),
+            )
+            conn.commit()
+        except Exception:
+            logger.exception("Error unlocking eidolon")
+        finally:
+            cur.close()
+            conn.close()
+
+    @staticmethod
+    def award_eidolon_experience(
+        session_id: int,
+        player_id: int,
+        eidolon_id: int,
+        xp_gain: int,
+    ) -> Optional[Dict[str, Any]]:
+        conn = Database().get_connection()
+        try:
+            cur = conn.cursor(dictionary=True)
+            cur.execute(
+                """
+                SELECT level, experience
+                  FROM player_eidolons
+                 WHERE session_id=%s AND player_id=%s AND eidolon_id=%s
+                """,
+                (session_id, player_id, eidolon_id),
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+
+            new_xp = row["experience"] + xp_gain
+            new_level = row["level"]
+
+            while True:
+                cur.execute("SELECT required_exp FROM levels WHERE level=%s", (new_level + 1,))
+                nxt = cur.fetchone()
+                if not nxt or new_xp < nxt["required_exp"]:
+                    break
+                new_level += 1
+
+            cur.execute(
+                """
+                UPDATE player_eidolons
+                   SET experience=%s, level=%s
+                 WHERE session_id=%s AND player_id=%s AND eidolon_id=%s
+                """,
+                (new_xp, new_level, session_id, player_id, eidolon_id),
+            )
+            conn.commit()
+            return {"level": new_level, "experience": new_xp}
+        except Exception:
+            logger.exception("Error awarding eidolon experience")
+            return None
+        finally:
+            cur.close()
+            conn.close()
+
 
 
     # ── class selection ───────────────────────────────────────────────
@@ -646,7 +772,7 @@ class SessionPlayerModel:
         try:
             cur.execute(
                 """
-                SELECT base_hp, base_attack, base_magic, base_defense,
+                SELECT base_hp, base_attack, base_magic, base_mp, base_defense,
                        base_magic_defense, base_accuracy,
                        base_evasion, base_speed
                   FROM classes WHERE class_id=%s
@@ -659,6 +785,7 @@ class SessionPlayerModel:
                     """
                     UPDATE players SET class_id=%s,
                         hp=%s, max_hp=%s,
+                        mp=%s, max_mp=%s,
                         attack_power=%s, defense=%s,
                         magic_power=%s, magic_defense=%s,
                         accuracy=%s, evasion=%s, speed=%s
@@ -667,6 +794,7 @@ class SessionPlayerModel:
                     (
                         class_id,
                         stats["base_hp"], stats["base_hp"],
+                        stats.get("base_mp", 0), stats.get("base_mp", 0),
                         stats["base_attack"], stats["base_defense"],
                         stats["base_magic"], stats["base_magic_defense"],
                         stats["base_accuracy"], stats["base_evasion"],

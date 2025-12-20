@@ -155,7 +155,7 @@ class DungeonGenerator(commands.Cog):
             with conn.cursor(dictionary=True) as cur:
                 cur.execute(
                     """
-                    SELECT template_id, description, image_url, default_enemy_id
+                    SELECT template_id, description, image_url, default_enemy_id, eidolon_id, attune_level
                       FROM room_templates
                      WHERE room_type=%s
                      ORDER BY RAND()
@@ -175,7 +175,7 @@ class DungeonGenerator(commands.Cog):
                     """
                     SELECT template_id
                       FROM room_templates
-                     WHERE room_type NOT IN ('locked','safe','entrance','chest_unlocked','boss','exit','illusion')
+                     WHERE room_type NOT IN ('locked','safe','entrance','chest_unlocked','boss','exit','illusion','cloister')
                      ORDER BY RAND()
                      LIMIT 1
                     """
@@ -627,13 +627,16 @@ class DungeonGenerator(commands.Cog):
                 desc = tmpl.get("description", "A mysterious room…")
                 img  = tmpl.get("image_url")
                 def_en = tmpl.get("default_enemy_id")
+                eidolon_id = tmpl.get("eidolon_id")
+                attune_level = tmpl.get("attune_level")
 
                 with conn.cursor() as cur:
                     cur.execute(
                         "INSERT INTO rooms "
                         "(session_id,floor_id,coord_x,coord_y,description,room_type,"
-                        " image_url,default_enemy_id,exits,vendor_id,inner_template_id) "
-                        "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NULL)",
+                        " image_url,default_enemy_id,exits,vendor_id,inner_template_id,"
+                        " eidolon_id,attune_level) "
+                        "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NULL,%s,%s)",
                         (
                             session_id,
                             basement_floor_id,
@@ -643,7 +646,9 @@ class DungeonGenerator(commands.Cog):
                             img,
                             def_en,
                             json.dumps(exits),
-                            vendor_id
+                            vendor_id,
+                            eidolon_id,
+                            attune_level,
                         ),
                     )
             conn.commit()
@@ -724,6 +729,8 @@ class DungeonGenerator(commands.Cog):
             tmpl = self.fetch_random_template(rtype) or {}
             desc = tmpl.get("description", "A mysterious room…")
             img  = tmpl.get("image_url")
+            eidolon_id = tmpl.get("eidolon_id")
+            attune_level = tmpl.get("attune_level")
 
             if rtype == "boss":
                 with conn.cursor(dictionary=True) as cur2:
@@ -741,13 +748,14 @@ class DungeonGenerator(commands.Cog):
                     "INSERT INTO rooms "
                     "(session_id,floor_id,coord_x,coord_y,description,room_type,"
                     " image_url,default_enemy_id,exits,vendor_id,inner_template_id,"
-                    " stair_down_floor_id,stair_down_x,stair_down_y) "
-                    "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                    " stair_down_floor_id,stair_down_x,stair_down_y,eidolon_id,attune_level) "
+                    "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
                     (
                         session_id, first_floor_id, x, y,
                         desc, rtype, img, def_en,
                         json.dumps(exits), vendor_id, inner_id,
                         stair_down_floor_id, stair_down_x, stair_down_y,
+                        eidolon_id, attune_level,
                     ),
                 )
                 rid = cur.lastrowid
@@ -936,6 +944,8 @@ class DungeonGenerator(commands.Cog):
                 tmpl = self.fetch_random_template(rtype) or {}
                 desc = tmpl.get("description") or "A mysterious room..."
                 img  = tmpl.get("image_url")
+                eidolon_id = tmpl.get("eidolon_id")
+                attune_level = tmpl.get("attune_level")
 
                 if rtype in ("miniboss","boss","monster"):
                     role = "miniboss" if rtype=="miniboss" else ("boss" if rtype=="boss" else "normal")
@@ -951,9 +961,9 @@ class DungeonGenerator(commands.Cog):
 
                 with conn.cursor() as cur:
                     cur.execute(
-                        "INSERT INTO rooms (session_id, floor_id, coord_x, coord_y, description, room_type, image_url, default_enemy_id, exits, vendor_id, inner_template_id) "
-                        "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-                        (session_id, floor_id, x, y, desc, rtype, img, def_en, json.dumps(exits), vendor_id, inner_id),
+                        "INSERT INTO rooms (session_id, floor_id, coord_x, coord_y, description, room_type, image_url, default_enemy_id, exits, vendor_id, inner_template_id, eidolon_id, attune_level) "
+                        "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                        (session_id, floor_id, x, y, desc, rtype, img, def_en, json.dumps(exits), vendor_id, inner_id, eidolon_id, attune_level),
                     )
                     room_id = cur.lastrowid
                     if rtype == "item":

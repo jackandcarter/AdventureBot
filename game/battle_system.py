@@ -47,6 +47,141 @@ class BattleSystem(commands.Cog):
             logger.error("DB connection error in BattleSystem: %s", e)
             raise
 
+    def _get_player_class_name(self, session_id: int, player_id: int) -> Optional[str]:
+        conn = self.db_connect()
+        try:
+            cur = conn.cursor(dictionary=True)
+            cur.execute(
+                """
+                SELECT c.class_name
+                  FROM players p
+                  JOIN classes c ON c.class_id = p.class_id
+                 WHERE p.session_id = %s AND p.player_id = %s
+                """,
+                (session_id, player_id),
+            )
+            row = cur.fetchone()
+            return row["class_name"] if row else None
+        finally:
+            cur.close()
+            conn.close()
+
+    def _get_player_level(self, session_id: int, player_id: int) -> Optional[int]:
+        conn = self.db_connect()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT level FROM players WHERE session_id=%s AND player_id=%s",
+                (session_id, player_id),
+            )
+            row = cur.fetchone()
+            return row[0] if row else None
+        finally:
+            cur.close()
+            conn.close()
+
+    def _get_player_mp(self, session_id: int, player_id: int) -> Optional[Dict[str, int]]:
+        conn = self.db_connect()
+        try:
+            cur = conn.cursor(dictionary=True)
+            cur.execute(
+                "SELECT mp, max_mp FROM players WHERE session_id=%s AND player_id=%s",
+                (session_id, player_id),
+            )
+            return cur.fetchone()
+        finally:
+            cur.close()
+            conn.close()
+
+    def _set_player_mp(self, session_id: int, player_id: int, mp: int) -> None:
+        conn = self.db_connect()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE players SET mp=%s WHERE session_id=%s AND player_id=%s",
+                (mp, session_id, player_id),
+            )
+            conn.commit()
+        finally:
+            cur.close()
+            conn.close()
+
+    def _get_eidolon_for_enemy(self, enemy_id: int) -> Optional[Dict[str, Any]]:
+        conn = self.db_connect()
+        try:
+            cur = conn.cursor(dictionary=True)
+            cur.execute(
+                "SELECT * FROM eidolons WHERE enemy_id=%s",
+                (enemy_id,),
+            )
+            return cur.fetchone()
+        finally:
+            cur.close()
+            conn.close()
+
+    def _get_eidolon(self, eidolon_id: int) -> Optional[Dict[str, Any]]:
+        conn = self.db_connect()
+        try:
+            cur = conn.cursor(dictionary=True)
+            cur.execute(
+                "SELECT * FROM eidolons WHERE eidolon_id=%s",
+                (eidolon_id,),
+            )
+            return cur.fetchone()
+        finally:
+            cur.close()
+            conn.close()
+
+    def _get_eidolon_level(self, session_id: int, player_id: int, eidolon_id: int) -> Optional[int]:
+        conn = self.db_connect()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT level
+                  FROM player_eidolons
+                 WHERE session_id=%s AND player_id=%s AND eidolon_id=%s
+                """,
+                (session_id, player_id, eidolon_id),
+            )
+            row = cur.fetchone()
+            return row[0] if row else None
+        finally:
+            cur.close()
+            conn.close()
+
+    def _get_level_growth(self, level: int) -> Dict[str, Any]:
+        conn = self.db_connect()
+        try:
+            cur = conn.cursor(dictionary=True)
+            cur.execute("SELECT * FROM levels WHERE level=%s", (level,))
+            row = cur.fetchone()
+            return row or {}
+        finally:
+            cur.close()
+            conn.close()
+
+    def _calculate_eidolon_stats(self, eidolon: Dict[str, Any], level: int) -> Dict[str, Any]:
+        growth = self._get_level_growth(level)
+        mapping = {
+            "base_hp": "hp_increase",
+            "base_attack": "attack_increase",
+            "base_magic": "magic_increase",
+            "base_defense": "defense_increase",
+            "base_magic_defense": "magic_defense_increase",
+            "base_accuracy": "accuracy_increase",
+            "base_evasion": "evasion_increase",
+            "base_speed": "speed_increase",
+        }
+        stats = {}
+        for base_key, growth_key in mapping.items():
+            base_value = eidolon.get(base_key, 0)
+            growth_factor = growth.get(growth_key, 0) or 0
+            stats[base_key.replace("base_", "")] = int(base_value * (1 + growth_factor * (level - 1)))
+        stats["hp"] = stats.get("hp", eidolon.get("base_hp", 0))
+        stats["max_hp"] = stats.get("hp", eidolon.get("base_hp", 0))
+        return stats
+
     def _normalize_se(self, raw: Dict[str,Any]) -> Dict[str,Any]:
         """
         Turn raw engine output into exactly the 3 keys our UI helper wants:
@@ -386,6 +521,17 @@ class BattleSystem(commands.Cog):
         if gm:
             gm.append_game_log(session.session_id, f"{enemy['enemy_name']} was defeated!")
         xp = enemy.get("xp_reward", 0)
+        if xp and session:
+            summoned = getattr(session, "summoned_eidolons", {}) or {}
+            for eidolon_id in summoned.get(session.current_turn, set()):
+                SessionPlayerModel.award_eidolon_experience(
+                    session.session_id,
+                    session.current_turn,
+                    eidolon_id,
+                    int(xp * 0.75),
+                )
+            summoned.pop(session.current_turn, None)
+            session.summoned_eidolons = summoned
         if xp and gm:
             await gm.award_experience(session.current_turn, session.session_id, xp)
 
@@ -433,6 +579,33 @@ class BattleSystem(commands.Cog):
         # ─── Now show the “Victory!” embed ─────────────────────────────
         await self.display_victory_embed(interaction, session, enemy)
 
+    async def _check_eidolon_attunement(self, interaction: discord.Interaction, session: Any, enemy: dict) -> bool:
+        if enemy.get("role") != "eidolon":
+            return False
+        threshold = max(1, int(enemy["max_hp"] * 0.1))
+        if enemy["hp"] > threshold:
+            return False
+        eidolon = self._get_eidolon_for_enemy(enemy["enemy_id"])
+        if not eidolon:
+            return False
+        session.eidolon_attuned = getattr(session, "eidolon_attuned", set())
+        key = (session.session_id, session.current_turn, eidolon["eidolon_id"])
+        if key in session.eidolon_attuned:
+            return False
+
+        SessionPlayerModel.unlock_eidolon(session.session_id, session.current_turn, eidolon["eidolon_id"])
+        session.eidolon_attuned.add(key)
+        session.game_log.append(f"{eidolon['name']} acknowledges your strength and joins your journey!")
+        msg = (
+            f"✨ **{eidolon['name']}**: *Your strength is proven. I shall fight at your side.*"
+        )
+        if interaction.response.is_done():
+            await interaction.followup.send(msg, ephemeral=True)
+        else:
+            await interaction.response.send_message(msg, ephemeral=True)
+        await self.handle_enemy_defeat(interaction, session, enemy)
+        return True
+
     async def start_battle(self,
                             interaction: discord.Interaction,
                             player_id: int,
@@ -476,7 +649,7 @@ class BattleSystem(commands.Cog):
         conn = self.db_connect()
         cursor = conn.cursor(dictionary=True)
         cursor.execute(
-            "SELECT hp, max_hp, defense, attack_power FROM players WHERE player_id = %s AND session_id = %s",
+            "SELECT hp, max_hp, mp, max_mp, defense, attack_power FROM players WHERE player_id = %s AND session_id = %s",
             (player_id, session.session_id),
         )
         player = cursor.fetchone()
@@ -502,6 +675,8 @@ class BattleSystem(commands.Cog):
         # show player HP + effects
         player_line = format_status_effects(session.battle_state["player_effects"])
         stats_text = f"❤️ HP: {create_health_bar(player['hp'], player['max_hp'])}"
+        if player.get("max_mp"):
+            stats_text += f"\n💠 MP: {create_health_bar(player.get('mp', 0), player['max_mp'])}"
         if player_line:
             stats_text += f" {player_line}"
         stats_text += f"\n⚔️ ATK: {player['attack_power']}\n🛡️ DEF: {player['defense']}"
@@ -532,6 +707,17 @@ class BattleSystem(commands.Cog):
                 ("Flee",   discord.ButtonStyle.secondary,"combat_flee",        0),
             ]
 
+        class_name = self._get_player_class_name(session.session_id, pid)
+        unlocked = SessionPlayerModel.get_unlocked_eidolons(session.session_id, pid)
+        session.active_summons = getattr(session, "active_summons", {}) or {}
+        if class_name == "Summoner" and unlocked:
+            session.summon_used = getattr(session, "summon_used", {}) or {}
+            if not session.summon_used.get(pid) and not session.active_summons.get(pid):
+                buttons.append(("Summon", discord.ButtonStyle.primary, "combat_summon_menu", 1))
+        if session.active_summons.get(pid):
+            eidolon_name = session.active_summons[pid]["name"]
+            buttons[0] = (eidolon_name, discord.ButtonStyle.danger, "combat_eidolon_menu", 0)
+
         await self.embed_manager.send_or_update_embed(
             interaction, title="", description="", embed_override=eb, buttons=buttons
         )
@@ -557,7 +743,7 @@ class BattleSystem(commands.Cog):
         conn = self.db_connect()
         cursor = conn.cursor(dictionary=True)
         cursor.execute(
-            "SELECT hp, max_hp, defense, attack_power FROM players WHERE player_id = %s AND session_id = %s",
+            "SELECT hp, max_hp, mp, max_mp, defense, attack_power FROM players WHERE player_id = %s AND session_id = %s",
             (player_id, session.session_id),
         )
         player = cursor.fetchone()
@@ -580,6 +766,8 @@ class BattleSystem(commands.Cog):
 
         player_line = format_status_effects(session.battle_state.get("player_effects", []))
         stats_text = f"❤️ HP: {create_health_bar(player['hp'], player['max_hp'])}"
+        if player.get("max_mp"):
+            stats_text += f"\n💠 MP: {create_health_bar(player.get('mp', 0), player['max_mp'])}"
         if player_line:
             stats_text += f" {player_line}"
         stats_text += (
@@ -612,6 +800,17 @@ class BattleSystem(commands.Cog):
                 ("Use",    discord.ButtonStyle.success,  "combat_item",        0),
                 ("Flee",   discord.ButtonStyle.secondary,"combat_flee",        0),
             ]
+
+        class_name = self._get_player_class_name(session.session_id, pid)
+        unlocked = SessionPlayerModel.get_unlocked_eidolons(session.session_id, pid)
+        session.active_summons = getattr(session, "active_summons", {}) or {}
+        if class_name == "Summoner" and unlocked:
+            session.summon_used = getattr(session, "summon_used", {}) or {}
+            if not session.summon_used.get(pid) and not session.active_summons.get(pid):
+                buttons.append(("Summon", discord.ButtonStyle.primary, "combat_summon_menu", 1))
+        if session.active_summons.get(pid):
+            eidolon_name = session.active_summons[pid]["name"]
+            buttons[0] = (eidolon_name, discord.ButtonStyle.danger, "combat_eidolon_menu", 0)
 
         await self.embed_manager.send_or_update_embed(
             interaction, title="", description="", embed_override=eb, buttons=buttons
@@ -723,6 +922,98 @@ class BattleSystem(commands.Cog):
         if not interaction.response.is_done():
             await interaction.response.defer()
         await embed_mgr.send_skill_menu_embed(interaction, abilities)
+
+    async def show_summon_menu(self, interaction: discord.Interaction) -> None:
+        mgr = self.bot.get_cog("SessionManager")
+        if not mgr or not self.embed_manager:
+            return await interaction.response.send_message("❌ SessionManager or EmbedManager unavailable.", ephemeral=True)
+
+        session = mgr.get_session(interaction.channel.id)
+        if not session:
+            return await interaction.response.send_message("❌ No active session.", ephemeral=True)
+
+        pid = session.current_turn
+        class_name = self._get_player_class_name(session.session_id, pid)
+        if class_name != "Summoner":
+            return await interaction.response.send_message("❌ Only Summoners can attune to Eidolons.", ephemeral=True)
+
+        unlocked = SessionPlayerModel.get_unlocked_eidolons(session.session_id, pid)
+        if not unlocked:
+            return await interaction.response.send_message("❌ You have not unlocked any Eidolons yet.", ephemeral=True)
+
+        session.summon_used = getattr(session, "summon_used", {}) or {}
+        if session.summon_used.get(pid):
+            return await interaction.response.send_message("❌ You can only summon once per turn.", ephemeral=True)
+
+        buttons = []
+        for eid in unlocked:
+            buttons.append((
+                f"{eid['name']} (Lv {eid['level']})",
+                discord.ButtonStyle.primary,
+                f"summon_select_{eid['eidolon_id']}",
+                0,
+            ))
+        buttons.append(("Back", discord.ButtonStyle.secondary, "summon_back", 1))
+        await self.embed_manager.send_or_update_embed(
+            interaction,
+            title="🔮 Eidolon Summon",
+            description="Select an Eidolon to summon.",
+            buttons=buttons,
+        )
+
+    async def show_eidolon_ability_menu(self, interaction: discord.Interaction, eidolon_id: int) -> None:
+        mgr = self.bot.get_cog("SessionManager")
+        if not mgr or not self.embed_manager:
+            return await interaction.response.send_message("❌ SessionManager or EmbedManager unavailable.", ephemeral=True)
+
+        session = mgr.get_session(interaction.channel.id)
+        if not session:
+            return await interaction.response.send_message("❌ No active session.", ephemeral=True)
+
+        pid = session.current_turn
+        level = self._get_eidolon_level(session.session_id, pid, eidolon_id)
+        if not level:
+            return await interaction.response.send_message("❌ Eidolon not unlocked.", ephemeral=True)
+
+        conn = self.db_connect()
+        cur = conn.cursor(dictionary=True)
+        cur.execute(
+            """
+            SELECT a.*, ea.unlock_level
+              FROM eidolon_abilities ea
+              JOIN abilities a ON a.ability_id = ea.ability_id
+             WHERE ea.eidolon_id = %s
+               AND ea.unlock_level <= %s
+            """,
+            (eidolon_id, level),
+        )
+        abilities = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        session.eidolon_ability_cooldowns = getattr(session, "eidolon_ability_cooldowns", {}) or {}
+        cds = session.eidolon_ability_cooldowns.get(pid, {})
+
+        buttons = []
+        for a in abilities:
+            cd_now = int(cds.get(a["ability_id"], 0))
+            bar = create_cooldown_bar(cd_now, a.get("cooldown", 0), length=6)
+            style = discord.ButtonStyle.secondary if cd_now > 0 else discord.ButtonStyle.primary
+            buttons.append((
+                f"{a['ability_name']} {bar}",
+                style,
+                f"summon_ability_{eidolon_id}_{a['ability_id']}",
+                0,
+                cd_now > 0,
+            ))
+
+        buttons.append(("Back", discord.ButtonStyle.secondary, "summon_back", 1))
+        await self.embed_manager.send_or_update_embed(
+            interaction,
+            title="✨ Eidolon Abilities",
+            description="Choose an Eidolon ability to unleash.",
+            buttons=buttons,
+        )
 
     async def display_trance_menu(self, interaction: discord.Interaction) -> None:
         """
@@ -838,6 +1129,14 @@ class BattleSystem(commands.Cog):
                 session.ability_cooldowns.setdefault(pid, {})[ability_id] = ability_meta.get("cooldown", 0)
                 self.reduce_player_cooldowns(session, pid)
                 return
+
+        mp_cost = ability_meta.get("mp_cost", 0) or 0
+        if mp_cost:
+            mp_state = self._get_player_mp(session.session_id, session.current_turn)
+            if not mp_state or mp_state.get("mp", 0) < mp_cost:
+                return await interaction.response.send_message("❌ Not enough MP.", ephemeral=True)
+            new_mp = max(mp_state.get("mp", 0) - mp_cost, 0)
+            self._set_player_mp(session.session_id, session.current_turn, new_mp)
 
 
         # 2) fetch player stats
@@ -1010,12 +1309,210 @@ class BattleSystem(commands.Cog):
                 if enemy["hp"] <= 0:
                     return await self.handle_enemy_defeat(interaction, session, enemy)
         
+        if await self._check_eidolon_attunement(interaction, session, enemy):
+            return
+        if await self._check_eidolon_attunement(interaction, session, enemy):
+            return
         if enemy["hp"] <= 0:
             return await self.handle_enemy_defeat(interaction, session, enemy)
 
         await self.update_battle_embed(interaction, pid, enemy)
 
         # 8) now let the enemy take their turn, then advance back
+        await asyncio.sleep(1)
+        await self.enemy_turn(interaction, enemy)
+
+    async def handle_summon_select(self, interaction: discord.Interaction, eidolon_id: int) -> None:
+        mgr = self.bot.get_cog("SessionManager")
+        if not mgr or not self.embed_manager:
+            return await interaction.response.send_message("❌ SessionManager or EmbedManager unavailable.", ephemeral=True)
+
+        session = mgr.get_session(interaction.channel.id)
+        if not session:
+            return await interaction.response.send_message("❌ No active session.", ephemeral=True)
+
+        pid = session.current_turn
+        session.summon_used = getattr(session, "summon_used", {}) or {}
+        if session.summon_used.get(pid):
+            return await interaction.response.send_message("❌ You can only summon once per turn.", ephemeral=True)
+
+        eidolon = self._get_eidolon(eidolon_id)
+        if not eidolon:
+            return await interaction.response.send_message("❌ Eidolon not found.", ephemeral=True)
+
+        level = self._get_eidolon_level(session.session_id, pid, eidolon_id)
+        if not level:
+            return await interaction.response.send_message("❌ Eidolon not unlocked.", ephemeral=True)
+
+        player_level = self._get_player_level(session.session_id, pid) or 0
+        if player_level < (eidolon.get("required_level") or 1):
+            return await interaction.response.send_message("❌ You are not attuned enough to summon that Eidolon.", ephemeral=True)
+
+        session.active_summons = getattr(session, "active_summons", {}) or {}
+        if session.active_summons.get(pid):
+            return await interaction.response.send_message("❌ You already have an Eidolon attuned this turn.", ephemeral=True)
+
+        mp_state = self._get_player_mp(session.session_id, pid)
+        summon_cost = eidolon.get("summon_mp_cost", 0) or 0
+        if summon_cost and (not mp_state or mp_state.get("mp", 0) < summon_cost):
+            return await interaction.response.send_message("❌ Not enough MP to summon.", ephemeral=True)
+
+        if summon_cost:
+            new_mp = max((mp_state.get("mp", 0) if mp_state else 0) - summon_cost, 0)
+            self._set_player_mp(session.session_id, pid, new_mp)
+
+        session.active_summons[pid] = {
+            "eidolon_id": eidolon_id,
+            "name": eidolon["name"],
+            "level": level,
+        }
+
+        if session.current_enemy:
+            session.summoned_eidolons = getattr(session, "summoned_eidolons", {}) or {}
+            session.summoned_eidolons.setdefault(pid, set()).add(eidolon_id)
+            return await self.update_battle_embed(interaction, pid, session.current_enemy)
+
+        return await self.show_eidolon_ability_menu(interaction, eidolon_id)
+
+    async def handle_eidolon_ability_use(
+        self,
+        interaction: discord.Interaction,
+        eidolon_id: int,
+        ability_id: int,
+    ) -> None:
+        mgr = self.bot.get_cog("SessionManager")
+        if not mgr or not self.embed_manager:
+            return await interaction.response.send_message("❌ SessionManager or EmbedManager unavailable.", ephemeral=True)
+
+        session = mgr.get_session(interaction.channel.id)
+        if not session:
+            return await interaction.response.send_message("❌ No active session.", ephemeral=True)
+
+        pid = session.current_turn
+        active = getattr(session, "active_summons", {}) or {}
+        if not active.get(pid) or active[pid]["eidolon_id"] != eidolon_id:
+            return await interaction.response.send_message("❌ No active Eidolon to command.", ephemeral=True)
+
+        conn = self.db_connect()
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT * FROM abilities WHERE ability_id = %s", (ability_id,))
+        ability_meta = cur.fetchone()
+        cur.close()
+        conn.close()
+        if not ability_meta:
+            return await interaction.response.send_message("❌ Ability not found.", ephemeral=True)
+
+        session.eidolon_ability_cooldowns = getattr(session, "eidolon_ability_cooldowns", {}) or {}
+        current_cd = session.eidolon_ability_cooldowns.get(pid, {}).get(ability_id, 0)
+        if current_cd > 0:
+            return await interaction.response.send_message("❌ That Eidolon ability is cooling down.", ephemeral=True)
+
+        mp_cost = ability_meta.get("mp_cost", 0) or 0
+        if mp_cost:
+            mp_state = self._get_player_mp(session.session_id, pid)
+            if not mp_state or mp_state.get("mp", 0) < mp_cost:
+                return await interaction.response.send_message("❌ Not enough MP.", ephemeral=True)
+            new_mp = max(mp_state.get("mp", 0) - mp_cost, 0)
+            self._set_player_mp(session.session_id, pid, new_mp)
+
+        in_battle = bool(session.current_enemy)
+        gm = self.bot.get_cog("GameMaster")
+        in_illusion = bool(gm and gm.is_player_in_illusion(session, pid))
+        if ability_meta["target_type"] == "enemy" and not in_battle and not in_illusion:
+            return await interaction.response.send_message("❌ That Eidolon ability can only be used in battle.", ephemeral=True)
+
+        eidolon = self._get_eidolon(eidolon_id)
+        level = self._get_eidolon_level(session.session_id, pid, eidolon_id) or 1
+        eidolon_stats = self._calculate_eidolon_stats(eidolon, level) if eidolon else {}
+
+        conn = self.db_connect()
+        cur = conn.cursor(dictionary=True)
+        cur.execute(
+            "SELECT hp, max_hp, attack_power, magic_power, defense, magic_defense, accuracy, evasion FROM players WHERE player_id=%s AND session_id=%s",
+            (pid, session.session_id),
+        )
+        player = cur.fetchone()
+        cur.close()
+        conn.close()
+        if not player:
+            return await interaction.response.send_message("❌ Could not retrieve your stats.", ephemeral=True)
+
+        enemy = session.current_enemy if in_battle else None
+        engine_target = enemy if enemy is not None else player
+        result = self.ability.resolve(eidolon_stats, engine_target, ability_meta)
+
+        session.eidolon_ability_cooldowns.setdefault(pid, {})[ability_id] = ability_meta.get("cooldown", 0)
+        session.summon_used = getattr(session, "summon_used", {}) or {}
+        session.summon_used[pid] = True
+        eidolon_name = active.get(pid, {}).get("name", "Eidolon")
+        active.pop(pid, None)
+
+        if not in_battle and ability_meta.get("target_type") == "self":
+            if gm:
+                for line in result.logs:
+                    gm.append_game_log(session.session_id, line)
+            if result.type in ("heal", "set_hp"):
+                old_hp = self._get_player_hp(pid, session.session_id)
+                new_hp = (result.amount if result.type == "set_hp" else min(
+                    old_hp + result.amount,
+                    self._get_player_max_hp(pid, session.session_id),
+                ))
+                self._update_player_hp(pid, session.session_id, new_hp)
+                if gm:
+                    gm.append_game_log(session.session_id, f"You are healed to {new_hp} HP.")
+            sm = self.bot.get_cog("SessionManager")
+            return await sm.refresh_current_state(interaction)
+
+        if not session.battle_state:
+            session.battle_state = {"player_effects": [], "enemy_effects": []}
+
+        target = ability_meta.get("target_type", "self")
+        if result.type in ("damage", "heal", "set_hp", "dot"):
+            if result.type == "damage":
+                enemy["hp"] = max(enemy["hp"] - result.amount, 0)
+                session.game_log.append(
+                    f"{eidolon_name} uses {ability_meta['ability_name']} for {result.amount} damage!"
+                )
+            elif result.type == "heal":
+                if target in ("self", "ally"):
+                    new_hp = min(player["hp"] + result.amount, player["max_hp"])
+                    self._update_player_hp(pid, session.session_id, new_hp)
+                    session.game_log.append(f"Eidolon restores {result.amount} HP to you!")
+                else:
+                    enemy["hp"] = min(enemy["hp"] + result.amount, enemy["max_hp"])
+                    session.game_log.append(f"{enemy['enemy_name']} recovers {result.amount} HP!")
+            elif result.type == "set_hp":
+                enemy["hp"] = result.amount
+            elif result.type == "dot":
+                enemy.setdefault("dot_effects", []).append(result.dot)
+                enemy["hp"] = max(enemy["hp"] - result.dot["damage_per_turn"], 0)
+        else:
+            session.game_log.extend(result.logs)
+
+        for raw_se in getattr(result, "status_effects", []) or []:
+            raw_se.setdefault("target", ability_meta.get("target_type", "self"))
+            se = self._normalize_se(raw_se)
+            bucket = "player_effects" if se["target"] == "self" else "enemy_effects"
+            session.battle_state[bucket].append(se)
+            if se["target"] == "self":
+                session.game_log.append(
+                    f"{se['effect_name']} has been applied to <@{pid}>."
+                )
+                SessionPlayerModel.update_status_effects(
+                    session.session_id, pid, session.battle_state[bucket]
+                )
+            else:
+                name = session.current_enemy.get("enemy_name", "The enemy")
+                session.game_log.append(
+                    f"{name} has been afflicted by {se['effect_name']}."
+                )
+
+        if enemy and await self._check_eidolon_attunement(interaction, session, enemy):
+            return
+        if enemy and enemy["hp"] <= 0:
+            return await self.handle_enemy_defeat(interaction, session, enemy)
+
+        await self.update_battle_embed(interaction, pid, enemy)
         await asyncio.sleep(1)
         await self.enemy_turn(interaction, enemy)
 
@@ -1395,6 +1892,8 @@ class BattleSystem(commands.Cog):
         session.game_log.append(f"You strike the {enemy['enemy_name']} for {dmg} damage!")
         self.reduce_player_cooldowns(session, pid)
 
+        if await self._check_eidolon_attunement(interaction, session, enemy):
+            return
         if enemy["hp"] <= 0:
             return await self.handle_enemy_defeat(interaction, session, enemy)
 
@@ -1551,6 +2050,25 @@ class BattleSystem(commands.Cog):
             return await self.handle_skill_menu(interaction)
         if cid == "combat_item":
             return await self.handle_item_menu(interaction)
+        if cid == "combat_summon_menu":
+            return await self.show_summon_menu(interaction)
+        if cid == "combat_eidolon_menu":
+            if session and getattr(session, "active_summons", None):
+                active = session.active_summons.get(session.current_turn)
+                if active:
+                    return await self.show_eidolon_ability_menu(interaction, active["eidolon_id"])
+            return await interaction.response.send_message("❌ No active Eidolon to command.", ephemeral=True)
+        if cid.startswith("summon_select_"):
+            eidolon_id = int(cid.split("_", 2)[2])
+            return await self.handle_summon_select(interaction, eidolon_id)
+        if cid.startswith("summon_ability_"):
+            _, _, eidolon_id, ability_id = cid.split("_", 3)
+            return await self.handle_eidolon_ability_use(interaction, int(eidolon_id), int(ability_id))
+        if cid == "summon_back":
+            if session and session.current_enemy:
+                return await self.update_battle_embed(interaction, session.current_turn, session.current_enemy)
+            sm = self.bot.get_cog("SessionManager")
+            return await sm.refresh_current_state(interaction) if sm else None
         if not cid.startswith("combat_"):
             return
 
@@ -1626,6 +2144,21 @@ class BattleSystem(commands.Cog):
             ("Flee",   discord.ButtonStyle.secondary, "combat_flee", 0),
             ("Menu",   discord.ButtonStyle.secondary, "action_menu", 0),
         ]
+        mgr = self.bot.get_cog("SessionManager")
+        if mgr:
+            session = mgr.get_session(interaction.channel.id)
+            if session:
+                class_name = self._get_player_class_name(session.session_id, session.current_turn)
+                unlocked = SessionPlayerModel.get_unlocked_eidolons(session.session_id, session.current_turn)
+                session.summon_used = getattr(session, "summon_used", {}) or {}
+                session.active_summons = getattr(session, "active_summons", {}) or {}
+                if (
+                    class_name == "Summoner"
+                    and unlocked
+                    and not session.summon_used.get(session.current_turn)
+                    and not session.active_summons.get(session.current_turn)
+                ):
+                    buttons.append(("Summon", discord.ButtonStyle.primary, "combat_summon_menu", 1))
         await self.embed_manager.send_or_update_embed(interaction, title, desc, buttons=buttons)
 
     async def send_inventory_menu(self, interaction: discord.Interaction) -> None:

@@ -45,6 +45,52 @@ def table_is_empty(cur, table_name: str) -> bool:
     cur.execute(f"SELECT COUNT(*) FROM {table_name}")
     return cur.fetchone()[0] == 0
 
+def column_exists(cur, table_name: str, column_name: str) -> bool:
+    cur.execute(
+        """
+        SELECT COUNT(*)
+          FROM information_schema.columns
+         WHERE table_schema = %s
+           AND table_name = %s
+           AND column_name = %s
+        """,
+        (DB_CONFIG["database"], table_name, column_name),
+    )
+    return cur.fetchone()[0] > 0
+
+def ensure_column(cur, table_name: str, column_name: str, definition: str) -> None:
+    if column_exists(cur, table_name, column_name):
+        return
+    logger.info("Adding column %s.%s", table_name, column_name)
+    cur.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
+
+def ensure_enum_values(cur, table_name: str, column_name: str, values: List[str], default: str) -> None:
+    cur.execute(
+        """
+        SELECT column_type
+          FROM information_schema.columns
+         WHERE table_schema = %s
+           AND table_name = %s
+           AND column_name = %s
+        """,
+        (DB_CONFIG["database"], table_name, column_name),
+    )
+    row = cur.fetchone()
+    if not row:
+        return
+    col_type = row[0] or ""
+    if not col_type.lower().startswith("enum("):
+        return
+    current = [v.strip("'") for v in col_type[5:-1].split(",")]
+    if all(v in current for v in values):
+        return
+    merged = sorted(set(current + values), key=lambda v: current.index(v) if v in current else len(current))
+    enum_list = ",".join(f"'{v}'" for v in merged)
+    logger.info("Updating enum %s.%s to include %s", table_name, column_name, values)
+    cur.execute(
+        f"ALTER TABLE {table_name} MODIFY COLUMN {column_name} ENUM({enum_list}) NOT NULL DEFAULT '{default}'"
+    )
+
 # ═══════════════════════════════════════════════════════════════════════════
 #  SEED DATA
 # ═══════════════════════════════════════════════════════════════════════════
@@ -146,6 +192,13 @@ MERGED_ABILITIES: List[Tuple] = [
     (93, '1,000 Needles', 'Deals 1,000 damage with 100% hit rate and ignores defense.', '{"flat_damage": 1000}', 0, None, 'any', None, None, None, None, '2025-05-22 15:21:04', 'attack_power')
 ]
 
+# --- eidolon abilities (with mp_cost) -----------------------------------------
+MERGED_EIDOLON_ABILITY_DEFS: List[Tuple] = [
+    (201, 'Hellfire', 'Engulf the enemy in infernal flames.', '{"base_damage": 160}', 2, '🔥', 'enemy', None, 1, None, None, '2025-07-01 00:00:00', 'magic_power', 35),
+    (202, 'Diamond Dust', 'Unleash a frozen tempest.', '{"base_damage": 160}', 2, '❄️', 'enemy', None, 2, None, None, '2025-07-01 00:00:00', 'magic_power', 35),
+    (203, 'Judgment Bolt', 'Call down a thunderous strike.', '{"base_damage": 175}', 3, '⚡', 'enemy', None, 6, None, None, '2025-07-01 00:00:00', 'magic_power', 40),
+]
+
 # --- ability ↔ status‑effects -------------------------------------------------
 MERGED_ABILITY_STATUS_EFFECTS: List[Tuple[int, int]] = [
     (10, 1),
@@ -225,17 +278,18 @@ MERGED_CLASS_ABILITIES: List[Tuple[int, int, int]] = [
 
 # --- classes ------------------------------------------------------------------
 MERGED_CLASSES: List[Tuple] = [
-    (1, 'Warrior', 'A sturdy fighter with strong physical attacks.', 600, 40, 10, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1364778448379318442/war.gif?ex=680c39fa&is=680ae87a&hm=80c89e0290ea5ad2432f2d9b265df190741f94309c2bca981ad1885af90671c4&', None, '2025-03-31 02:40:47', 5),
-    (2, 'Berserker', 'A savage fighter who channels uncontrollable fury.', 600, 45, 10, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1365296689379938355/Berserker.gif?ex=680ccb20&is=680b79a0&hm=aa06cfa2c7fb2fb30ffe9e4991d2dda0d4f9420587656a0ddc61b192372ad067&', None, '2025-04-03 07:05:45', 5),
-    (3, 'Mystic Knight', 'A hybrid fighter that fuses magic to their blade.', 500, 40, 15, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1365296718815432724/mystic.gif?ex=680ccb27&is=680b79a7&hm=3f8ad9a2b215496adbc6c0dfd328a9e30621c73e292c40f0fd5ebfb0025bd910&', None, '2025-04-03 07:05:45', 5),
-    (4, 'Thief', 'A quick fighter who excels at stealing items.', 500, 45, 10, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1365296784301363303/thief.gif?ex=680ccb37&is=680b79b7&hm=34ee2d981b968e6de51e52e85c51b3c16ed4ac71974df3ada3f305603d95b59a&', None, '2025-03-31 02:40:47', 5),
-    (5, 'Green Mage', 'A powerful mage that manipulates time and space magics.', 500, 20, 20, 5, 1, 99, 1, 10, None, None, '2025-03-31 02:40:47', 5),
-    (6, 'Dragoon', 'A lancer who can jump high and strike down foes.', 500, 40, 10, 5, 1, 99, 1, 10, None, None, '2025-03-31 02:40:47', 5),
-    (7, 'Bard', 'A ranged attacker wielding a bow and musical influence.', 500, 45, 20, 5, 1, 99, 1, 10, None, None, '2025-04-03 07:05:45', 5),
-    (8, 'White Mage', 'A healer who uses holy magic to restore and protect.', 500, 15, 20, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1365296761723158538/whitemage.gif?ex=680ccb31&is=680b79b1&hm=cd94aeb45272086aac0e5c40507390e5738ef9ee419634a7eded75bf67ea91be&', None, '2025-04-03 07:05:45', 5),
-    (9, 'Black Mage', 'A mage who uses destructive elemental spells.', 500, 15, 25, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1364772285873127434/blm.gif?ex=680c343d&is=680ae2bd&hm=c3ce479bfd4cd9152348f3bf1d114ce29a63c7c04ac42c7d3ad845ab6bf51eda&', None, '2025-04-03 07:05:45', 5),
-    (10, 'Geomancer', 'A sorcerer using environmental/elemental attacks.', 500, 15, 20, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1372019632139145237/out.gif?ex=6825405b&is=6823eedb&hm=b0c22f7902cc76c50ce038d3c74dc16559a02e5e3d4262b5173592491bce32e6&', None, '2025-04-03 07:05:45', 5),
-    (11, 'Gun Mage', 'A mage clad in blue armor who holds a magic-infused pistol.', 600, 30, 15, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1372162446311165983/out.gif?ex=6825c55c&is=682473dc&hm=1e03aac8f24a02d80ee1f48c84a204d43207a75b55259d5bb8c461bb7af6f35e&', None, '2025-04-03 07:05:45', 5)
+    (1, 'Warrior', 'A sturdy fighter with strong physical attacks.', 600, 40, 10, 0, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1364778448379318442/war.gif?ex=680c39fa&is=680ae87a&hm=80c89e0290ea5ad2432f2d9b265df190741f94309c2bca981ad1885af90671c4&', None, '2025-03-31 02:40:47', 5),
+    (2, 'Berserker', 'A savage fighter who channels uncontrollable fury.', 600, 45, 10, 0, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1365296689379938355/Berserker.gif?ex=680ccb20&is=680b79a0&hm=aa06cfa2c7fb2fb30ffe9e4991d2dda0d4f9420587656a0ddc61b192372ad067&', None, '2025-04-03 07:05:45', 5),
+    (3, 'Mystic Knight', 'A hybrid fighter that fuses magic to their blade.', 500, 40, 15, 0, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1365296718815432724/mystic.gif?ex=680ccb27&is=680b79a7&hm=3f8ad9a2b215496adbc6c0dfd328a9e30621c73e292c40f0fd5ebfb0025bd910&', None, '2025-04-03 07:05:45', 5),
+    (4, 'Thief', 'A quick fighter who excels at stealing items.', 500, 45, 10, 0, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1365296784301363303/thief.gif?ex=680ccb37&is=680b79b7&hm=34ee2d981b968e6de51e52e85c51b3c16ed4ac71974df3ada3f305603d95b59a&', None, '2025-03-31 02:40:47', 5),
+    (5, 'Green Mage', 'A powerful mage that manipulates time and space magics.', 500, 20, 20, 80, 5, 1, 99, 1, 10, None, None, '2025-03-31 02:40:47', 5),
+    (6, 'Dragoon', 'A lancer who can jump high and strike down foes.', 500, 40, 10, 0, 5, 1, 99, 1, 10, None, None, '2025-03-31 02:40:47', 5),
+    (7, 'Bard', 'A ranged attacker wielding a bow and musical influence.', 500, 45, 20, 40, 5, 1, 99, 1, 10, None, None, '2025-04-03 07:05:45', 5),
+    (8, 'White Mage', 'A healer who uses holy magic to restore and protect.', 500, 15, 20, 120, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1365296761723158538/whitemage.gif?ex=680ccb31&is=680b79b1&hm=cd94aeb45272086aac0e5c40507390e5738ef9ee419634a7eded75bf67ea91be&', None, '2025-04-03 07:05:45', 5),
+    (9, 'Black Mage', 'A mage who uses destructive elemental spells.', 500, 15, 25, 120, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1364772285873127434/blm.gif?ex=680c343d&is=680ae2bd&hm=c3ce479bfd4cd9152348f3bf1d114ce29a63c7c04ac42c7d3ad845ab6bf51eda&', None, '2025-04-03 07:05:45', 5),
+    (10, 'Geomancer', 'A sorcerer using environmental/elemental attacks.', 500, 15, 20, 80, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1372019632139145237/out.gif?ex=6825405b&is=6823eedb&hm=b0c22f7902cc76c50ce038d3c74dc16559a02e5e3d4262b5173592491bce32e6&', None, '2025-04-03 07:05:45', 5),
+    (11, 'Gun Mage', 'A mage clad in blue armor who holds a magic-infused pistol.', 600, 30, 15, 60, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1372162446311165983/out.gif?ex=6825c55c&is=682473dc&hm=1e03aac8f24a02d80ee1f48c84a204d43207a75b55259d5bb8c461bb7af6f35e&', None, '2025-04-03 07:05:45', 5),
+    (12, 'Summoner', 'A mage who bonds with Eidolons and calls them to battle.', 480, 15, 20, 160, 5, 1, 99, 1, 10, None, None, '2025-07-01 00:00:00', 5),
 ]
 
 # --- temporary abilities ------------------------------------------------------
@@ -296,28 +350,31 @@ MERGED_INTRO_STEPS: List[Tuple] = [
 
 # --- room templates -----------------------------------------------------------
 MERGED_ROOM_TEMPLATES: List[Tuple] = [
-    (1, 'safe', 'Moss Room', 'You do not notice anything of importance, the area appears to be safe.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362833775637303336/roomtypemoss.png?ex=680c671c&is=680b159c&hm=3dc79f7a87ce268e9d54deae12bee18fa98b37a69caa1644257023135acfee8e&', None, '2025-03-31 07:40:47', None, None),
-    (2, 'safe', 'Mystic Room', 'You do not notice anything of importance, the area appears to be safe.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362833776446673227/roomtypemystic.png?ex=680c671c&is=680b159c&hm=bc397f1f43a2317102e1f4216333b331c31dcbac9ffd8078f61c0c43171841a1&', None, '2025-03-31 07:40:47', None, None),
-    (3, 'safe', 'Crystal Tunnel', 'You do not notice anything of importance, the area appears to be safe.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362833695169576981/crystals.png?ex=680c6709&is=680b1589&hm=2c0977deb61f6e286646aeddab3a54cf048c6043dbd398c15f5ebbe7a1d5e8f6&', None, '2025-03-31 07:40:47', None, None),
-    (4, 'safe', 'Bridge', 'You do not notice anything of importance, the area appears to be safe.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362833699648966726/roomtypebridge.png?ex=680c670a&is=680b158a&hm=88011ac41a9c277ce6ecc855a7cb3099d9c35a0d648caa944397718741c2d5c0&', None, '2025-04-10 01:22:14', None, None),
-    (5, 'safe', 'Magicite', 'You do not notice anything of importance, the area appears to be safe.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362833774844313750/roomtypemagicite.png?ex=680c671c&is=680b159c&hm=07b6f7a5c5f95e556e7adb11a013cb9d546489d7a64954d15f5c99d11acf9847&', None, '2025-04-10 01:22:19', None, None),
-    (6, 'safe', 'Rainbow Crystal', 'You do not notice anything of importance, the area appears to be safe.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362833696519885081/rainbowcrystal.png?ex=680c6709&is=680b1589&hm=efecc1cf0d3a6e9f30364b1e4731697a65ab5745807ba1cb30574569cf10be16&', None, '2025-04-10 01:22:27', None, None),
-    (7, 'safe', 'Aetheryte', 'You do not notice any hostile presence;\ninstead you see a naturally growing Aetheryte cluster.\n\nPerhaps this will be useful in the future...', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362833698168508496/roomtypeaetheryte.png?ex=680c6709&is=680b159c&hm=29873e0d2dea2ecbd63a66c0d18825c5954f80965e19309827e18a8f77459052&', None, '2025-04-10 01:22:27', None, None),
-    (8, 'monster', 'You Sense A Hostile Presence...', 'An enemy appears upon entering the area...', '', None, '2025-03-31 07:40:47', None, None),
-    (9, 'staircase_up', 'Staircase Up', 'You notice a staircase leading up to the next level.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362832388677308516/stairs.png?ex=680c65d1&is=680b1451&hm=8b5d73c9b00898e7913c5d661d2f107731817084c19a8f938f7ce9ec3637340d&', None, '2025-04-19 18:55:00', None, None),
-    (10, 'staircase_down', 'Staircase Down', 'You notice a staircase leading down to the next level.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1365404303161950388/stairs_down_2.png?ex=680d2f59&is=680bddd9&hm=94fbe622374098bfcb2d17b5c79a63542853d7ee574c5c93ef98dfea92e6780b&', None, '2025-04-19 18:55:00', None, None),
-    (11, 'exit', 'Dungeon Exit', '(Implemented in next patch)', 'https://the-demiurge.com/DemiDevUnit/images/backintro.png', None, '2025-03-31 02:40:47', None, None),
-    (12, 'item', 'Treasure Room', 'You do not notice any hostile presence,\ninstead you see a treasure chest waiting to be unlocked.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362832389629284544/treasurechest.png?ex=680c65d1&is=680b1451&hm=e1971818f32f4e0b0f43cfcbf5283fc1c3f36f80b1af2bcfacbfd7ba8ecf3ace&', None, '2025-03-31 02:40:47', None, None),
-    (13, 'boss', 'Boss Lair', 'A grand chamber with ominous decorations.', None, 17, '2025-03-31 02:40:47', None, None),
-    (15, 'shop', 'Shop Room', 'You do not notice any hostile presence.\n\nInstead you find a Moogle hiding in the corner...', 'https://cdn.discordapp.com/attachments/1362832151485354065/1376308720144748554/Shop_Entrance.gif?ex=6834dae1&is=68338961&hm=5370f37045df11803229a217bc984ce52b910b64c59a6ede123468567b6d1991&', None, '2025-03-31 02:40:47', None, None),
-    (16, 'illusion', 'Illusion Chamber', 'The room shimmers mysteriously...', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362832385040711930/Illusion.png?ex=680c65d0&is=680b1450&hm=17f9b558f22f2738b576bb373eec18b161c8df67c8f2bcfff86a1ddc6d604eed&', None, '2025-03-31 02:40:47', None, None),
-    (17, 'locked', 'Locked Door', 'A heavy door with a glowing symbol and what appears to be a lock. It seems you need a key.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362832387742109886/lockedroom.png?ex=680d0e91&is=680bbd11&hm=d3b19049954366cd7d625e5592a6cffbf7242aa3462ea107525c4919c371bee3&', None, '2025-04-19 18:55:00', None, None),
-    (18, 'chest_unlocked', 'Unlocked Chest', 'You notice an empty chest and nothing else of importance.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1365404301488291880/chestopen.png?ex=680d2f59&is=680bddd9&hm=df9e2742340f802058c078a816d17d0ffaaadeca5cfafa526db4273c28c02faf&', None, '2025-04-23 23:00:00', None, None),
-    (19, 'safe', 'Lake Room', 'You do not notice anything of importance, the area appears to be safe.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362832385829244948/Lake2.png?ex=680c65d0&is=680b1450&hm=bbf00040b5390f13ae4c8eedd2ea32dc08a0510e150879ae30cfc4b6e0a13ff0&', None, '2025-04-25 12:29:10', None, None),
-    (20, 'safe', 'Lake Room 2', 'You do not notice anything of importance, the area appears to be safe.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362832386416443683/Lake3.png?ex=680c65d1&is=680b1451&hm=1dc65d458458bb0e73e417850bc66973c79921757193b7d85d5849923cb3624a&', None, '2025-04-25 12:29:10', None, None),
-    (21, 'miniboss', 'Mimic', "As you approach the locked chest it springs to life and bares it's fangs!", 'https://cdn.discordapp.com/attachments/1362832151485354065/1365786181417177148/2.png?ex=68113600&is=680fe480&hm=a35ce81d097c19b34c06338bb678627ec9b16061ba867cb0d72be0d84075a927&', 16, '2025-04-29 00:24:47', None, None),
-    (22, 'death', 'Death', 'Your health as fallen to 0 and have fainted.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1370837025665712178/output.gif?ex=6820f2f7&is=681fa177&hm=5c0ff142cc94ff7dd4050fb0be0cb1821580e251f6c5e8cb2f31384170afbd52&', None, '2025-05-09 16:59:31', None, None),
-    (23, 'entrance', 'Dungeon Entrance', 'You arrive at the dungeon entrance. The air is calm, and the path ahead beckons you forward.', 'https://the-demiurge.com/DemiDevUnit/images/backintro.png', None, '2025-06-23 12:00:00', None, None)
+    (1, 'safe', 'Moss Room', 'You do not notice anything of importance, the area appears to be safe.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362833775637303336/roomtypemoss.png?ex=680c671c&is=680b159c&hm=3dc79f7a87ce268e9d54deae12bee18fa98b37a69caa1644257023135acfee8e&', None, '2025-03-31 07:40:47', None, None, None, None),
+    (2, 'safe', 'Mystic Room', 'You do not notice anything of importance, the area appears to be safe.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362833776446673227/roomtypemystic.png?ex=680c671c&is=680b159c&hm=bc397f1f43a2317102e1f4216333b331c31dcbac9ffd8078f61c0c43171841a1&', None, '2025-03-31 07:40:47', None, None, None, None),
+    (3, 'safe', 'Crystal Tunnel', 'You do not notice anything of importance, the area appears to be safe.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362833695169576981/crystals.png?ex=680c6709&is=680b1589&hm=2c0977deb61f6e286646aeddab3a54cf048c6043dbd398c15f5ebbe7a1d5e8f6&', None, '2025-03-31 07:40:47', None, None, None, None),
+    (4, 'safe', 'Bridge', 'You do not notice anything of importance, the area appears to be safe.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362833699648966726/roomtypebridge.png?ex=680c670a&is=680b158a&hm=88011ac41a9c277ce6ecc855a7cb3099d9c35a0d648caa944397718741c2d5c0&', None, '2025-04-10 01:22:14', None, None, None, None),
+    (5, 'safe', 'Magicite', 'You do not notice anything of importance, the area appears to be safe.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362833774844313750/roomtypemagicite.png?ex=680c671c&is=680b159c&hm=07b6f7a5c5f95e556e7adb11a013cb9d546489d7a64954d15f5c99d11acf9847&', None, '2025-04-10 01:22:19', None, None, None, None),
+    (6, 'safe', 'Rainbow Crystal', 'You do not notice anything of importance, the area appears to be safe.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362833696519885081/rainbowcrystal.png?ex=680c6709&is=680b1589&hm=efecc1cf0d3a6e9f30364b1e4731697a65ab5745807ba1cb30574569cf10be16&', None, '2025-04-10 01:22:27', None, None, None, None),
+    (7, 'safe', 'Aetheryte', 'You do not notice any hostile presence;\ninstead you see a naturally growing Aetheryte cluster.\n\nPerhaps this will be useful in the future...', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362833698168508496/roomtypeaetheryte.png?ex=680c6709&is=680b159c&hm=29873e0d2dea2ecbd63a66c0d18825c5954f80965e19309827e18a8f77459052&', None, '2025-04-10 01:22:27', None, None, None, None),
+    (8, 'monster', 'You Sense A Hostile Presence...', 'An enemy appears upon entering the area...', '', None, '2025-03-31 07:40:47', None, None, None, None),
+    (9, 'staircase_up', 'Staircase Up', 'You notice a staircase leading up to the next level.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362832388677308516/stairs.png?ex=680c65d1&is=680b1451&hm=8b5d73c9b00898e7913c5d661d2f107731817084c19a8f938f7ce9ec3637340d&', None, '2025-04-19 18:55:00', None, None, None, None),
+    (10, 'staircase_down', 'Staircase Down', 'You notice a staircase leading down to the next level.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1365404303161950388/stairs_down_2.png?ex=680d2f59&is=680bddd9&hm=94fbe622374098bfcb2d17d0ffaaadeca5cfafa526db4273c28c02faf&', None, '2025-04-19 18:55:00', None, None, None, None),
+    (11, 'exit', 'Dungeon Exit', '(Implemented in next patch)', 'https://the-demiurge.com/DemiDevUnit/images/backintro.png', None, '2025-03-31 02:40:47', None, None, None, None),
+    (12, 'item', 'Treasure Room', 'You do not notice any hostile presence,\ninstead you see a treasure chest waiting to be unlocked.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362832389629284544/treasurechest.png?ex=680c65d1&is=680b1451&hm=e1971818f32f4e0b0f43cfcbf5283fc1c3f36f80b1af2bcfacbfd7ba8ecf3ace&', None, '2025-03-31 02:40:47', None, None, None, None),
+    (13, 'boss', 'Boss Lair', 'A grand chamber with ominous decorations.', None, 17, '2025-03-31 02:40:47', None, None, None, None),
+    (15, 'shop', 'Shop Room', 'You do not notice any hostile presence.\n\nInstead you find a Moogle hiding in the corner...', 'https://cdn.discordapp.com/attachments/1362832151485354065/1376308720144748554/Shop_Entrance.gif?ex=6834dae1&is=68338961&hm=5370f37045df11803229a217bc984ce52b910b64c59a6ede123468567b6d1991&', None, '2025-03-31 02:40:47', None, None, None, None),
+    (16, 'illusion', 'Illusion Chamber', 'The room shimmers mysteriously...', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362832385040711930/Illusion.png?ex=680c65d0&is=680b1450&hm=17f9b558f22f2738b576bb373eec18b161c8df67c8f2bcfff86a1ddc6d604eed&', None, '2025-03-31 02:40:47', None, None, None, None),
+    (17, 'locked', 'Locked Door', 'A heavy door with a glowing symbol and what appears to be a lock. It seems you need a key.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362832387742109886/lockedroom.png?ex=680d0e91&is=680bbd11&hm=d3b19049954366cd7d625e5592a6cffbf7242aa3462ea107525c4919c371bee3&', None, '2025-04-19 18:55:00', None, None, None, None),
+    (18, 'chest_unlocked', 'Unlocked Chest', 'You notice an empty chest and nothing else of importance.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1365404301488291880/chestopen.png?ex=680d2f59&is=680bddd9&hm=df9e2742340f802058c078a816d17d0ffaaadeca5cfafa526db4273c28c02faf&', None, '2025-04-23 23:00:00', None, None, None, None),
+    (19, 'safe', 'Lake Room', 'You do not notice anything of importance, the area appears to be safe.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362832385829244948/Lake2.png?ex=680c65d0&is=680b1450&hm=bbf00040b5390f13ae4c8eedd2ea32dc08a0510e150879ae30cfc4b6e0a13ff0&', None, '2025-04-25 12:29:10', None, None, None, None),
+    (20, 'safe', 'Lake Room 2', 'You do not notice anything of importance, the area appears to be safe.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1362832386416443683/Lake3.png?ex=680c65d1&is=680b1451&hm=1dc65d458458bb0e73e417850bc66973c79921757193b7d85d5849923cb3624a&', None, '2025-04-25 12:29:10', None, None, None, None),
+    (21, 'miniboss', 'Mimic', "As you approach the locked chest it springs to life and bares it's fangs!", 'https://cdn.discordapp.com/attachments/1362832151485354065/1365786181417177148/2.png?ex=68113600&is=680fe480&hm=a35ce81d097c19b34c06338bb678627ec9b16061ba867cb0d72be0d84075a927&', 16, '2025-04-29 00:24:47', None, None, None, None),
+    (22, 'death', 'Death', 'Your health as fallen to 0 and have fainted.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1370837025665712178/output.gif?ex=6820f2f7&is=681fa177&hm=5c0ff142cc94ff7dd4050fb0be0cb1821580e251f6c5e8cb2f31384170afbd52&', None, '2025-05-09 16:59:31', None, None, None, None),
+    (23, 'entrance', 'Dungeon Entrance', 'You arrive at the dungeon entrance. The air is calm, and the path ahead beckons you forward.', 'https://the-demiurge.com/DemiDevUnit/images/backintro.png', None, '2025-06-23 12:00:00', None, None, None, None),
+    (24, 'cloister', 'Cloister of Flames', 'You sense a great power in this cloister. A crimson Aetheryte crystal hums softly at its center.', None, None, '2025-07-01 00:00:00', None, None, 1, 5),
+    (25, 'cloister', 'Cloister of Frost', 'You sense a great power in this cloister. A pale Aetheryte crystal floats, cold mist curling from it.', None, None, '2025-07-01 00:00:00', None, None, 2, 8),
+    (26, 'cloister', 'Cloister of Storms', 'You sense a great power in this cloister. A crackling Aetheryte crystal pulses with thunder.', None, None, '2025-07-01 00:00:00', None, None, 3, 12)
 ]
 
 # --- items --------------------------------------------------------------------
@@ -360,7 +417,10 @@ MERGED_ENEMIES: List[Tuple] = [
     (23, 'Black Waltz', 'miniboss', 'A mage resembling those from stories of the Dark Era of Alexandria. Where did it come from? What or who could it be searching for?', 600, 600, 10, 10, 13, 12, 99, 1, 'Easy', None, 'https://cdn.discordapp.com/attachments/1362832151485354065/1375114690589364266/blackwaltz.png?ex=683082da&is=682f315a&hm=dd33c631faee48b90bedb3c64c62b15b1b5dc339324507287cf396b0eb08f724&', 0.1, 500, 2200, 4, 1, None, '2025-05-22 14:42:26', 5),
     (24, 'Black Waltz', 'miniboss', 'A mage resembling those from stories of the Dark Era of Alexandria. Where did it come from? What or who could it be searching for?', 800, 800, 11, 11, 14, 13, 99, 1, 'Medium', None, 'https://cdn.discordapp.com/attachments/1362832151485354065/1375114690589364266/blackwaltz.png?ex=683082da&is=682f315a&hm=dd33c631faee48b90bedb3c64c62b15b1b5dc339324507287cf396b0eb08f724&', 0.1, 500, 2200, 4, 1, None, '2025-05-22 14:42:26', 5),
     (25, 'Drake', 'normal', 'An ancient creature with scales and fangs, said to be extinct for over 1,000 years.', 300, 300, 15, 10, 10, 10, 99, 1, 'Medium', None, 'https://cdn.discordapp.com/attachments/1362832151485354065/1375114639914045480/drake.png?ex=683082ce&is=682f314e&hm=92fdeabf72b3026f912674b0faa2f98bf993aea384119831b63492d607c84d3e&', 0.1, 150, 150, 5, 1, None, '2025-03-31 07:40:47', 5),
-    (26, 'Cactuar', 'normal', "An evasive cactus species that is known to attack and run, watch our for it's Needles!", 300, 300, 15, 13, 11, 8, 99, 1, 'Medium', None, 'https://cdn.discordapp.com/attachments/1362832151485354065/1375114595626389514/Cactuar.png?ex=683082c3&is=682f3143&hm=6dc61cc626160c8ed9d1619142eb319365330b98641bd2e9db5359c4fef1c373&', 0.1, 220, 200, 5, 1, None, '2025-05-22 14:44:44', 5)
+    (26, 'Cactuar', 'normal', "An evasive cactus species that is known to attack and run, watch our for it's Needles!", 300, 300, 15, 13, 11, 8, 99, 1, 'Medium', None, 'https://cdn.discordapp.com/attachments/1362832151485354065/1375114595626389514/Cactuar.png?ex=683082c3&is=682f3143&hm=6dc61cc626160c8ed9d1619142eb319365330b98641bd2e9db5359c4fef1c373&', 0.1, 220, 200, 5, 1, None, '2025-05-22 14:44:44', 5),
+    (101, 'Ifrit', 'eidolon', 'A blazing Eidolon wreathed in infernal flames.', 1200, 1200, 25, 18, 30, 20, 99, 5, 'Summoner', None, None, 0, 500, 800, None, 1, None, '2025-07-01 00:00:00', 6),
+    (102, 'Shiva', 'eidolon', 'A frigid Eidolon whose breath freezes the air.', 1300, 1300, 22, 18, 32, 22, 99, 6, 'Summoner', None, None, 0, 600, 900, None, 1, None, '2025-07-01 00:00:00', 6),
+    (103, 'Ramuh', 'eidolon', 'A stormbound Eidolon crackling with lightning.', 1400, 1400, 24, 20, 34, 24, 99, 6, 'Summoner', None, None, 0, 700, 1000, None, 1, None, '2025-07-01 00:00:00', 6)
 ]
 
 # --- enemy ↔ ability links ----------------------------------------------------
@@ -431,6 +491,20 @@ MERGED_ENEMY_ABILITIES: List[Tuple] = [
     (26, 93, 0, 0, None, None, 'attack_power', 1, 100)
 ]
 
+# --- eidolons -----------------------------------------------------------------
+MERGED_EIDOLONS: List[Tuple] = [
+    (1, 'Ifrit', 'A fiery Eidolon bound to the Cloister of Flames.', 101, 5, 20, 15, 30, 18, 20, 8, 95, 5, 25, '2025-07-01 00:00:00'),
+    (2, 'Shiva', 'A crystalline Eidolon bound to the Cloister of Frost.', 102, 8, 18, 14, 32, 20, 22, 10, 95, 6, 25, '2025-07-01 00:00:00'),
+    (3, 'Ramuh', 'A stormy Eidolon bound to the Cloister of Storms.', 103, 12, 22, 16, 34, 22, 24, 10, 95, 6, 30, '2025-07-01 00:00:00'),
+]
+
+# --- eidolon ↔ ability links --------------------------------------------------
+MERGED_EIDOLON_ABILITIES: List[Tuple] = [
+    (1, 201, 1),
+    (2, 202, 1),
+    (3, 203, 1),
+]
+
 # --- enemy drops --------------------------------------------------------------
 MERGED_ENEMY_DROPS: List[Tuple] = [
     (1, 1, 0.5, 1, 1),
@@ -453,26 +527,26 @@ MERGED_ENEMY_RESISTANCES: List[Tuple] = [
 
 # --- levels -------------------------------------------------------------------
 MERGED_LEVELS: List[Tuple] = [
-    (1, 0, 0, 0, 0, 0, 0, 0, 0, 0, None, '2025-04-08 15:00:00'),
-    (2, 150, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-08 15:00:00'),
-    (3, 200, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-08 15:00:00'),
-    (4, 250, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-09 15:15:49'),
-    (5, 300, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-09 15:15:49'),
-    (6, 350, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-09 15:15:49'),
-    (7, 500, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24'),
-    (8, 600, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24'),
-    (9, 700, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24'),
-    (10, 900, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24'),
-    (11, 1000, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24'),
-    (12, 1100, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24'),
-    (13, 1200, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24'),
-    (14, 1300, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24'),
-    (15, 1400, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24'),
-    (16, 1500, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24'),
-    (17, 1600, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24'),
-    (18, 1700, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24'),
-    (19, 1800, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24'),
-    (20, 2000, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24')
+    (1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, None, '2025-04-08 15:00:00'),
+    (2, 150, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-08 15:00:00'),
+    (3, 200, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-08 15:00:00'),
+    (4, 250, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-09 15:15:49'),
+    (5, 300, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-09 15:15:49'),
+    (6, 350, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-09 15:15:49'),
+    (7, 500, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24'),
+    (8, 600, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24'),
+    (9, 700, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24'),
+    (10, 900, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24'),
+    (11, 1000, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24'),
+    (12, 1100, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24'),
+    (13, 1200, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24'),
+    (14, 1300, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24'),
+    (15, 1400, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24'),
+    (16, 1500, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24'),
+    (17, 1600, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24'),
+    (18, 1700, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24'),
+    (19, 1800, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24'),
+    (20, 2000, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, None, '2025-04-17 03:25:24')
 ]
 
 # --- vendors + items ----------------------------------------------------------
@@ -541,6 +615,8 @@ MERGED_FLOOR_ROOM_RULES: List[Tuple] = [
     (15, 'Easy', 2, 'boss', 0.1, 1, '2025-04-21 19:33:59'),
     (16, 'Easy', 1, 'locked', 0.1, 3, '2025-05-25 01:57:39'),
     (17, 'Easy', 2, 'locked', 0.1, 3, '2025-05-25 01:57:39'),
+    (35, 'Easy', 1, 'cloister', 0.03, 1, '2025-07-01 00:00:00'),
+    (36, 'Easy', 2, 'cloister', 0.02, 1, '2025-07-01 00:00:00'),
     (18, 'Medium', 1, 'safe', 0.5, 50, '2025-04-24 21:03:18'),
     (19, 'Medium', 2, 'safe', 0.5, 50, '2025-04-24 21:03:18'),
     (20, 'Medium', 1, 'monster', 0.5, 70, '2025-04-21 19:07:34'),
@@ -557,7 +633,9 @@ MERGED_FLOOR_ROOM_RULES: List[Tuple] = [
     (31, 'Medium', 2, 'staircase_up', 0, 0, '2025-04-21 19:33:59'),
     (32, 'Medium', 1, 'staircase_down', 0.05, 1, '2025-04-24 21:03:18'),
     (33, 'Medium', 1, 'locked', 0.1, 3, '2025-05-25 01:57:39'),
-    (34, 'Medium', 2, 'locked', 0.1, 3, '2025-05-25 01:57:39')
+    (34, 'Medium', 2, 'locked', 0.1, 3, '2025-05-25 01:57:39'),
+    (37, 'Medium', 1, 'cloister', 0.03, 1, '2025-07-01 00:00:00'),
+    (38, 'Medium', 2, 'cloister', 0.02, 1, '2025-07-01 00:00:00')
 ]
 
 # --- class trances ------------------------------------------------------------
@@ -684,7 +762,7 @@ TABLES = {
             floor_number      INT,
             room_type ENUM(
                 'safe','entrance','monster','item','shop','boss','trap','illusion',
-                'staircase_up','staircase_down','exit','locked'
+                'staircase_up','staircase_down','exit','locked','cloister'
             ) NOT NULL,
             chance            FLOAT   NOT NULL,
             max_per_floor     INT     NOT NULL,
@@ -722,6 +800,7 @@ TABLES = {
             description    TEXT,
             effect         JSON,
             cooldown       INT DEFAULT 0,
+            mp_cost        INT DEFAULT 0,
             icon_url       VARCHAR(255),
             target_type    ENUM('self','enemy','ally','any') DEFAULT 'any',
             special_effect VARCHAR(50),
@@ -743,6 +822,7 @@ TABLES = {
             base_hp             INT DEFAULT 100,
             base_attack         INT DEFAULT 10,
             base_magic          INT DEFAULT 10,
+            base_mp             INT DEFAULT 0,
             base_defense        INT DEFAULT 5,
             base_magic_defense  INT DEFAULT 5,
             base_accuracy       INT DEFAULT 95,
@@ -785,6 +865,7 @@ TABLES = {
             accuracy_increase          FLOAT NOT NULL,
             evasion_increase           FLOAT NOT NULL,
             speed_increase             FLOAT NOT NULL,
+            mp_increase                FLOAT NOT NULL DEFAULT 0,
             unlocked_abilities         JSON,
             created_at                 TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -861,6 +942,8 @@ TABLES = {
             experience       INT DEFAULT 0,
             hp               INT DEFAULT 100,
             max_hp           INT DEFAULT 100,
+            mp               INT DEFAULT 0,
+            max_mp           INT DEFAULT 0,
             attack_power     INT DEFAULT 10,
             defense          INT DEFAULT 5,
             magic_power      INT DEFAULT 10,
@@ -923,7 +1006,7 @@ TABLES = {
             room_type ENUM(
                 'safe','entrance','monster','item','shop','boss','trap','illusion',
                 'staircase_up','staircase_down','exit','locked','chest_unlocked',
-                'miniboss','death'
+                'miniboss','death','cloister'
             ) NOT NULL DEFAULT 'safe',
             template_name VARCHAR(100) NOT NULL,
             description   TEXT,
@@ -931,7 +1014,11 @@ TABLES = {
             default_enemy_id INT,
             created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             trap_type     ENUM('spike','gil_snatcher','mimic'),
-            trap_payload  JSON
+            trap_payload  JSON,
+            eidolon_id   INT NULL,
+            attune_level INT NULL,
+            FOREIGN KEY (default_enemy_id) REFERENCES enemies(enemy_id) ON DELETE SET NULL,
+            FOREIGN KEY (eidolon_id) REFERENCES eidolons(eidolon_id) ON DELETE SET NULL
         )
     ''',
     'crystal_templates': '''
@@ -1036,13 +1123,64 @@ TABLES = {
             stair_down_x     INT,
             stair_down_y     INT,
             inner_template_id INT NULL,
+            eidolon_id INT NULL,
+            attune_level INT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             stair_up_floor   INT,
             stair_down_floor INT,
             FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE,
             FOREIGN KEY (floor_id)   REFERENCES floors(floor_id)     ON DELETE CASCADE,
             FOREIGN KEY (vendor_id)  REFERENCES session_vendor_instances(session_vendor_id) ON DELETE SET NULL,
-            FOREIGN KEY (inner_template_id) REFERENCES room_templates(template_id) ON DELETE SET NULL
+            FOREIGN KEY (inner_template_id) REFERENCES room_templates(template_id) ON DELETE SET NULL,
+            FOREIGN KEY (eidolon_id) REFERENCES eidolons(eidolon_id) ON DELETE SET NULL
+        )
+    ''',
+    # ---------- eidolons ----------
+    'eidolons': '''
+        CREATE TABLE IF NOT EXISTS eidolons (
+            eidolon_id      INT AUTO_INCREMENT PRIMARY KEY,
+            name            VARCHAR(100) NOT NULL,
+            description     TEXT,
+            enemy_id        INT NOT NULL,
+            required_level  INT NOT NULL DEFAULT 1,
+            base_hp         INT DEFAULT 100,
+            base_attack     INT DEFAULT 10,
+            base_magic      INT DEFAULT 10,
+            base_defense    INT DEFAULT 5,
+            base_magic_defense INT DEFAULT 5,
+            base_accuracy   INT DEFAULT 95,
+            base_evasion    INT DEFAULT 5,
+            base_speed      INT DEFAULT 10,
+            summon_mp_cost  INT DEFAULT 0,
+            created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (enemy_id) REFERENCES enemies(enemy_id) ON DELETE CASCADE
+        )
+    ''',
+    # ---------- eidolon_abilities ----------
+    'eidolon_abilities': '''
+        CREATE TABLE IF NOT EXISTS eidolon_abilities (
+            eidolon_id   INT NOT NULL,
+            ability_id   INT NOT NULL,
+            unlock_level INT DEFAULT 1,
+            PRIMARY KEY (eidolon_id, ability_id),
+            FOREIGN KEY (eidolon_id) REFERENCES eidolons(eidolon_id) ON DELETE CASCADE,
+            FOREIGN KEY (ability_id) REFERENCES abilities(ability_id) ON DELETE CASCADE,
+            FOREIGN KEY (unlock_level) REFERENCES levels(level) ON UPDATE CASCADE
+        )
+    ''',
+    # ---------- player_eidolons ----------
+    'player_eidolons': '''
+        CREATE TABLE IF NOT EXISTS player_eidolons (
+            session_id   INT NOT NULL,
+            player_id    BIGINT NOT NULL,
+            eidolon_id   INT NOT NULL,
+            level        INT DEFAULT 1,
+            experience   INT DEFAULT 0,
+            unlocked_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (session_id, player_id, eidolon_id),
+            FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE,
+            FOREIGN KEY (player_id, session_id) REFERENCES players(player_id, session_id) ON DELETE CASCADE,
+            FOREIGN KEY (eidolon_id) REFERENCES eidolons(eidolon_id) ON DELETE CASCADE
         )
     ''',
     # ---------- key_items ----------
@@ -1140,7 +1278,7 @@ TABLES = {
         CREATE TABLE IF NOT EXISTS enemies (
             enemy_id INT AUTO_INCREMENT PRIMARY KEY,
             enemy_name VARCHAR(50) NOT NULL,
-            role ENUM('normal','miniboss','boss') NOT NULL DEFAULT 'normal',
+            role ENUM('normal','miniboss','boss','eidolon') NOT NULL DEFAULT 'normal',
             description TEXT,
             hp INT NOT NULL,
             max_hp INT NOT NULL,
@@ -1346,20 +1484,23 @@ TABLE_ORDER = [
     'players',
     'player_temporary_abilities',
     'floors',
-    'room_templates',
-    'crystal_templates',
-    'npc_vendors',
     'items',
+    'npc_vendors',
     'npc_vendor_items',
     'session_vendor_instances',
     'session_vendor_items',
+    'enemies',
+    'eidolons',
+    'eidolon_abilities',
+    'player_eidolons',
+    'room_templates',
+    'crystal_templates',
     'rooms',
     'key_items',
     'treasure_chests',
     'chest_def_rewards',
     'treasure_chest_instances',
     'chest_instance_rewards',
-    'enemies',
     'enemy_drops',
     'enemy_abilities',
     'enemy_resistances',
@@ -1397,18 +1538,16 @@ def insert_difficulties(cur):
 
 def insert_floor_room_rules(cur):
     logger.info("Checking floor_room_rules seed data…")
-    if table_is_empty(cur, "floor_room_rules") and MERGED_FLOOR_ROOM_RULES:
+    if MERGED_FLOOR_ROOM_RULES:
         cur.executemany(
             """
-            INSERT INTO floor_room_rules
+            INSERT IGNORE INTO floor_room_rules
               (difficulty_name, floor_number, room_type, chance, max_per_floor, created_at)
             VALUES (%s, %s, %s, %s, %s, %s)
             """,
             [row[1:] for row in MERGED_FLOOR_ROOM_RULES]
         )
-        logger.info("Inserted floor_room_rules.")
-    else:
-        logger.info("floor_room_rules already populated or no seed data provided – skipping")
+        logger.info("Ensured floor_room_rules.")
 
 def insert_elements(cur):
     logger.info("Checking elements seed data…")
@@ -1438,46 +1577,47 @@ def insert_element_oppositions(cur):
 
 def insert_abilities_and_classes(cur):
     logger.info("Checking abilities seed data…")
-    if table_is_empty(cur, "abilities"):
-        cur.executemany(
-            """
-            INSERT INTO abilities
-              (ability_name, description, effect, cooldown, icon_url,
-               target_type, special_effect, element_id, status_effect_id,
-               status_duration, created_at, scaling_stat)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            """,
-            [row[1:] for row in MERGED_ABILITIES]
-        )
-        logger.info("Inserted abilities.")
-    else:
-        logger.info("abilities already populated – skipping")
+    cur.executemany(
+        """
+        INSERT IGNORE INTO abilities
+          (ability_name, description, effect, cooldown, icon_url,
+           target_type, special_effect, element_id, status_effect_id,
+           status_duration, created_at, scaling_stat)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """,
+        [row[1:] for row in MERGED_ABILITIES]
+    )
+    cur.executemany(
+        """
+        INSERT IGNORE INTO abilities
+          (ability_id, ability_name, description, effect, cooldown, icon_url,
+           target_type, special_effect, element_id, status_effect_id,
+           status_duration, created_at, scaling_stat, mp_cost)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """,
+        MERGED_EIDOLON_ABILITY_DEFS
+    )
+    logger.info("Ensured abilities.")
 
     logger.info("Checking classes seed data…")
-    if table_is_empty(cur, "classes"):
-        cur.executemany(
-            """
-            INSERT INTO classes
-              (class_name, description, base_hp, base_attack, base_magic,
-               base_defense, base_magic_defense, base_accuracy,
-               base_evasion, base_speed, image_url, creator_id, created_at, atb_max)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            """,
-            [row[1:] for row in MERGED_CLASSES]
-        )
-        logger.info("Inserted classes.")
-    else:
-        logger.info("classes already populated – skipping")
+    cur.executemany(
+        """
+        INSERT IGNORE INTO classes
+          (class_name, description, base_hp, base_attack, base_magic, base_mp,
+           base_defense, base_magic_defense, base_accuracy,
+           base_evasion, base_speed, image_url, creator_id, created_at, atb_max)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """,
+        [row[1:] for row in MERGED_CLASSES]
+    )
+    logger.info("Ensured classes.")
 
     logger.info("Checking class_abilities links…")
-    if table_is_empty(cur, "class_abilities"):
-        cur.executemany(
-            "INSERT INTO class_abilities (class_id, ability_id, unlock_level) VALUES (%s, %s, %s)",
-            MERGED_CLASS_ABILITIES
-        )
-        logger.info("Inserted class_abilities links.")
-    else:
-        logger.info("class_abilities already populated – skipping")
+    cur.executemany(
+        "INSERT IGNORE INTO class_abilities (class_id, ability_id, unlock_level) VALUES (%s, %s, %s)",
+        MERGED_CLASS_ABILITIES
+    )
+    logger.info("Ensured class_abilities links.")
 
 def insert_temporary_abilities(cur):
     logger.info("Checking temporary_abilities seed data…")
@@ -1497,20 +1637,17 @@ def insert_temporary_abilities(cur):
 
 def insert_levels(cur):
     logger.info("Checking levels seed data…")
-    if not table_is_empty(cur, "levels"):
-        logger.info("levels already populated – skipping")
-        return
     cur.executemany(
         """
-        INSERT INTO levels
+        INSERT IGNORE INTO levels
           (level, required_exp, hp_increase, attack_increase, magic_increase,
            defense_increase, magic_defense_increase, accuracy_increase,
-           evasion_increase, speed_increase, unlocked_abilities, created_at)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+           evasion_increase, speed_increase, mp_increase, unlocked_abilities, created_at)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """,
         MERGED_LEVELS
     )
-    logger.info("Inserted levels.")
+    logger.info("Ensured levels seed data.")
 
 def insert_intro_steps(cur):
     logger.info("Checking intro_steps seed data…")
@@ -1529,19 +1666,16 @@ def insert_intro_steps(cur):
 
 def insert_room_templates(cur):
     logger.info("Checking room_templates seed data…")
-    if not table_is_empty(cur, "room_templates"):
-        logger.info("room_templates already populated – skipping")
-        return
     cur.executemany(
         """
-        INSERT INTO room_templates
+        INSERT IGNORE INTO room_templates
           (room_type, template_name, description, image_url,
-           default_enemy_id, created_at, trap_type, trap_payload)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+           default_enemy_id, created_at, trap_type, trap_payload, eidolon_id, attune_level)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """,
         [row[1:] for row in MERGED_ROOM_TEMPLATES]
     )
-    logger.info("Inserted room_templates.")
+    logger.info("Ensured room_templates.")
 
 def insert_crystal_templates(cur):
     logger.info("Checking crystal_templates seed data…")
@@ -1662,36 +1796,55 @@ def insert_trance_abilities(cur):
 
 def insert_enemies_and_abilities(cur):
     logger.info("Checking enemies seed data…")
-    if table_is_empty(cur, "enemies"):
-        cur.executemany(
-            """
-            INSERT INTO enemies
-              (enemy_name, role, description, hp, max_hp, attack_power, defense,
-               magic_power, magic_defense, accuracy, evasion, difficulty,
-               abilities, image_url, spawn_chance, gil_drop, xp_reward,
-               loot_item_id, loot_quantity, creator_id, created_at, atb_max)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            """,
-            [row[1:] for row in MERGED_ENEMIES]
-        )
-        logger.info("Inserted enemies.")
-    else:
-        logger.info("enemies already populated – skipping")
+    cur.executemany(
+        """
+        INSERT IGNORE INTO enemies
+          (enemy_name, role, description, hp, max_hp, attack_power, defense,
+           magic_power, magic_defense, accuracy, evasion, difficulty,
+           abilities, image_url, spawn_chance, gil_drop, xp_reward,
+           loot_item_id, loot_quantity, creator_id, created_at, atb_max)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """,
+        [row[1:] for row in MERGED_ENEMIES]
+    )
+    logger.info("Ensured enemies.")
 
     logger.info("Checking enemy_abilities links…")
-    if table_is_empty(cur, "enemy_abilities"):
-        cur.executemany(
-            """
-            INSERT INTO enemy_abilities
-              (enemy_id, ability_id, weight, can_heal, heal_threshold_pct,
-               heal_amount_pct, scaling_stat, scaling_factor, accuracy)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            """,
-            MERGED_ENEMY_ABILITIES
-        )
-        logger.info("Inserted enemy_abilities links.")
-    else:
-        logger.info("enemy_abilities already populated – skipping")
+    cur.executemany(
+        """
+        INSERT IGNORE INTO enemy_abilities
+          (enemy_id, ability_id, weight, can_heal, heal_threshold_pct,
+           heal_amount_pct, scaling_stat, scaling_factor, accuracy)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """,
+        MERGED_ENEMY_ABILITIES
+    )
+    logger.info("Ensured enemy_abilities links.")
+
+def insert_eidolons(cur):
+    logger.info("Checking eidolons seed data…")
+    cur.executemany(
+        """
+        INSERT IGNORE INTO eidolons
+          (eidolon_id, name, description, enemy_id, required_level,
+           base_hp, base_attack, base_magic, base_defense, base_magic_defense,
+           base_accuracy, base_evasion, base_speed, summon_mp_cost, created_at)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """,
+        MERGED_EIDOLONS
+    )
+    logger.info("Ensured eidolons.")
+
+    logger.info("Checking eidolon_abilities links…")
+    cur.executemany(
+        """
+        INSERT IGNORE INTO eidolon_abilities
+          (eidolon_id, ability_id, unlock_level)
+        VALUES (%s,%s,%s)
+        """,
+        MERGED_EIDOLON_ABILITIES
+    )
+    logger.info("Ensured eidolon_abilities.")
 
 def insert_enemy_drops(cur):
     logger.info("Checking enemy_drops seed data…")
@@ -1786,6 +1939,21 @@ def main() -> None:
                     cur.execute(TABLES[tbl])
                     logger.debug("Table `%s` ready.", tbl)
 
+                # ── schema migrations (add missing columns/enums) ──────────────
+                ensure_enum_values(cur, "enemies", "role", ["eidolon"], "normal")
+                ensure_enum_values(cur, "floor_room_rules", "room_type", ["cloister"], "safe")
+                ensure_enum_values(cur, "room_templates", "room_type", ["cloister"], "safe")
+
+                ensure_column(cur, "abilities", "mp_cost", "INT DEFAULT 0")
+                ensure_column(cur, "classes", "base_mp", "INT DEFAULT 0")
+                ensure_column(cur, "levels", "mp_increase", "FLOAT NOT NULL DEFAULT 0")
+                ensure_column(cur, "players", "mp", "INT DEFAULT 0")
+                ensure_column(cur, "players", "max_mp", "INT DEFAULT 0")
+                ensure_column(cur, "room_templates", "eidolon_id", "INT NULL")
+                ensure_column(cur, "room_templates", "attune_level", "INT NULL")
+                ensure_column(cur, "rooms", "eidolon_id", "INT NULL")
+                ensure_column(cur, "rooms", "attune_level", "INT NULL")
+
                 # ── seed data (order matters) ──────────────────────────────────
                 insert_difficulties(cur)
                 insert_floor_room_rules(cur)
@@ -1798,14 +1966,15 @@ def main() -> None:
                 insert_class_trances(cur)
                 insert_trance_abilities(cur)
                 insert_intro_steps(cur)
-                insert_room_templates(cur)
-                insert_crystal_templates(cur)
                 insert_npc_vendors(cur)
                 insert_items(cur)
                 insert_key_items(cur)
                 insert_treasure_chests(cur)
                 insert_chest_def_rewards(cur)
                 insert_enemies_and_abilities(cur)
+                insert_eidolons(cur)
+                insert_room_templates(cur)
+                insert_crystal_templates(cur)
                 insert_enemy_drops(cur)
                 insert_enemy_resistances(cur)
                 insert_npc_vendor_items(cur)

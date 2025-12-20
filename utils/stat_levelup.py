@@ -35,10 +35,11 @@ def get_level_growth(level: int) -> dict:
         conn.close()
         if row:
             # Extract only the growth multipliers.
-            growth_keys = [
-                "hp_increase", "attack_increase", "magic_increase", "defense_increase", 
-                "magic_defense_increase", "accuracy_increase", "evasion_increase", "speed_increase"
-            ]
+        growth_keys = [
+            "hp_increase", "attack_increase", "magic_increase", "defense_increase",
+            "magic_defense_increase", "accuracy_increase", "evasion_increase", "speed_increase",
+            "mp_increase",
+        ]
             growth = {key: row.get(key, 0) for key in growth_keys}
             return growth
         else:
@@ -54,13 +55,13 @@ def get_class_base_stats(class_id: int) -> dict:
     
     Returns a dict with:
       - base_hp, base_attack, base_magic, base_defense, base_magic_defense,
-        base_accuracy, base_evasion, base_speed.
+        base_accuracy, base_evasion, base_speed, base_mp.
     """
     try:
         conn = db_connect()
         cursor = conn.cursor(dictionary=True)
         cursor.execute("""
-            SELECT base_hp, base_attack, base_magic, base_defense, 
+            SELECT base_hp, base_attack, base_magic, base_mp, base_defense,
                    base_magic_defense, base_accuracy, base_evasion, base_speed
             FROM classes
             WHERE class_id = %s
@@ -95,7 +96,8 @@ def calculate_effective_stats(base_stats: dict, growth: dict, level: int) -> dic
         "base_magic_defense": "magic_defense_increase",
         "base_accuracy": "accuracy_increase",
         "base_evasion": "evasion_increase",
-        "base_speed": "speed_increase"
+        "base_speed": "speed_increase",
+        "base_mp": "mp_increase",
     }
     effective = {}
     for base_key, growth_key in mapping.items():
@@ -137,6 +139,8 @@ def update_player_stats(player_id: int, session_id: int, new_level: int, class_i
             UPDATE players
             SET hp = %s,
                 max_hp = %s,
+                mp = %s,
+                max_mp = %s,
                 attack_power = %s,
                 magic_power = %s,
                 defense = %s,
@@ -149,6 +153,8 @@ def update_player_stats(player_id: int, session_id: int, new_level: int, class_i
         cursor.execute(update_query, (
             effective_stats.get("hp", 0),               # hp
             effective_stats.get("hp", 0),               # max_hp
+            effective_stats.get("mp", 0),               # mp
+            effective_stats.get("mp", 0),               # max_mp
             effective_stats.get("attack", 0),           # attack_power
             effective_stats.get("magic", 0),            # magic_power
             effective_stats.get("defense", 0),          # defense

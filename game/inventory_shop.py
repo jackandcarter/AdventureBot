@@ -452,7 +452,7 @@ class InventoryShop(commands.Cog):
 
         with self.db.get_connection() as conn, conn.cursor(dictionary=True) as cur:
             cur.execute(
-                "SELECT inventory, hp, max_hp FROM players "
+                "SELECT inventory, hp, max_hp, mp, max_mp FROM players "
                 "WHERE player_id=%s AND session_id=%s",
                 (interaction.user.id, session.session_id)
             )
@@ -468,6 +468,7 @@ class InventoryShop(commands.Cog):
 
             effect = json.loads(item_row["effect"]) if item_row.get("effect") else {}
             heal = effect.get("heal", 0)
+            restore_mp = effect.get("restore_mp", 0)
             is_trance = effect.get("trance", False)
             txt = f"You used **{item_row['item_name']}**."
             if heal:
@@ -477,6 +478,13 @@ class InventoryShop(commands.Cog):
                     (new_hp, interaction.user.id, session.session_id)
                 )
                 txt += f" Healed **{heal}** HP! (HP: {new_hp}/{player['max_hp']})"
+            if restore_mp and player.get("max_mp"):
+                new_mp = min((player.get("mp") or 0) + restore_mp, player.get("max_mp") or 0)
+                cur.execute(
+                    "UPDATE players SET mp=%s WHERE player_id=%s AND session_id=%s",
+                    (new_mp, interaction.user.id, session.session_id)
+                )
+                txt += f" Restored **{restore_mp}** MP! (MP: {new_mp}/{player['max_mp']})"
 
             inv_dict[str(item_id)] -= 1
             if inv_dict[str(item_id)] <= 0:

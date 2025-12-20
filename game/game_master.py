@@ -1237,7 +1237,7 @@ class GameMaster(commands.Cog):
         try:
             with conn.cursor(dictionary=True) as cur:
                 cur.execute(
-                    "SELECT hp, max_hp, gil FROM players "
+                    "SELECT hp, max_hp, mp, max_mp, gil, class_id, level FROM players "
                     "WHERE player_id=%s AND session_id=%s",
                     (session.current_turn, session.session_id)
                 )
@@ -1279,9 +1279,18 @@ class GameMaster(commands.Cog):
         )
 
         header = ""
+        class_name = None
+        unlocked_eidolons: List[Dict[str, Any]] = []
+        if p and p.get("class_id"):
+            class_name = ClassModel.get_class_name(p["class_id"])
+            unlocked_eidolons = SessionPlayerModel.get_unlocked_eidolons(
+                session.session_id, session.current_turn
+            )
         if p:
             # 1) HP bar
             header += f"**HP:** {create_health_bar(p['hp'], p['max_hp'])}\n"
+            if p.get("max_mp"):
+                header += f"**MP:** {create_health_bar(p.get('mp', 0), p['max_mp'])}\n"
 
             # 2) Status‐effects line (one per effect)
             from utils.ui_helpers import format_status_effects
@@ -1309,6 +1318,29 @@ class GameMaster(commands.Cog):
 
 
         desc = room.get("description") or ""
+        if room.get("room_type") == "cloister":
+            eidolon_id = room.get("eidolon_id")
+            attune_level = room.get("attune_level")
+            eidolon_name = None
+            if eidolon_id:
+                conn = self.db_connect()
+                with conn.cursor(dictionary=True) as cur:
+                    cur.execute(
+                        "SELECT name, required_level FROM eidolons WHERE eidolon_id=%s",
+                        (eidolon_id,),
+                    )
+                    eidolon = cur.fetchone()
+                conn.close()
+                if eidolon:
+                    eidolon_name = eidolon["name"]
+                    attune_level = attune_level or eidolon.get("required_level")
+            if class_name == "Summoner":
+                if attune_level and p and p.get("level", 0) < attune_level:
+                    desc += f"\n\nThe Aetheryte feels distant. You sense you must be at least **level {attune_level}** to attune."
+                elif eidolon_name:
+                    desc += f"\n\nThe Aetheryte resonates with **{eidolon_name}**."
+            else:
+                desc += "\n\nThe Aetheryte hums softly, but nothing responds."
         recent = self.get_game_log(session.session_id)
         body = f"{header}{desc}\n\n**Recent Actions:**\n{recent}"
 
@@ -1327,16 +1359,32 @@ class GameMaster(commands.Cog):
 
         has_key = _player_has_key(session.session_id, session.current_turn)
 
+        session.summon_used = getattr(session, "summon_used", {}) or {}
+        can_summon = class_name == "Summoner" and bool(unlocked_eidolons) and not session.summon_used.get(session.current_turn)
         buttons = em.get_main_menu_buttons(
             directions=exits,
             include_shop=(room.get("vendor_id") is not None),
             vendor_id=room.get("vendor_id"),
+            include_summon=can_summon,
             is_item=(room.get("room_type") == "item"),
             is_locked=(room.get("room_type") == "locked"),
             has_key=has_key,
             is_stair_up=(room.get("room_type") == "staircase_up"),
             is_stair_down=(room.get("room_type") == "staircase_down"),
         )
+
+        if room.get("room_type") == "cloister" and class_name == "Summoner":
+            eidolon_id = room.get("eidolon_id")
+            attune_level = room.get("attune_level")
+            if eidolon_id and not any(e["eidolon_id"] == eidolon_id for e in unlocked_eidolons):
+                if attune_level and p and p.get("level", 0) >= attune_level:
+                    buttons.append((
+                        "Attune to Aetheryte",
+                        discord.ButtonStyle.primary,
+                        f"action_attune_{eidolon_id}",
+                        2,
+                        False,
+                    ))
 
         # Chest logic: check if chest is still locked
         if room.get("room_type") == "item":
@@ -2066,6 +2114,7 @@ class GameMaster(commands.Cog):
 
         xp_bar = _bar(pd["experience"], nxt["required_exp"] if nxt else None)
         hp_bar = create_health_bar(pd["hp"], pd["max_hp"])
+        mp_bar = create_health_bar(pd.get("mp", 0), pd.get("max_mp", 0)) if pd.get("max_mp") else None
 
         c_name  = ClassModel.get_class_name(pd["class_id"]) or "Unknown"
         c_thumb = ClassModel.get_class_image_url(pd["class_id"])
@@ -2112,10 +2161,11 @@ class GameMaster(commands.Cog):
             ("Level", str(pd["level"]), True),
             ("Experience", xp_bar, False),
             ("HP", hp_bar, False),
+            ("MP", mp_bar, False) if mp_bar else None,
             ("Keys", str(key_count), True),
             ("Auto‑Raise", str(magicite_count), True),
         ]
-        
+        fields = [field for field in fields if field]
         # other stats
         for n in ("gil", "attack_power", "defense",
                   "magic_power", "magic_defense",
@@ -2287,6 +2337,11 @@ class GameMaster(commands.Cog):
 
         self._tick_temporary_abilities(session, prev_pid)
 
+        session.active_summons = getattr(session, "active_summons", {}) or {}
+        session.active_summons.pop(prev_pid, None)
+        session.summon_used = getattr(session, "summon_used", {}) or {}
+        session.summon_used.pop(prev_pid, None)
+
         # 2️⃣ Advance to the next alive player
         await self.advance_turn(interaction, interaction.channel.id)
 
@@ -2343,6 +2398,78 @@ class GameMaster(commands.Cog):
                 "❌ Room missing.", ephemeral=True
             )
         await self.update_room_view(interaction, room, x, y)
+
+    async def handle_attune(self, interaction: Interaction, eidolon_id: int) -> None:
+        sm = self.bot.get_cog("SessionManager")
+        session = sm.get_session(interaction.channel.id) if sm else None
+        if not session:
+            return await interaction.response.send_message("❌ No session.", ephemeral=True)
+
+        conn = self.db_connect()
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute(
+                "SELECT coord_x, coord_y, current_floor_id, class_id, level "
+                "FROM players WHERE player_id=%s AND session_id=%s",
+                (interaction.user.id, session.session_id),
+            )
+            player = cur.fetchone()
+        conn.close()
+        if not player:
+            return await interaction.response.send_message("❌ Player data missing.", ephemeral=True)
+
+        if ClassModel.get_class_name(player["class_id"]) != "Summoner":
+            return await interaction.response.send_message("❌ Only Summoners can attune to Aetherytes.", ephemeral=True)
+
+        conn = self.db_connect()
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute(
+                """
+                SELECT r.room_type, r.eidolon_id, r.attune_level
+                  FROM rooms r
+                 WHERE r.session_id=%s
+                   AND r.floor_id=%s
+                   AND r.coord_x=%s AND r.coord_y=%s
+                """,
+                (session.session_id, player["current_floor_id"], player["coord_x"], player["coord_y"]),
+            )
+            room = cur.fetchone()
+        conn.close()
+        if not room or room.get("room_type") != "cloister" or room.get("eidolon_id") != eidolon_id:
+            return await interaction.response.send_message("❌ There is no Aetheryte to attune here.", ephemeral=True)
+
+        conn = self.db_connect()
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute(
+                "SELECT required_level, enemy_id, name FROM eidolons WHERE eidolon_id=%s",
+                (eidolon_id,),
+            )
+            eidolon = cur.fetchone()
+        conn.close()
+        if not eidolon:
+            return await interaction.response.send_message("❌ Eidolon data missing.", ephemeral=True)
+
+        if player["level"] < eidolon["required_level"]:
+            return await interaction.response.send_message(
+                f"❌ You must be level {eidolon['required_level']} to attune here.",
+                ephemeral=True,
+            )
+
+        unlocked = SessionPlayerModel.get_unlocked_eidolons(session.session_id, interaction.user.id)
+        if any(e["eidolon_id"] == eidolon_id for e in unlocked):
+            return await interaction.response.send_message("✅ You are already attuned to this Eidolon.", ephemeral=True)
+
+        bs = self.bot.get_cog("BattleSystem")
+        if not bs:
+            return await interaction.response.send_message("❌ BattleSystem offline.", ephemeral=True)
+        enemy = await bs.get_enemy_by_id(eidolon["enemy_id"])
+        if not enemy:
+            return await interaction.response.send_message("❌ Eidolon battle data missing.", ephemeral=True)
+
+        await interaction.response.send_message(
+            f"🔮 The Aetheryte flares as **{eidolon['name']}** accepts your challenge!",
+            ephemeral=True,
+        )
+        await bs.start_battle(interaction, interaction.user.id, enemy)
 
     async def handle_save_game(self, interaction: Interaction) -> None:
         """
@@ -2522,6 +2649,11 @@ class GameMaster(commands.Cog):
             inv = self.bot.get_cog("InventoryShop")
             if inv:
                 return await inv.display_use_item_menu(interaction)
+        if cid == "action_summon":
+            bs = self.bot.get_cog("BattleSystem")
+            if not bs:
+                return await interaction.response.send_message("❌ BattleSystem offline.", ephemeral=True)
+            return await bs.show_summon_menu(interaction)
         # Use-stairs
         if cid == "action_use_stairs":
             return await self.handle_use_stairs(interaction)
@@ -2561,6 +2693,10 @@ class GameMaster(commands.Cog):
 
             if cid == "action_end_turn":
                 return await self.end_player_turn(interaction)
+
+            if cid.startswith("action_attune_"):
+                eidolon_id = int(cid.split("_", 2)[2])
+                return await self.handle_attune(interaction, eidolon_id)
 
             if cid == "start_game":
                 sm = self.bot.get_cog("SessionManager")
