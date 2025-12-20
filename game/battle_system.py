@@ -1514,6 +1514,8 @@ class BattleSystem(commands.Cog):
         session = mgr.get_session(interaction.channel.id) if mgr else None
 
         if cid == "battle_victory_continue":
+            if not interaction.response.is_done():
+                await interaction.response.defer()
             if session:
                 session.victory_pending = False
                 conn = self.db_connect()
