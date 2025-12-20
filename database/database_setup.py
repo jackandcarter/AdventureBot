@@ -142,8 +142,8 @@ MERGED_ABILITIES: List[Tuple] = [
     (89, 'Mighty Guard', None, '{"barrier": {"duration": 3}}', 0, '🛡️🔼', 'self', None, None, 12, 3, '2025-05-14 01:44:27', 'attack_power'),
     (90, 'Blue Bullet', None, '{"base_damage": 100}', 0, '⚔️', 'enemy', None, None, None, None, '2025-05-14 01:45:27', 'attack_power'),
     (91, 'Karma', 'Deals Damage based on turn amount', '{"karma": true}', 3, None, 'any', None, None, None, None, '2025-05-16 16:13:30', 'attack_power'),
-    (92, '50 Needles', 'Deals 50 damage with 100% hit rate and ignores defense.', '{"base_damage": 47}', 0, None, 'any', None, None, None, None, '2025-05-22 15:21:04', 'attack_power'),
-    (93, '1,000 Needles', 'Deals 1,000 damage with 100% hit rate and ignores defense.', '{"base_damage": 1000}', 0, None, 'any', None, None, None, None, '2025-05-22 15:21:04', 'attack_power')
+    (92, '50 Needles', 'Deals 50 damage with 100% hit rate and ignores defense.', '{"flat_damage": 50}', 0, None, 'any', None, None, None, None, '2025-05-22 15:21:04', 'attack_power'),
+    (93, '1,000 Needles', 'Deals 1,000 damage with 100% hit rate and ignores defense.', '{"flat_damage": 1000}', 0, None, 'any', None, None, None, None, '2025-05-22 15:21:04', 'attack_power')
 ]
 
 # --- ability ↔ status‑effects -------------------------------------------------
