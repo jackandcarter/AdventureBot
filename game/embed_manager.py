@@ -650,7 +650,7 @@ class EmbedManager(commands.Cog):
             if room_info.get("image_url"):
                 embed.set_image(url=f"{room_info['image_url']}?t={int(time.time())}")
             buttons = [
-                ("Skill", discord.ButtonStyle.primary, "action_skill", 0),
+                ("Enter Room", discord.ButtonStyle.primary, "action_enter_illusion", 0),
                 ("Menu", discord.ButtonStyle.secondary, "action_menu", 0),
             ]
             await self.send_or_update_embed(interaction, _ZWSP, _ZWSP, embed_override=embed, buttons=buttons)
