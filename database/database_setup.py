@@ -320,15 +320,15 @@ MERGED_ELEMENTS: List[Tuple] = [
 ]
 
 # --- element oppositions ------------------------------------------------------
-MERGED_ELEMENT_OPPOSITIONS: List[Tuple] = [
-    (1, 1, 2),
-    (2, 2, 1),
-    (3, 3, 4),
-    (4, 4, 3),
-    (5, 5, 8),
-    (6, 6, 7),
-    (7, 7, 6),
-    (8, 8, 5)
+MERGED_ELEMENT_OPPOSITIONS: List[Tuple[str, str]] = [
+    ("Fire", "Ice"),
+    ("Ice", "Fire"),
+    ("Holy", "Death"),
+    ("Death", "Holy"),
+    ("Air", "Earth"),
+    ("Lightning", "Water"),
+    ("Water", "Lightning"),
+    ("Earth", "Air")
 ]
 
 # --- difficulties -------------------------------------------------------------
@@ -1576,9 +1576,13 @@ def insert_element_oppositions(cur):
         """
         INSERT INTO element_oppositions
           (element_id, opposing_element_id)
-        VALUES (%s, %s)
+        SELECT e.element_id, o.element_id
+        FROM elements e
+        JOIN elements o
+          ON e.element_name = %s
+         AND o.element_name = %s
         """,
-        [row[1:] for row in MERGED_ELEMENT_OPPOSITIONS]
+        MERGED_ELEMENT_OPPOSITIONS
     )
     logger.info("Inserted element_oppositions.")
 
