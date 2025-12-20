@@ -274,11 +274,14 @@ class GameMaster(commands.Cog):
         if len(templates) < count:
             count = len(templates)
         sequence = random.sample(templates, count)
+        crystal_hp = [999 for _ in range(len(sequence))]
         state = {
             "room_id": room["room_id"],
             "sequence": sequence,
             "current_index": 0,
-            "failures": 0
+            "failures": 0,
+            "crystal_hp": crystal_hp,
+            "current_crystal_element_id": sequence[0]["element_id"] if sequence else None,
         }
         session.illusion_states[player_id] = state
         return state
@@ -397,9 +400,31 @@ class GameMaster(commands.Cog):
             return False
 
         sequence = state["sequence"]
-        current = sequence[state["current_index"]]
+        current_index = state.get("current_index", 0)
+        current = sequence[current_index]
         opposing_id = self.get_opposing_element_id(current["element_id"])
-        if opposing_id and ability_element_id == opposing_id:
+
+        crystal_hp = state.get("crystal_hp")
+        if not crystal_hp or len(crystal_hp) != len(sequence):
+            crystal_hp = [999 for _ in range(len(sequence))]
+            state["crystal_hp"] = crystal_hp
+
+        state["current_crystal_element_id"] = current["element_id"]
+        current_hp = crystal_hp[current_index]
+
+        is_correct = opposing_id and ability_element_id == opposing_id
+        damage = 999 if is_correct else 1
+        new_hp = max(current_hp - damage, 0)
+        crystal_hp[current_index] = new_hp
+        self.append_game_log(
+            session.session_id,
+            f"You use {ability_name} and deal {damage} damage!"
+        )
+
+        if not is_correct:
+            state["failures"] += 1
+
+        if new_hp <= 0:
             self.append_game_log(session.session_id, "The crystal shatters...")
             state["current_index"] += 1
             if state["current_index"] >= len(sequence):
@@ -412,10 +437,12 @@ class GameMaster(commands.Cog):
                         session.session_id,
                         f"You gained the temporary ability **{reward['ability_name']}**."
                     )
+            else:
+                state["current_crystal_element_id"] = sequence[state["current_index"]]["element_id"]
+
             await sm.refresh_current_state(interaction)
             return True
 
-        state["failures"] += 1
         if state["failures"] >= 3:
             self.append_game_log(
                 session.session_id,
@@ -426,7 +453,8 @@ class GameMaster(commands.Cog):
             await sm.refresh_current_state(interaction)
             return True
 
-        self.append_game_log(session.session_id, "the crystal glows brighter")
+        if not is_correct:
+            self.append_game_log(session.session_id, "the crystal glows brighter")
         await sm.refresh_current_state(interaction)
         return True
 
