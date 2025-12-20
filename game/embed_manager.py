@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -649,10 +650,14 @@ class EmbedManager(commands.Cog):
             )
             if room_info.get("image_url"):
                 embed.set_image(url=f"{room_info['image_url']}?t={int(time.time())}")
-            buttons = [
-                ("Enter Room", discord.ButtonStyle.primary, "action_enter_illusion", 0),
-                ("Menu", discord.ButtonStyle.secondary, "action_menu", 0),
-            ]
+            exits = room_info.get("exits")
+            if isinstance(exits, str):
+                try:
+                    exits = json.loads(exits)
+                except json.JSONDecodeError:
+                    exits = None
+            buttons = self.get_main_menu_buttons(directions=exits)
+            buttons.append(("Enter Room", discord.ButtonStyle.primary, "action_enter_illusion", 2, False))
             await self.send_or_update_embed(interaction, _ZWSP, _ZWSP, embed_override=embed, buttons=buttons)
             return
 
