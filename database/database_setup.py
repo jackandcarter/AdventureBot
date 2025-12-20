@@ -1427,7 +1427,7 @@ TABLES = {
             effect_id INT NOT NULL,
             PRIMARY KEY (item_id, effect_id),
             FOREIGN KEY (item_id)  REFERENCES items(item_id)  ON DELETE CASCADE,
-            FOREIGN KEY (effect_id)REFERENCES status_effects(effect_id)ON DELETE CASCADE
+            FOREIGN KEY (effect_id) REFERENCES status_effects(effect_id) ON DELETE CASCADE
         )
     ''',
     # ---------- hub_embeds ----------
