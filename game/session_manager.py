@@ -277,6 +277,11 @@ class SessionManager(commands.Cog):
         if not session:
             return await interaction.followup.send("❌ No active session found.", ephemeral=True)
 
+        if getattr(session, "victory_pending", False):
+            if not interaction.response.is_done():
+                await interaction.response.defer()
+            return
+
         pid = session.current_turn
         # ── If this player is dead, jump into GM.update_room_view (which will
         #     send the “💀 You have fallen” embed and buttons) *without* touching battle_state.

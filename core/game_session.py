@@ -48,6 +48,9 @@ class GameSession:
         # ── battle state ────────────────────────────────────────────────
         self.battle_state: Optional[Dict[str, Any]] = None
         self.current_enemy: Optional[Dict[str, Any]] = None
+        self.victory_pending: bool = False
+        self.victory_embed_sent: bool = False
+        self.last_victory_enemy: Optional[Dict[str, Any]] = None
 
         # ── trance state ────────────────────────────────────────────────
         # { player_id: { "trance_id": int, "name": str, "remaining": int, "max": int } }

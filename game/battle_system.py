@@ -379,6 +379,8 @@ class BattleSystem(commands.Cog):
     # --------------------------------------------------------------------- #
     async def handle_enemy_defeat(self, interaction: discord.Interaction, session: Any, enemy: dict) -> None:
         session.victory_pending = True
+        session.victory_embed_sent = False
+        session.last_victory_enemy = dict(enemy)
         session.current_enemy = None
         gm = self.bot.get_cog("GameMaster")
         if gm:
@@ -444,6 +446,8 @@ class BattleSystem(commands.Cog):
 
         session.battle_state     = {"enemy": enemy, "player_effects": [], "enemy_effects": []}
         session.victory_pending = False
+        session.victory_embed_sent = False
+        session.last_victory_enemy = None
 
         # 2) Load & normalize any buffs the player already had
         raw_buffs = SessionPlayerModel.get_status_effects(
@@ -1425,6 +1429,7 @@ class BattleSystem(commands.Cog):
         eb.add_field(name="Rewards", value=reward_text, inline=False)
         btns = [("Continue", discord.ButtonStyle.primary, "battle_victory_continue", 0)]
         await self.embed_manager.send_or_update_embed(interaction, title="", description="", embed_override=eb, buttons=btns)
+        session.victory_embed_sent = True
 
     # --------------------------------------------------------------------- #
     #                              Loot / XP                                #
