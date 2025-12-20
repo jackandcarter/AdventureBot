@@ -748,6 +748,13 @@ class GameMaster(commands.Cog):
             await interaction.followup.send(
                 "❌ EmbedManager unavailable.", ephemeral=True
             )
+        await interaction.followup.send(
+            (
+                "✅ Your private game thread is ready. "
+                f"Click {thread.mention} in the channel list to start setup."
+            ),
+            ephemeral=True
+        )
 
     async def send_queue_and_lfg(self,
                                  interaction: discord.Interaction,
@@ -2385,8 +2392,7 @@ class GameMaster(commands.Cog):
         
         # New Game button in hub → create session
         if cid == "setup_new_game":
-            # ACK the button silently (no ephemeral, no new message)
-            await interaction.response.defer()
+            await interaction.response.defer(ephemeral=True)
             await self.create_session(interaction, max_slots=6)
             return
         # ─── “End My Turn” on death (multiplayer) ───────────────────
