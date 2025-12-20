@@ -1587,12 +1587,12 @@ def insert_abilities_and_classes(cur):
     cur.executemany(
         """
         INSERT IGNORE INTO abilities
-          (ability_name, description, effect, cooldown, icon_url,
+          (ability_id, ability_name, description, effect, cooldown, icon_url,
            target_type, special_effect, element_id, status_effect_id,
            status_duration, created_at, scaling_stat)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """,
-        [row[1:] for row in MERGED_ABILITIES]
+        MERGED_ABILITIES
     )
     cur.executemany(
         """
@@ -1610,12 +1610,12 @@ def insert_abilities_and_classes(cur):
     cur.executemany(
         """
         INSERT IGNORE INTO classes
-          (class_name, description, base_hp, base_attack, base_magic, base_mp,
+          (class_id, class_name, description, base_hp, base_attack, base_magic, base_mp,
            base_defense, base_magic_defense, base_accuracy,
            base_evasion, base_speed, image_url, creator_id, created_at, atb_max)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """,
-        [row[1:] for row in MERGED_CLASSES]
+        MERGED_CLASSES
     )
     logger.info("Ensured classes.")
 
@@ -1676,11 +1676,11 @@ def insert_room_templates(cur):
     cur.executemany(
         """
         INSERT IGNORE INTO room_templates
-          (room_type, template_name, description, image_url,
+          (template_id, room_type, template_name, description, image_url,
            default_enemy_id, created_at, trap_type, trap_payload, eidolon_id, attune_level)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """,
-        [row[1:] for row in MERGED_ROOM_TEMPLATES]
+        MERGED_ROOM_TEMPLATES
     )
     logger.info("Ensured room_templates.")
 
@@ -1806,13 +1806,13 @@ def insert_enemies_and_abilities(cur):
     cur.executemany(
         """
         INSERT IGNORE INTO enemies
-          (enemy_name, role, description, hp, max_hp, attack_power, defense,
+          (enemy_id, enemy_name, role, description, hp, max_hp, attack_power, defense,
            magic_power, magic_defense, accuracy, evasion, difficulty,
            abilities, image_url, spawn_chance, gil_drop, xp_reward,
            loot_item_id, loot_quantity, creator_id, created_at, atb_max)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """,
-        [row[1:] for row in MERGED_ENEMIES]
+        MERGED_ENEMIES
     )
     logger.info("Ensured enemies.")
 
