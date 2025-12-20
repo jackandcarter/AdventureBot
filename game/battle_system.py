@@ -378,6 +378,8 @@ class BattleSystem(commands.Cog):
     #                           Battle sequence                             #
     # --------------------------------------------------------------------- #
     async def handle_enemy_defeat(self, interaction: discord.Interaction, session: Any, enemy: dict) -> None:
+        session.victory_pending = True
+        session.current_enemy = None
         gm = self.bot.get_cog("GameMaster")
         if gm:
             gm.append_game_log(session.session_id, f"{enemy['enemy_name']} was defeated!")
@@ -426,9 +428,6 @@ class BattleSystem(commands.Cog):
         # 2) Call your normal clear (in case it resets other bits)
         session.clear_battle_state()
 
-        # 3) Also nuke out the current_enemy reference so nothing remains truthy
-        session.current_enemy = None
-
         # ─── Now show the “Victory!” embed ─────────────────────────────
         await self.display_victory_embed(interaction, session, enemy)
 
@@ -444,6 +443,7 @@ class BattleSystem(commands.Cog):
             return await interaction.response.send_message("❌ No session found.", ephemeral=True)
 
         session.battle_state     = {"enemy": enemy, "player_effects": [], "enemy_effects": []}
+        session.victory_pending = False
 
         # 2) Load & normalize any buffs the player already had
         raw_buffs = SessionPlayerModel.get_status_effects(
@@ -544,6 +544,10 @@ class BattleSystem(commands.Cog):
             return
         session = mgr.get_session(interaction.channel.id)
         if not session:
+            return
+        if getattr(session, "victory_pending", False):
+            return
+        if not session.battle_state or session.current_enemy is None:
             return
 
         conn = self.db_connect()
@@ -1408,6 +1412,10 @@ class BattleSystem(commands.Cog):
     #                            Victory embed                              #
     # --------------------------------------------------------------------- #
     async def display_victory_embed(self, interaction: discord.Interaction, session: Any, enemy: dict) -> None:
+        self.embed_manager = self.embed_manager or self.bot.get_cog("EmbedManager")
+        if not self.embed_manager:
+            logger.warning("EmbedManager missing; cannot render victory embed.")
+            return
         reward_text = await self.award_loot(session, enemy)
         eb = discord.Embed(title="Victory!", color=discord.Color.gold())
         if enemy.get("image_url"):
@@ -1489,6 +1497,7 @@ class BattleSystem(commands.Cog):
         if not session:
             return await interaction.response.send_message("❌ No active session found.", ephemeral=True)
         session.clear_battle_state()
+        session.victory_pending = False
         session.game_log.append("You fled the battle!")
         await mgr.refresh_current_state(interaction)
 
@@ -1506,6 +1515,7 @@ class BattleSystem(commands.Cog):
 
         if cid == "battle_victory_continue":
             if session:
+                session.victory_pending = False
                 conn = self.db_connect()
                 with conn.cursor(dictionary=True) as cur:
                     cur.execute(
