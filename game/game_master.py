@@ -485,6 +485,28 @@ class GameMaster(commands.Cog):
 
         await sm.refresh_current_state(interaction)
 
+    async def action_leave_room(self, interaction: discord.Interaction) -> None:
+        sm = self.bot.get_cog("SessionManager")
+        session = sm.get_session(interaction.channel.id) if sm else None
+        if not session:
+            return await interaction.response.send_message(
+                "❌ No active session found.", ephemeral=True
+            )
+
+        room = self._get_player_room(session.session_id, session.current_turn)
+        if not room or room.get("room_type") != "illusion":
+            return await interaction.response.send_message(
+                "❌ You can only leave an active illusion chamber.", ephemeral=True
+            )
+
+        self.append_game_log(
+            session.session_id,
+            "You retreat from the illusion chamber."
+        )
+        self._clear_illusion_state(session, session.current_turn)
+        await self._teleport_player_to_safe_room(interaction, session, room["floor_id"])
+        await sm.refresh_current_state(interaction)
+
     def _tick_temporary_abilities(self, session: GameSession, player_id: int) -> None:
         session.temp_ability_cooldowns = getattr(session, "temp_ability_cooldowns", {}) or {}
         cooldowns = session.temp_ability_cooldowns.get(player_id, {})
@@ -2449,6 +2471,8 @@ class GameMaster(commands.Cog):
             return await self.handle_use_stairs(interaction)
         if cid == "action_enter_illusion":
             return await self.action_enter_illusion(interaction)
+        if cid == "action_leave_room":
+            return await self.action_leave_room(interaction)
 
 
         # ↳ custom_id="action_skill"

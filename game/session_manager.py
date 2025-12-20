@@ -369,6 +369,32 @@ class SessionManager(commands.Cog):
                     session.battle_state.get("enemy")
                 )
 
+        if room.get("room_type") == "illusion":
+            state = session.illusion_states.get(pid)
+            if state and state.get("room_id") != room["room_id"]:
+                state = None
+            if state and state.get("sequence"):
+                conn = self.db_connect()
+                with conn.cursor(dictionary=True) as cur:
+                    cur.execute(
+                        "SELECT hp, max_hp, attack_power, defense FROM players "
+                        "WHERE player_id=%s AND session_id=%s",
+                        (pid, session.session_id),
+                    )
+                    player_status = cur.fetchone()
+                conn.close()
+                if player_status:
+                    em = self.bot.get_cog("EmbedManager")
+                    if not em:
+                        return await interaction.followup.send("❌ EmbedManager unavailable.", ephemeral=True)
+                    return await em.send_illusion_battle_embed(
+                        interaction,
+                        room,
+                        state,
+                        player_status,
+                        session.game_log,
+                    )
+
         # ── Otherwise normal room ────────────────────────────────────────────────────
         # Attach key status
         if room.get("room_type") == "locked":
