@@ -639,6 +639,8 @@ class BattleSystem(commands.Cog):
 
         pid = session.current_turn
         in_battle = bool(session.battle_state)
+        gm = self.bot.get_cog("GameMaster")
+        in_illusion = bool(gm and gm.is_player_in_illusion(session, pid))
 
         # fetch class & level
         from models.session_models import SessionPlayerModel
@@ -697,7 +699,7 @@ class BattleSystem(commands.Cog):
         conn.close()
 
         # filter by context
-        allowed = {"self", "any"} | ({"enemy"} if in_battle else {"ally"})
+        allowed = {"self", "any"} | ({"enemy"} if (in_battle or in_illusion) else {"ally"})
         abilities = [a for a in abilities if a["target_type"] in allowed]
         temp_abilities = [a for a in temp_abilities if a["target_type"] in allowed]
 
