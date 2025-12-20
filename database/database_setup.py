@@ -735,6 +735,12 @@ MERGED_ITEM_EFFECTS: List[Tuple] = []
 #  TABLE DEFINITIONS (players added + new floor_room_rules)
 # ═══════════════════════════════════════════════════════════════════════════
 TABLES = {
+    'seed_meta': '''
+        CREATE TABLE IF NOT EXISTS seed_meta (
+            seed_name   VARCHAR(100) PRIMARY KEY,
+            applied_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''',
     'difficulties': '''
         CREATE TABLE IF NOT EXISTS difficulties (
             difficulty_id       INT AUTO_INCREMENT PRIMARY KEY,
@@ -1467,6 +1473,7 @@ TABLES = {
 #  CREATION ORDER (players added, floor_room_rules after difficulties)
 # ═══════════════════════════════════════════════════════════════════════════
 TABLE_ORDER = [
+    'seed_meta',
     'difficulties',
     'floor_room_rules',
     'elements',
@@ -1926,6 +1933,13 @@ def insert_hub_embeds(cur):
     )
     logger.info("Inserted hub_embeds.")
 
+def seed_already_applied(cur, seed_name: str = "initial_seed") -> bool:
+    cur.execute("SELECT 1 FROM seed_meta WHERE seed_name = %s LIMIT 1", (seed_name,))
+    return cur.fetchone() is not None
+
+def mark_seed_applied(cur, seed_name: str = "initial_seed") -> None:
+    cur.execute("INSERT INTO seed_meta (seed_name) VALUES (%s)", (seed_name,))
+
 # ═══════════════════════════════════════════════════════════════════════════
 #  MAIN
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1955,31 +1969,35 @@ def main() -> None:
                 ensure_column(cur, "rooms", "attune_level", "INT NULL")
 
                 # ── seed data (order matters) ──────────────────────────────────
-                insert_difficulties(cur)
-                insert_floor_room_rules(cur)
-                insert_elements(cur)
-                insert_element_oppositions(cur)
-                insert_status_effects(cur)
-                insert_levels(cur)
-                insert_abilities_and_classes(cur)
-                insert_temporary_abilities(cur)
-                insert_class_trances(cur)
-                insert_trance_abilities(cur)
-                insert_intro_steps(cur)
-                insert_npc_vendors(cur)
-                insert_items(cur)
-                insert_key_items(cur)
-                insert_treasure_chests(cur)
-                insert_chest_def_rewards(cur)
-                insert_enemies_and_abilities(cur)
-                insert_eidolons(cur)
-                insert_room_templates(cur)
-                insert_crystal_templates(cur)
-                insert_enemy_drops(cur)
-                insert_enemy_resistances(cur)
-                insert_npc_vendor_items(cur)
-                insert_ability_status_effects(cur)
-                insert_hub_embeds(cur)
+                if seed_already_applied(cur):
+                    logger.info("Seed data already applied – skipping")
+                else:
+                    insert_difficulties(cur)
+                    insert_floor_room_rules(cur)
+                    insert_elements(cur)
+                    insert_element_oppositions(cur)
+                    insert_status_effects(cur)
+                    insert_levels(cur)
+                    insert_abilities_and_classes(cur)
+                    insert_temporary_abilities(cur)
+                    insert_class_trances(cur)
+                    insert_trance_abilities(cur)
+                    insert_intro_steps(cur)
+                    insert_npc_vendors(cur)
+                    insert_items(cur)
+                    insert_key_items(cur)
+                    insert_treasure_chests(cur)
+                    insert_chest_def_rewards(cur)
+                    insert_enemies_and_abilities(cur)
+                    insert_eidolons(cur)
+                    insert_room_templates(cur)
+                    insert_crystal_templates(cur)
+                    insert_enemy_drops(cur)
+                    insert_enemy_resistances(cur)
+                    insert_npc_vendor_items(cur)
+                    insert_ability_status_effects(cur)
+                    insert_hub_embeds(cur)
+                    mark_seed_applied(cur)
                 cnx.commit()
                 logger.info("Database setup complete ✔")
     except Error as err:
