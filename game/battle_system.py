@@ -913,51 +913,41 @@ class BattleSystem(commands.Cog):
                 f"You use {ability_meta['ability_name']} and deal {result.amount} damage!"
             )
         elif result.type == "dot":
-            if result.type == "dot":
-                dot = result.dot
-                # schedule the DoT on the enemy…
-                enemy.setdefault("dot_effects", []).append(dot)
-                # apply the first tick immediately
-                enemy["hp"] = max(enemy["hp"] - dot["damage_per_turn"], 0)
-                session.game_log.append(
-                    f"{enemy['enemy_name']} has been afflicted by {dot['effect_name']}."
+            session.game_log.append(
+                f"{enemy['enemy_name']} has been afflicted by {result.dot['effect_name']}."
+            )
+        else:
+            # miss, heal, pilfer, mug, etc.
+            session.game_log.extend(result.logs)
+            # ── If we’re *outside* battle and this was a self‐target skill ──
+            if not in_battle and target == "self":
+                # 1) Persist any status‐effects exactly as before
+                if result.status_effects:
+                    SessionPlayerModel.update_status_effects(
+                        session.session_id,
+                        pid,
+                        session.battle_state.get("player_effects", []) + result.status_effects
+                    )
+
+            # 2) If this skill also heals immediately on use, write that to the DB now:
+            if result.type in ("heal", "set_hp"):
+                # e.g. “heal” gives you result.amount HP
+                # or “set_hp” forces to exactly result.amount
+                old_hp = self._get_player_hp(pid, session.session_id)
+                new_hp = result.amount if result.type == "set_hp" else min(
+                    old_hp + result.amount,
+                    self._get_player_max_hp(pid, session.session_id),
                 )
-                if enemy["hp"] <= 0:
-                    return await self.handle_enemy_defeat(interaction, session, enemy)
-            else:
-                # miss, heal, pilfer, mug, etc.
-                session.game_log.extend(result.logs)
-                # ── If we’re *outside* battle and this was a self‐target skill ──
-                if not in_battle and target == "self":
-                    # 1) Persist any status‐effects exactly as before
-                    if result.status_effects:
-                        SessionPlayerModel.update_status_effects(
-                            session.session_id,
-                            pid,
-                            session.battle_state.get("player_effects", []) + result.status_effects
-                        )
+                self._update_player_hp(pid, session.session_id, new_hp)
+                session.game_log.append(f"You are healed to {new_hp} HP.")
 
-                # 2) If this skill also heals immediately on use, write that to the DB now:
-                if result.type in ("heal", "set_hp"):
-                    # e.g. “heal” gives you result.amount HP
-                    # or “set_hp” forces to exactly result.amount
-                    old_hp = self._get_player_hp(pid, session.session_id)
-                    new_hp = result.amount if result.type=="set_hp" else min(old_hp + result.amount,
-                                                                            self._get_player_max_hp(pid, session.session_id))
-                    self._update_player_hp(pid, session.session_id, new_hp)
-                    session.game_log.append(f"You are healed to {new_hp} HP.")
+            # 3) Send the same ephemeral confirmation you already build in game_log
+            await interaction.followup.send("\n".join(session.game_log), ephemeral=True)
 
-                # 3) Send the same ephemeral confirmation you already build in game_log
-                await interaction.followup.send("\n".join(session.game_log), ephemeral=True)
-
-                # 4) Finally—*after* writing to the DB— redraw the *room* (not the battle embed)
-                #    so your room embed updates with your new HP and buttons.
-                sm = self.bot.get_cog("SessionManager")
-                return await sm.refresh_current_state(interaction)
-
-        await self.update_battle_embed(interaction, pid, enemy)
-        if result.type in ("damage","dot") and enemy["hp"] <= 0:
-            return await self.handle_enemy_defeat(interaction, session, enemy)
+            # 4) Finally—*after* writing to the DB— redraw the *room* (not the battle embed)
+            #    so your room embed updates with your new HP and buttons.
+            sm = self.bot.get_cog("SessionManager")
+            return await sm.refresh_current_state(interaction)
 
 
         # 5) apply any returned status effects
@@ -1023,7 +1013,8 @@ class BattleSystem(commands.Cog):
         if enemy["hp"] <= 0:
             return await self.handle_enemy_defeat(interaction, session, enemy)
 
-        
+        await self.update_battle_embed(interaction, pid, enemy)
+
         # 8) now let the enemy take their turn, then advance back
         await asyncio.sleep(1)
         await self.enemy_turn(interaction, enemy)
