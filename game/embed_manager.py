@@ -680,6 +680,69 @@ class EmbedManager(commands.Cog):
         ]
         await self.send_or_update_embed(interaction, _ZWSP, _ZWSP, embed_override=embed, buttons=buttons)
 
+    # ──────────────────────────────────────────────────────────────────
+    # Illusion battle-like embed
+    # ──────────────────────────────────────────────────────────────────
+    async def send_illusion_battle_embed(
+        self,
+        interaction: discord.Interaction,
+        room_info: Dict[str, Any],
+        challenge_state: Dict[str, Any],
+        player_status: Dict[str, Any],
+        battle_log: List[str],
+    ):
+        sequence = challenge_state["sequence"]
+        current_index = challenge_state.get("current_index", 0)
+        failures = challenge_state.get("failures", 0)
+        crystal_hp = challenge_state.get("crystal_hp") or [999 for _ in range(len(sequence))]
+        if len(crystal_hp) != len(sequence):
+            crystal_hp = [999 for _ in range(len(sequence))]
+
+        total_steps = len(sequence)
+        crystal = sequence[current_index]
+        current_hp = crystal_hp[current_index]
+
+        embed = discord.Embed(
+            title=f"🔮 Illusion Battle ({current_index + 1}/{total_steps})",
+            description=(
+                "The crystal surges with hostile energy.\n"
+                "Strike it with the opposing element to shatter the illusion."
+            ),
+            color=discord.Color.purple(),
+        )
+        if crystal.get("image_url"):
+            embed.set_image(url=f"{crystal['image_url']}?t={int(time.time())}")
+        elif room_info.get("image_url"):
+            embed.set_image(url=f"{room_info['image_url']}?t={int(time.time())}")
+
+        crystal_value = (
+            f"❤️ HP: {create_health_bar(current_hp, 999)}\n"
+            f"✨ Element: {crystal.get('element_name', 'Unknown')}\n"
+            f"Failures: {failures}/2"
+        )
+        embed.add_field(name=f"Crystal: {crystal.get('name', 'Unknown')}", value=crystal_value, inline=False)
+
+        stats_text = (
+            f"❤️ HP: {create_health_bar(player_status['hp'], player_status['max_hp'])}\n"
+            f"⚔️ ATK: {player_status['attack_power']}\n"
+            f"🛡️ DEF: {player_status['defense']}"
+        )
+        embed.add_field(name="Your Stats", value=stats_text, inline=False)
+
+        embed.add_field(
+            name="Battle Log",
+            value="\n".join(battle_log[-5:]) or "The crystal awaits your strike.",
+            inline=False,
+        )
+
+        buttons = [
+            ("Skill", discord.ButtonStyle.primary, "action_skill", 0),
+            ("Use", discord.ButtonStyle.success, "action_use", 0),
+            ("Leave Room", discord.ButtonStyle.secondary, "action_leave_room", 0),
+            ("Menu", discord.ButtonStyle.secondary, "action_menu", 0),
+        ]
+        await self.send_or_update_embed(interaction, _ZWSP, _ZWSP, embed_override=embed, buttons=buttons)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(EmbedManager(bot))
