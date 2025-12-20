@@ -154,15 +154,43 @@ class EmbedManager(commands.Cog):
             # Send or edit
             try:
                 if cid in self.active_messages:
-                    msg = await target.fetch_message(self.active_messages[cid])
-                    await msg.edit(embed=embed, view=view)
-                else:
-                    msg = await target.send(embed=embed, view=view)
-                    self.active_messages[cid] = msg.id
+                    msg_id = self.active_messages[cid]
+                    partial = target.get_partial_message(msg_id)
+                    try:
+                        await partial.edit(embed=embed, view=view)
+                        return partial
+                    except Exception as edit_error:
+                        logger.warning(
+                            "send_or_update_embed: partial edit failed for %s: %s",
+                            msg_id,
+                            edit_error,
+                        )
+                        try:
+                            msg = await target.fetch_message(msg_id)
+                            await msg.edit(embed=embed, view=view)
+                            return msg
+                        except Exception as fetch_error:
+                            logger.warning(
+                                "send_or_update_embed: fetch+edit failed for %s: %s",
+                                msg_id,
+                                fetch_error,
+                            )
+                            msg = await target.send(embed=embed, view=view)
+                            self.active_messages[cid] = msg.id
+                            return msg
+                msg = await target.send(embed=embed, view=view)
+                self.active_messages[cid] = msg.id
                 return msg
             except Exception as e:
                 logger.error("send_or_update_embed failed: %s", e)
-                # Fallback to followup
+                if cid in self.active_messages:
+                    try:
+                        msg = await target.send(embed=embed, view=view)
+                        self.active_messages[cid] = msg.id
+                        return msg
+                    except Exception as fb:
+                        logger.error("Fallback send failed: %s", fb)
+                        return None
                 try:
                     return await interaction.followup.send(embed=embed, view=view)
                 except Exception as fb:
@@ -186,10 +214,28 @@ class EmbedManager(commands.Cog):
             await interaction.response.send_message("⚙️ Game Menu", view=self._get_game_menu_view(), ephemeral=True)
             return
 
-        msg = await interaction.channel.fetch_message(msg_id)
-        await msg.edit(view=self._get_game_menu_view())
-        if not interaction.response.is_done():
-            await interaction.response.defer()
+        try:
+            msg = interaction.channel.get_partial_message(msg_id)
+            try:
+                await msg.edit(view=self._get_game_menu_view())
+                if not interaction.response.is_done():
+                    await interaction.response.defer()
+                return
+            except Exception as edit_error:
+                logger.warning("show_game_menu partial edit failed: %s", edit_error)
+                msg = await interaction.channel.fetch_message(msg_id)
+                await msg.edit(view=self._get_game_menu_view())
+                if not interaction.response.is_done():
+                    await interaction.response.defer()
+                return
+        except Exception as e:
+            logger.error("show_game_menu edit failed: %s", e)
+            if not interaction.response.is_done():
+                await interaction.response.send_message(
+                    "⚙️ Game Menu",
+                    view=self._get_game_menu_view(),
+                    ephemeral=True,
+                )
 
     # ──────────────────────────────────────────────────────────────────
     # Death embed (player fallen)
@@ -225,8 +271,14 @@ class EmbedManager(commands.Cog):
         cid = interaction.channel.id
         try:
             if cid in self.status_messages:
-                m = await interaction.channel.fetch_message(self.status_messages[cid])
-                await m.edit(embed=embed)
+                msg_id = self.status_messages[cid]
+                m = interaction.channel.get_partial_message(msg_id)
+                try:
+                    await m.edit(embed=embed)
+                except Exception as edit_error:
+                    logger.warning("Status embed partial edit failed: %s", edit_error)
+                    m = await interaction.channel.fetch_message(msg_id)
+                    await m.edit(embed=embed)
             else:
                 m = await interaction.channel.send(embed=embed)
                 self.status_messages[cid] = m.id
