@@ -208,6 +208,7 @@ class SessionManager(commands.Cog):
                 "⚠️ You’ve already joined this session!", ephemeral=True
             )
         try:
+                SessionPlayerModel.add_player(session_id, user.id, user.display_name)
                 session.add_player(user.id)
                 SessionModel.increment_player_count(session_id)
                 session.players = SessionPlayerModel.get_players(session_id)
