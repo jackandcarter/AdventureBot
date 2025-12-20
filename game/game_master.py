@@ -395,8 +395,8 @@ class GameMaster(commands.Cog):
             self._clear_illusion_state(session, session.current_turn)
             return False
 
-        state = self._ensure_illusion_state(session, session.current_turn, room)
-        if not state:
+        state = session.illusion_states.get(session.current_turn)
+        if not state or state.get("room_id") != room["room_id"] or not state.get("sequence"):
             return False
 
         sequence = state["sequence"]
@@ -457,6 +457,33 @@ class GameMaster(commands.Cog):
             self.append_game_log(session.session_id, "the crystal glows brighter")
         await sm.refresh_current_state(interaction)
         return True
+
+    async def action_enter_illusion(self, interaction: discord.Interaction) -> None:
+        sm = self.bot.get_cog("SessionManager")
+        session = sm.get_session(interaction.channel.id) if sm else None
+        if not session:
+            return await interaction.response.send_message(
+                "❌ No active session found.", ephemeral=True
+            )
+
+        room = self._get_player_room(session.session_id, session.current_turn)
+        if not room or room.get("room_type") != "illusion":
+            return await interaction.response.send_message(
+                "❌ You are not in an illusion chamber.", ephemeral=True
+            )
+
+        if self._is_illusion_cleared(session, session.current_turn, room["room_id"]):
+            return await interaction.response.send_message(
+                "✨ The illusion in this room has already been dispelled.", ephemeral=True
+            )
+
+        state = self._ensure_illusion_state(session, session.current_turn, room)
+        if not state:
+            return await interaction.response.send_message(
+                "❌ The illusion refuses to coalesce.", ephemeral=True
+            )
+
+        await sm.refresh_current_state(interaction)
 
     def _tick_temporary_abilities(self, session: GameSession, player_id: int) -> None:
         session.temp_ability_cooldowns = getattr(session, "temp_ability_cooldowns", {}) or {}
@@ -1111,7 +1138,10 @@ class GameMaster(commands.Cog):
                 conn.close()
 
         if rtype == "illusion" and not self._is_illusion_cleared(session, session.current_turn, room["room_id"]):
-            state = self._ensure_illusion_state(session, session.current_turn, room)
+            state = session.illusion_states.get(session.current_turn)
+            if state and state.get("room_id") != room["room_id"]:
+                self._clear_illusion_state(session, session.current_turn)
+                state = None
             em = self.bot.get_cog("EmbedManager")
             if not em:
                 return await interaction.followup.send("❌ EmbedManager unavailable.", ephemeral=True)
@@ -2417,6 +2447,8 @@ class GameMaster(commands.Cog):
         # Use-stairs
         if cid == "action_use_stairs":
             return await self.handle_use_stairs(interaction)
+        if cid == "action_enter_illusion":
+            return await self.action_enter_illusion(interaction)
 
 
         # ↳ custom_id="action_skill"
