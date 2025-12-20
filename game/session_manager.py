@@ -278,6 +278,12 @@ class SessionManager(commands.Cog):
             return await interaction.followup.send("❌ No active session found.", ephemeral=True)
 
         if getattr(session, "victory_pending", False):
+            if not getattr(session, "victory_embed_sent", False) and session.last_victory_enemy:
+                bs = self.bot.get_cog("BattleSystem")
+                if bs:
+                    return await bs.display_victory_embed(
+                        interaction, session, session.last_victory_enemy
+                    )
             if not interaction.response.is_done():
                 await interaction.response.defer()
             return
