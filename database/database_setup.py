@@ -1750,17 +1750,23 @@ def insert_key_items(cur):
 
 def insert_treasure_chests(cur):
     logger.info("Checking treasure_chests seed data…")
-    if not table_is_empty(cur, "treasure_chests"):
-        logger.info("treasure_chests already populated – skipping")
-        return
+    values = [
+        (chest_name, spawn_weight, template_id, created_at, chest_name, template_id)
+        for (_, chest_name, spawn_weight, template_id, created_at) in MERGED_TREASURE_CHESTS
+    ]
     cur.executemany(
         """
         INSERT INTO treasure_chests (chest_name, spawn_weight, template_id, created_at)
-        VALUES (%s,%s,%s,%s)
+        SELECT %s, %s, %s, %s
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM treasure_chests
+            WHERE chest_name = %s AND template_id = %s
+        )
         """,
-        [row[1:] for row in MERGED_TREASURE_CHESTS]
+        values
     )
-    logger.info("Inserted treasure_chests.")
+    logger.info("Ensured treasure_chests.")
 
 def insert_chest_def_rewards(cur):
     logger.info("Checking chest_def_rewards seed data…")
@@ -1779,31 +1785,43 @@ def insert_chest_def_rewards(cur):
 
 def insert_class_trances(cur):
     logger.info("Checking class_trances seed data…")
-    if not table_is_empty(cur, "class_trances"):
-        logger.info("class_trances already populated – skipping")
-        return
+    values = [
+        (class_id, trance_name, duration_turns, class_id, trance_name)
+        for (_, class_id, trance_name, duration_turns) in MERGED_CLASS_TRANCES
+    ]
     cur.executemany(
         """
         INSERT INTO class_trances (class_id, trance_name, duration_turns)
-        VALUES (%s,%s,%s)
+        SELECT %s, %s, %s
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM class_trances
+            WHERE class_id = %s AND trance_name = %s
+        )
         """,
-        [row[1:] for row in MERGED_CLASS_TRANCES]
+        values
     )
-    logger.info("Inserted class_trances.")
+    logger.info("Ensured class_trances.")
 
 def insert_trance_abilities(cur):
     logger.info("Checking trance_abilities seed data…")
-    if not table_is_empty(cur, "trance_abilities"):
-        logger.info("trance_abilities already populated – skipping")
-        return
+    values = [
+        (trance_id, ability_id, trance_id, ability_id)
+        for (trance_id, ability_id) in MERGED_TRANCE_ABILITIES
+    ]
     cur.executemany(
         """
         INSERT INTO trance_abilities (trance_id, ability_id)
-        VALUES (%s,%s)
+        SELECT %s, %s
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM trance_abilities
+            WHERE trance_id = %s AND ability_id = %s
+        )
         """,
-        MERGED_TRANCE_ABILITIES
+        values
     )
-    logger.info("Inserted trance_abilities.")
+    logger.info("Ensured trance_abilities.")
 
 def insert_enemies_and_abilities(cur):
     logger.info("Checking enemies seed data…")
@@ -1990,11 +2008,11 @@ def main() -> None:
                     insert_npc_vendors(cur)
                     insert_items(cur)
                     insert_key_items(cur)
-                    insert_treasure_chests(cur)
-                    insert_chest_def_rewards(cur)
                     insert_enemies_and_abilities(cur)
                     insert_eidolons(cur)
                     insert_room_templates(cur)
+                    insert_treasure_chests(cur)
+                    insert_chest_def_rewards(cur)
                     insert_crystal_templates(cur)
                     insert_enemy_drops(cur)
                     insert_enemy_resistances(cur)
