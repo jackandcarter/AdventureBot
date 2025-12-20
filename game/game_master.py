@@ -854,10 +854,6 @@ class GameMaster(commands.Cog):
             "steps": self.fetch_intro_steps(),
             "current_index": 0
         }
-        self.append_game_log(
-            session.session_id,
-            f"Difficulty set to **{difficulty}**."
-        )
         await self.begin_intro_sequence(interaction, interaction.channel.id)
 
     # ────────────────────────────────────────────────────────────────────────────
