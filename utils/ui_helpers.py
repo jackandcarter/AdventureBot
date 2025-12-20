@@ -75,6 +75,7 @@ def get_emoji_for_room_type(room_type: str) -> str:
         "staircase_up":   "🔼",
         "staircase_down": "🔽",
         "trap":           "🟧",
+        "cloister":       "🧿",
     }
     if not room_type:
         return "⬛"

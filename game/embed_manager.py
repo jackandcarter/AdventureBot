@@ -534,6 +534,7 @@ class EmbedManager(commands.Cog):
         directions: Optional[List[str]] = None,
         include_shop: bool = False,
         vendor_id: Optional[int] = None,
+        include_summon: bool = False,
         is_item: bool = False,
         is_locked: bool = False,
         has_key: bool = False,
@@ -584,6 +585,8 @@ class EmbedManager(commands.Cog):
         btns.extend(action_row)
 
         # ── Row 2: shop / unlock / stairs (optional) ────────────
+        if include_summon:
+            btns.append(("Summon", discord.ButtonStyle.primary, "action_summon", 2, False))
         if include_shop and vendor_id is not None:
             btns.append(("Shop", discord.ButtonStyle.secondary, f"action_shop_{vendor_id}", 2, False))
         if is_locked and has_key:
