@@ -478,8 +478,8 @@ class EmbedManager(commands.Cog):
             name="__**Legend**__",
             value=(
                 "**🤺 You**  **🟨 Visited**  **🟩 Safe**  **🟥 Monster**  **⬛ Unknown**\n"
-                "**🟦 Item**  **👤 Quest**  **🔼 Up**  **🔽 Down**\n"
-                "**🟧 Trap**  **🔒 Locked**  **🟪 Shop**  **🔮 Illusion**\n"
+                "**⬜ Entrance**  **🟦 Item**  **👤 Quest**  **🔼 Up**  **🔽 Down**\n"
+                "**🔒 Locked**  **🟪 Shop**  **🔮 Illusion**\n"
                 "**💀 Boss**  **🚪 Exit**  **⚰️ Fallen Player**"
             ),
             inline=False,
