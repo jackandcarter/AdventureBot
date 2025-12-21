@@ -75,7 +75,21 @@ intents.members = True
 # ---------------------
 #   BOT INITIALIZATION
 # ---------------------
-bot = commands.Bot(command_prefix="/", intents=intents)
+class AdventureBot(commands.Bot):
+    async def setup_hook(self) -> None:
+        try:
+            await self.tree.sync()
+            synced_guilds = [guild.id for guild in self.guilds]
+            logger.info(
+                "✅ Slash commands synced for %s guilds: %s",
+                len(synced_guilds),
+                synced_guilds,
+            )
+        except Exception as e:
+            logger.error("❌ Failed to sync slash commands: %s", e)
+
+
+bot = AdventureBot(command_prefix="/", intents=intents)
 
 @bot.event
 async def on_ready():
@@ -83,12 +97,6 @@ async def on_ready():
     await bot.wait_until_ready()
     if not bot.application_id:
         bot.application_id = (await bot.application_info()).id
-    try:
-        await bot.tree.sync()
-        synced_guilds = [guild.id for guild in bot.guilds]
-        logger.info(f"✅ Slash commands synced for {len(synced_guilds)} guilds: {synced_guilds}")
-    except Exception as e:
-        logger.error(f"❌ Failed to sync slash commands: {e}")
     await bot.change_presence(activity=discord.Game(name="Dungeon Adventure!"))
 
 @bot.event
