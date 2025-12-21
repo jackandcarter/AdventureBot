@@ -583,12 +583,19 @@ class BattleSystem(commands.Cog):
                 session.game_state = new_room
 
         # ─── Completely tear down combat state ─────────────────────────
-        # 1) Clear out any lingering player‐side DoT/status effects
+        # 1) Persist any lingering player‐side DoT/status effects
         if session.battle_state:
+            player_effects = session.battle_state.get("player_effects", []) or []
+            SessionPlayerModel.update_status_effects(
+                session.session_id,
+                session.current_turn,
+                player_effects,
+            )
+            # 2) Clear out any lingering player/enemy effects from battle state
             session.battle_state.pop("player_effects", None)
             session.battle_state.pop("enemy_effects", None)
 
-        # 2) Call your normal clear (in case it resets other bits)
+        # 3) Call your normal clear (in case it resets other bits)
         session.clear_battle_state()
 
         # ─── Now show the “Victory!” embed ─────────────────────────────
