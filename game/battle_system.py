@@ -970,8 +970,15 @@ class BattleSystem(commands.Cog):
 
         buttons = []
         for eid in unlocked:
+            summon_cost = eid.get("summon_mp_cost", 0) or 0
+            label_parts = [f"{eid['name']} (Lv {eid['level']})"]
+            if summon_cost > 0:
+                label_parts.append(f"[MP Cost: {summon_cost}]")
+            label = " ".join(label_parts).strip()
+            if len(label) > 80:
+                label = label[:77] + "..."
             buttons.append((
-                f"{eid['name']} (Lv {eid['level']})",
+                label,
                 discord.ButtonStyle.primary,
                 f"summon_select_{eid['eidolon_id']}",
                 0,
@@ -1022,7 +1029,15 @@ class BattleSystem(commands.Cog):
             cd_now = int(cds.get(a["ability_id"], 0))
             bar = create_cooldown_bar(cd_now, a.get("cooldown", 0), length=6)
             style = discord.ButtonStyle.secondary if cd_now > 0 else discord.ButtonStyle.primary
-            label = f"{a['ability_name']} {bar}".strip()
+            mp_cost = a.get("mp_cost", 0) or 0
+            label_parts = [a["ability_name"]]
+            if mp_cost > 0:
+                label_parts.append(f"[MP Cost: {mp_cost}]")
+            if bar:
+                label_parts.append(bar)
+            label = " ".join(label_parts).strip()
+            if len(label) > 80:
+                label = label[:77] + "..."
             buttons.append((
                 label,
                 style,
@@ -1062,6 +1077,7 @@ class BattleSystem(commands.Cog):
             SELECT ta.ability_id,
                    a.ability_name,
                    a.cooldown,
+                   a.mp_cost,
                    a.icon_url
               FROM trance_abilities ta
               JOIN abilities a USING (ability_id)
@@ -1081,7 +1097,15 @@ class BattleSystem(commands.Cog):
             cd_now = int(cds.get(a["ability_id"], 0))
             bar = create_cooldown_bar(cd_now, a["cooldown"], length=6)
             style = discord.ButtonStyle.secondary if cd_now > 0 else discord.ButtonStyle.primary
-            label = f"{a['ability_name']} {bar}".strip()
+            mp_cost = a.get("mp_cost", 0) or 0
+            label_parts = [a["ability_name"]]
+            if mp_cost > 0:
+                label_parts.append(f"[MP Cost: {mp_cost}]")
+            if bar:
+                label_parts.append(bar)
+            label = " ".join(label_parts).strip()
+            if len(label) > 80:
+                label = label[:77] + "..."
             buttons.append((label, style, f"combat_trance_{a['ability_id']}", 0, cd_now > 0))
 
         # ← Back
