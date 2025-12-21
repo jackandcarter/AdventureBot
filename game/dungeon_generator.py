@@ -28,6 +28,8 @@ class DungeonGenerator(commands.Cog):
 
     MIN_LOCK_DISTANCE = 5    # minimum tiles from (0,0) before a room can be locked
     MIN_STAIR_DISTANCE = 6   # minimum tiles from entry before staircase appears
+    MIN_SPECIAL_DISTANCE = 2  # minimum spacing between special/unique rooms
+    SPECIAL_ROOM_TYPES = {"shop", "cloister", "illusion", "item", "locked"}
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -508,13 +510,18 @@ class DungeonGenerator(commands.Cog):
         remaining = {r["room_type"]: r["max_per_floor"] for r in rules}
         weights   = {r["room_type"]: r["chance"]      for r in rules}
 
-        def choose_type(exclude_locked=False, exclude_item=False) -> str:
+        def choose_type(
+            exclude_locked: bool = False,
+            exclude_item: bool = False,
+            exclude_special: bool = False,
+        ) -> str:
             avail = [
                 rt for rt, cap in remaining.items()
                 if cap > 0
                 and rt not in ("staircase_up","staircase_down")
                 and not (exclude_locked and rt == "locked")
                 and not (exclude_item and rt == "item")
+                and not (exclude_special and rt in self.SPECIAL_ROOM_TYPES)
             ]
             if not avail:
                 return "monster" if random.random() < enemy_chance else "safe"
@@ -526,9 +533,18 @@ class DungeonGenerator(commands.Cog):
 
         # 7) build rooms
         out: List[Tuple[int,int,int,str,Dict[str,Tuple[int,int]]]] = []
+        special_coords: List[Tuple[int, int]] = []
+
+        def is_special_too_close(coord: Tuple[int, int]) -> bool:
+            for sx, sy in special_coords:
+                if max(abs(coord[0] - sx), abs(coord[1] - sy)) <= self.MIN_SPECIAL_DISTANCE:
+                    return True
+            return False
+
         for y in range(height):
             for x in range(width):
                 coord = (x, y)
+                chosen_from_rules = False
                 if coord == boss_coord:
                     rtype = "boss"
                 elif coord == exit_coord:
@@ -539,17 +555,27 @@ class DungeonGenerator(commands.Cog):
                     rtype = "shop"
                 else:
                     rtype = choose_type()
+                    chosen_from_rules = True
 
                 # lock/item safety
                 if rtype == "locked" and dist.get(coord,0) < self.MIN_LOCK_DISTANCE:
                     remaining["locked"] += 1
                     rtype = choose_type(exclude_locked=True)
+                    chosen_from_rules = True
                 if rtype in ("locked","item") and coord not in path:
                     remaining[rtype] += 1
                     rtype = "monster" if random.random() < enemy_chance else "safe"
 
+                # spacing for special/unique rooms
+                if rtype in self.SPECIAL_ROOM_TYPES and is_special_too_close(coord):
+                    if chosen_from_rules:
+                        remaining[rtype] += 1
+                    rtype = choose_type(exclude_special=True)
+
                 exits = self.get_room_exits(x, y, adj)
                 out.append((floor_id, x, y, rtype, exits))
+                if rtype in self.SPECIAL_ROOM_TYPES:
+                    special_coords.append(coord)
 
         return out
 
