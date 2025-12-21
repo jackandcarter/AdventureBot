@@ -934,7 +934,11 @@ class BattleSystem(commands.Cog):
         conn = self.db_connect()
         cursor = conn.cursor(dictionary=True)
         cursor.execute(
-            "SELECT hp, max_hp, mp, max_mp, defense, attack_power FROM players WHERE player_id = %s AND session_id = %s",
+            """
+            SELECT hp, max_hp, mp, max_mp, defense, attack_power, level
+            FROM players
+            WHERE player_id = %s AND session_id = %s
+            """,
             (player_id, session.session_id),
         )
         player = cursor.fetchone()
@@ -955,7 +959,11 @@ class BattleSystem(commands.Cog):
         val = f"❤️ HP: {create_health_bar(enemy['hp'], enemy['max_hp'])}"
         if enemy_line:
             val += f" {enemy_line}"
-        eb.add_field(name=f"Enemy: {enemy['enemy_name']}", value=val, inline=False)
+        enemy_level = enemy.get("level")
+        enemy_label = f"Enemy: {enemy['enemy_name']}"
+        if enemy_level:
+            enemy_label += f" (Lv {enemy_level})"
+        eb.add_field(name=enemy_label, value=val, inline=False)
 
         # show player HP + effects
         player_line = format_status_effects(session.battle_state["player_effects"])
@@ -965,7 +973,11 @@ class BattleSystem(commands.Cog):
         if player_line:
             stats_text += f" {player_line}"
         stats_text += f"\n⚔️ ATK: {player['attack_power']}\n🛡️ DEF: {player['defense']}"
-        eb.add_field(name="Your Stats", value=stats_text, inline=False)
+        player_level = player.get("level")
+        player_label = "Your Stats"
+        if player_level:
+            player_label += f" (Lv {player_level})"
+        eb.add_field(name=player_label, value=stats_text, inline=False)
 
         eb.add_field(name="Battle Log",
                      value="\n".join(session.game_log[-5:]) or "No actions recorded.",
@@ -1028,7 +1040,11 @@ class BattleSystem(commands.Cog):
         conn = self.db_connect()
         cursor = conn.cursor(dictionary=True)
         cursor.execute(
-            "SELECT hp, max_hp, mp, max_mp, defense, attack_power FROM players WHERE player_id = %s AND session_id = %s",
+            """
+            SELECT hp, max_hp, mp, max_mp, defense, attack_power, level
+            FROM players
+            WHERE player_id = %s AND session_id = %s
+            """,
             (player_id, session.session_id),
         )
         player = cursor.fetchone()
@@ -1047,7 +1063,11 @@ class BattleSystem(commands.Cog):
         val = f"❤️ HP: {create_health_bar(enemy['hp'], enemy['max_hp'])}"
         if enemy_line:
             val += f" {enemy_line}"
-        eb.add_field(name=f"Enemy: {enemy['enemy_name']}", value=val, inline=False)
+        enemy_level = enemy.get("level")
+        enemy_label = f"Enemy: {enemy['enemy_name']}"
+        if enemy_level:
+            enemy_label += f" (Lv {enemy_level})"
+        eb.add_field(name=enemy_label, value=val, inline=False)
 
         player_line = format_status_effects(session.battle_state.get("player_effects", []))
         stats_text = f"❤️ HP: {create_health_bar(player['hp'], player['max_hp'])}"
@@ -1059,7 +1079,11 @@ class BattleSystem(commands.Cog):
             f"\n⚔️ ATK: {player['attack_power']}\n"
             f"🛡️ DEF: {player['defense']}"
         )
-        eb.add_field(name="Your Stats", value=stats_text, inline=False)
+        player_level = player.get("level")
+        player_label = "Your Stats"
+        if player_level:
+            player_label += f" (Lv {player_level})"
+        eb.add_field(name=player_label, value=stats_text, inline=False)
 
         eb.add_field(name="Battle Log",
                      value="\n".join(session.game_log[-5:]) or "No actions recorded.",
