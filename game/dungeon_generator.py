@@ -149,10 +149,30 @@ class DungeonGenerator(commands.Cog):
         return [start, end]
 
     # ─────────────────────────────────────────────── Fetch template helpers
-    def fetch_random_template(self, rtype: str) -> Optional[Dict[str, Any]]:
+    def fetch_random_template(
+        self,
+        rtype: str,
+        exclude_eidolon_ids: Optional[Set[int]] = None,
+    ) -> Optional[Dict[str, Any]]:
         conn = self.db_connect()
         try:
             with conn.cursor(dictionary=True) as cur:
+                if rtype == "cloister" and exclude_eidolon_ids:
+                    placeholders = ", ".join(["%s"] * len(exclude_eidolon_ids))
+                    cur.execute(
+                        f"""
+                        SELECT template_id, description, image_url, default_enemy_id, eidolon_id, attune_level
+                          FROM room_templates
+                         WHERE room_type=%s
+                           AND eidolon_id NOT IN ({placeholders})
+                         ORDER BY RAND()
+                         LIMIT 1
+                        """,
+                        (rtype, *exclude_eidolon_ids),
+                    )
+                    row = cur.fetchone()
+                    if row:
+                        return row
                 cur.execute(
                     """
                     SELECT template_id, description, image_url, default_enemy_id, eidolon_id, attune_level
@@ -587,6 +607,7 @@ class DungeonGenerator(commands.Cog):
             is_goal        = False
 
         basement_floor_id: Optional[int] = None
+        used_eidolon_ids: Set[int] = set()
         loop = asyncio.get_running_loop()
 
         # Optional basement
@@ -623,12 +644,14 @@ class DungeonGenerator(commands.Cog):
                     gvid = self.fetch_random_vendor()
                     if gvid:
                         vendor_id = self.create_session_vendor_instance(session_id, gvid)
-                tmpl = self.fetch_random_template(rtype) or {}
+                tmpl = self.fetch_random_template(rtype, used_eidolon_ids) or {}
                 desc = tmpl.get("description", "A mysterious room…")
                 img  = tmpl.get("image_url")
                 def_en = tmpl.get("default_enemy_id")
                 eidolon_id = tmpl.get("eidolon_id")
                 attune_level = tmpl.get("attune_level")
+                if rtype == "cloister" and eidolon_id:
+                    used_eidolon_ids.add(eidolon_id)
 
                 with conn.cursor() as cur:
                     cur.execute(
@@ -726,11 +749,13 @@ class DungeonGenerator(commands.Cog):
                 if gvid:
                     vendor_id = self.create_session_vendor_instance(session_id, gvid)
 
-            tmpl = self.fetch_random_template(rtype) or {}
+            tmpl = self.fetch_random_template(rtype, used_eidolon_ids) or {}
             desc = tmpl.get("description", "A mysterious room…")
             img  = tmpl.get("image_url")
             eidolon_id = tmpl.get("eidolon_id")
             attune_level = tmpl.get("attune_level")
+            if rtype == "cloister" and eidolon_id:
+                used_eidolon_ids.add(eidolon_id)
 
             if rtype == "boss":
                 with conn.cursor(dictionary=True) as cur2:
@@ -869,7 +894,8 @@ class DungeonGenerator(commands.Cog):
                 session_id, difficulty_name,
                 width, height, min_rooms,
                 enemy_chance, npc_count, shop_limit,
-                total_floors, exit_x, exit_y, first_floor_id
+                total_floors, exit_x, exit_y, first_floor_id,
+                used_eidolon_ids,
             )
 
         return blob
@@ -889,6 +915,7 @@ class DungeonGenerator(commands.Cog):
         prev_x: int,
         prev_y: int,
         prev_floor_id: int,
+        used_eidolon_ids: Set[int],
     ):
         conn = self.db_connect()
         cur = conn.cursor(dictionary=True)
@@ -941,11 +968,13 @@ class DungeonGenerator(commands.Cog):
                     if gvid:
                         vendor_id = self.create_session_vendor_instance(session_id, gvid)
 
-                tmpl = self.fetch_random_template(rtype) or {}
+                tmpl = self.fetch_random_template(rtype, used_eidolon_ids) or {}
                 desc = tmpl.get("description") or "A mysterious room..."
                 img  = tmpl.get("image_url")
                 eidolon_id = tmpl.get("eidolon_id")
                 attune_level = tmpl.get("attune_level")
+                if rtype == "cloister" and eidolon_id:
+                    used_eidolon_ids.add(eidolon_id)
 
                 if rtype in ("miniboss","boss","monster"):
                     role = "miniboss" if rtype=="miniboss" else ("boss" if rtype=="boss" else "normal")
