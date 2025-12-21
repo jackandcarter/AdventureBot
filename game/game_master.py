@@ -1360,7 +1360,14 @@ class GameMaster(commands.Cog):
         has_key = _player_has_key(session.session_id, session.current_turn)
 
         session.summon_used = getattr(session, "summon_used", {}) or {}
-        can_summon = class_name == "Summoner" and bool(unlocked_eidolons) and not session.summon_used.get(session.current_turn)
+        can_summon = (
+            class_name == "Summoner"
+            and bool(unlocked_eidolons)
+            and not session.summon_used.get(session.current_turn)
+            and SessionPlayerModel.has_out_of_battle_eidolon_support(
+                session.session_id, session.current_turn
+            )
+        )
         buttons = em.get_main_menu_buttons(
             directions=exits,
             include_shop=(room.get("vendor_id") is not None),
