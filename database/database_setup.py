@@ -45,6 +45,18 @@ def table_is_empty(cur, table_name: str) -> bool:
     cur.execute(f"SELECT COUNT(*) FROM {table_name}")
     return cur.fetchone()[0] == 0
 
+def table_exists(cur, table_name: str) -> bool:
+    cur.execute(
+        """
+        SELECT COUNT(*)
+          FROM information_schema.tables
+         WHERE table_schema = %s
+           AND table_name = %s
+        """,
+        (DB_CONFIG["database"], table_name),
+    )
+    return cur.fetchone()[0] > 0
+
 def column_exists(cur, table_name: str, column_name: str) -> bool:
     cur.execute(
         """
@@ -58,11 +70,12 @@ def column_exists(cur, table_name: str, column_name: str) -> bool:
     )
     return cur.fetchone()[0] > 0
 
-def ensure_column(cur, table_name: str, column_name: str, definition: str) -> None:
+def ensure_column(cur, table_name: str, column_name: str, definition: str) -> bool:
     if column_exists(cur, table_name, column_name):
-        return
+        return False
     logger.info("Adding column %s.%s", table_name, column_name)
     cur.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
+    return True
 
 def ensure_enum_values(cur, table_name: str, column_name: str, values: List[str], default: str) -> None:
     cur.execute(
@@ -1624,7 +1637,7 @@ def insert_element_oppositions(cur):
     )
     logger.info("Ensured element_oppositions.")
 
-def insert_abilities_and_classes(cur):
+def insert_abilities(cur):
     logger.info("Checking abilities seed data…")
     cur.executemany(
         """
@@ -1648,6 +1661,7 @@ def insert_abilities_and_classes(cur):
     )
     logger.info("Ensured abilities.")
 
+def insert_classes(cur):
     logger.info("Checking classes seed data…")
     cur.executemany(
         """
@@ -1661,6 +1675,7 @@ def insert_abilities_and_classes(cur):
     )
     logger.info("Ensured classes.")
 
+def insert_class_abilities(cur):
     logger.info("Checking class_abilities links…")
     cur.executemany(
         "INSERT IGNORE INTO class_abilities (class_id, ability_id, unlock_level) VALUES (%s, %s, %s)",
@@ -1993,7 +2008,7 @@ def insert_trance_abilities(cur):
     )
     logger.info("Ensured trance_abilities.")
 
-def insert_enemies_and_abilities(cur):
+def insert_enemies(cur):
     logger.info("Checking enemies seed data…")
     cur.executemany(
         """
@@ -2008,6 +2023,7 @@ def insert_enemies_and_abilities(cur):
     )
     logger.info("Ensured enemies.")
 
+def insert_enemy_abilities(cur):
     logger.info("Checking enemy_abilities links…")
     cur.executemany(
         """
@@ -2034,6 +2050,7 @@ def insert_eidolons(cur):
     )
     logger.info("Ensured eidolons.")
 
+def insert_eidolon_abilities(cur):
     logger.info("Checking eidolon_abilities links…")
     cur.executemany(
         """
@@ -2177,8 +2194,12 @@ def main() -> None:
         with mysql.connector.connect(**DB_CONFIG) as cnx:
             with cnx.cursor() as cur:
                 logger.info("Creating / verifying tables…")
+                tables_to_seed = set()
                 for tbl in TABLE_ORDER:
+                    existed = table_exists(cur, tbl)
                     cur.execute(TABLES[tbl])
+                    if not existed:
+                        tables_to_seed.add(tbl)
                     logger.debug("Table `%s` ready.", tbl)
 
                 # ── schema migrations (add missing columns/enums) ──────────────
@@ -2186,42 +2207,84 @@ def main() -> None:
                 ensure_enum_values(cur, "floor_room_rules", "room_type", ["cloister"], "safe")
                 ensure_enum_values(cur, "room_templates", "room_type", ["cloister"], "safe")
 
-                ensure_column(cur, "abilities", "mp_cost", "INT DEFAULT 0")
-                ensure_column(cur, "classes", "base_mp", "INT DEFAULT 0")
-                ensure_column(cur, "levels", "mp_increase", "FLOAT NOT NULL DEFAULT 0")
-                ensure_column(cur, "players", "mp", "INT DEFAULT 0")
-                ensure_column(cur, "players", "max_mp", "INT DEFAULT 0")
-                ensure_column(cur, "room_templates", "eidolon_id", "INT NULL")
-                ensure_column(cur, "room_templates", "attune_level", "INT NULL")
-                ensure_column(cur, "rooms", "eidolon_id", "INT NULL")
-                ensure_column(cur, "rooms", "attune_level", "INT NULL")
+                if ensure_column(cur, "abilities", "mp_cost", "INT DEFAULT 0"):
+                    tables_to_seed.add("abilities")
+                if ensure_column(cur, "classes", "base_mp", "INT DEFAULT 0"):
+                    tables_to_seed.add("classes")
+                if ensure_column(cur, "levels", "mp_increase", "FLOAT NOT NULL DEFAULT 0"):
+                    tables_to_seed.add("levels")
+                if ensure_column(cur, "players", "mp", "INT DEFAULT 0"):
+                    tables_to_seed.add("players")
+                if ensure_column(cur, "players", "max_mp", "INT DEFAULT 0"):
+                    tables_to_seed.add("players")
+                if ensure_column(cur, "room_templates", "eidolon_id", "INT NULL"):
+                    tables_to_seed.add("room_templates")
+                if ensure_column(cur, "room_templates", "attune_level", "INT NULL"):
+                    tables_to_seed.add("room_templates")
+                if ensure_column(cur, "rooms", "eidolon_id", "INT NULL"):
+                    tables_to_seed.add("rooms")
+                if ensure_column(cur, "rooms", "attune_level", "INT NULL"):
+                    tables_to_seed.add("rooms")
 
                 # ── seed data (order matters) ──────────────────────────────────
-                insert_difficulties(cur)
-                insert_floor_room_rules(cur)
-                insert_elements(cur)
-                insert_element_oppositions(cur)
-                insert_status_effects(cur)
-                insert_levels(cur)
-                insert_abilities_and_classes(cur)
-                insert_temporary_abilities(cur)
-                insert_class_trances(cur)
-                insert_trance_abilities(cur)
-                insert_intro_steps(cur)
-                insert_npc_vendors(cur)
-                insert_items(cur)
-                insert_key_items(cur)
-                insert_enemies_and_abilities(cur)
-                insert_eidolons(cur)
-                insert_room_templates(cur)
-                insert_treasure_chests(cur)
-                insert_chest_def_rewards(cur)
-                insert_crystal_templates(cur)
-                insert_enemy_drops(cur)
-                insert_enemy_resistances(cur)
-                insert_npc_vendor_items(cur)
-                insert_ability_status_effects(cur)
-                insert_hub_embeds(cur)
+                if "difficulties" in tables_to_seed:
+                    insert_difficulties(cur)
+                if "floor_room_rules" in tables_to_seed:
+                    insert_floor_room_rules(cur)
+                if "elements" in tables_to_seed:
+                    insert_elements(cur)
+                if "element_oppositions" in tables_to_seed:
+                    insert_element_oppositions(cur)
+                if "status_effects" in tables_to_seed:
+                    insert_status_effects(cur)
+                if "levels" in tables_to_seed:
+                    insert_levels(cur)
+                if "abilities" in tables_to_seed:
+                    insert_abilities(cur)
+                if "classes" in tables_to_seed:
+                    insert_classes(cur)
+                if "class_abilities" in tables_to_seed:
+                    insert_class_abilities(cur)
+                if "temporary_abilities" in tables_to_seed:
+                    insert_temporary_abilities(cur)
+                if "class_trances" in tables_to_seed:
+                    insert_class_trances(cur)
+                if "trance_abilities" in tables_to_seed:
+                    insert_trance_abilities(cur)
+                if "intro_steps" in tables_to_seed:
+                    insert_intro_steps(cur)
+                if "npc_vendors" in tables_to_seed:
+                    insert_npc_vendors(cur)
+                if "items" in tables_to_seed:
+                    insert_items(cur)
+                if "key_items" in tables_to_seed:
+                    insert_key_items(cur)
+                if "enemies" in tables_to_seed:
+                    insert_enemies(cur)
+                if "enemy_abilities" in tables_to_seed:
+                    insert_enemy_abilities(cur)
+                if "eidolons" in tables_to_seed:
+                    insert_eidolons(cur)
+                if "eidolon_abilities" in tables_to_seed:
+                    insert_eidolon_abilities(cur)
+                if "room_templates" in tables_to_seed:
+                    insert_room_templates(cur)
+                if "treasure_chests" in tables_to_seed:
+                    insert_treasure_chests(cur)
+                if "chest_def_rewards" in tables_to_seed:
+                    insert_chest_def_rewards(cur)
+                if "crystal_templates" in tables_to_seed:
+                    insert_crystal_templates(cur)
+                if "enemy_drops" in tables_to_seed:
+                    insert_enemy_drops(cur)
+                if "enemy_resistances" in tables_to_seed:
+                    insert_enemy_resistances(cur)
+                if "npc_vendor_items" in tables_to_seed:
+                    insert_npc_vendor_items(cur)
+                if "ability_status_effects" in tables_to_seed:
+                    insert_ability_status_effects(cur)
+                if "hub_embeds" in tables_to_seed:
+                    insert_hub_embeds(cur)
                 cnx.commit()
                 logger.info("Database setup complete ✔")
     except Error as err:
