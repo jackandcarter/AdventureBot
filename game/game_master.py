@@ -2736,7 +2736,7 @@ class GameMaster(commands.Cog):
 
             if cid.startswith("setup_"):
                 # e.g. “setup_4” → 4‑player session
-                await interaction.response.defer_update()
+                await interaction.response.defer()
                 parts = cid.split("_",1)
                 try:
                     slots = int(parts[1])

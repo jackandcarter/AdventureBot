@@ -98,10 +98,10 @@ class EmbedManager(commands.Cog):
         # don’t see “Interaction Failed” while we fetch/update messages.
         if not interaction.response.is_done():
             try:
-                # For component interactions, defer_update avoids creating
-                # a separate (often ephemeral) response message.
+                # For component interactions, defer without creating a
+                # response message. We will edit the target message directly.
                 if interaction.type == discord.InteractionType.component:
-                    await interaction.response.defer_update()
+                    await interaction.response.defer()
                 else:
                     # A plain defer is safe even when we later edit a different
                     # message via the webhook/message API.
