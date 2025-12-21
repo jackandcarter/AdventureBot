@@ -882,7 +882,8 @@ class BattleSystem(commands.Cog):
                    a.cooldown,
                    a.icon_url,
                    a.target_type,
-                   a.element_id
+                   a.element_id,
+                   a.mp_cost
               FROM class_abilities ca
               JOIN abilities a USING (ability_id)
              WHERE ca.class_id    = %s
@@ -1021,8 +1022,9 @@ class BattleSystem(commands.Cog):
             cd_now = int(cds.get(a["ability_id"], 0))
             bar = create_cooldown_bar(cd_now, a.get("cooldown", 0), length=6)
             style = discord.ButtonStyle.secondary if cd_now > 0 else discord.ButtonStyle.primary
+            label = f"{a['ability_name']} {bar}".strip()
             buttons.append((
-                f"{a['ability_name']} {bar}",
+                label,
                 style,
                 f"summon_ability_{eidolon_id}_{a['ability_id']}",
                 0,
@@ -1079,7 +1081,8 @@ class BattleSystem(commands.Cog):
             cd_now = int(cds.get(a["ability_id"], 0))
             bar = create_cooldown_bar(cd_now, a["cooldown"], length=6)
             style = discord.ButtonStyle.secondary if cd_now > 0 else discord.ButtonStyle.primary
-            buttons.append((f"{a['ability_name']} {bar}", style, f"combat_trance_{a['ability_id']}", 0, cd_now > 0))
+            label = f"{a['ability_name']} {bar}".strip()
+            buttons.append((label, style, f"combat_trance_{a['ability_id']}", 0, cd_now > 0))
 
         # ← Back
         buttons.append(("← Back", discord.ButtonStyle.secondary, "combat_trance_back", 0))

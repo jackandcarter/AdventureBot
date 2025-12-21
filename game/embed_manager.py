@@ -603,7 +603,7 @@ class EmbedManager(commands.Cog):
                 duration_bar = ""
                 if duration is not None and duration_max:
                     duration_bar = create_progress_bar(int(duration), int(duration_max), length=6)
-                cd_bar = create_cooldown_bar(cur_cd, cd) if cd and cur_cd else ("[Ready]" if cd else "")
+                cd_bar = create_cooldown_bar(cur_cd, cd) if cd and cur_cd else ""
                 mp_cost = ab.get("mp_cost", 0) or 0
                 label_parts = [icon, ab["ability_name"]]
                 if mp_cost > 0:
