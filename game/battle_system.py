@@ -432,6 +432,19 @@ class BattleSystem(commands.Cog):
 
         session.ability_cooldowns[player_id] = cds
 
+    def _append_elemental_log(self, session: Any, result: Any, target_name: str) -> None:
+        relation = getattr(result, "element_relation", None)
+        if not relation:
+            return
+        if relation == "weak":
+            session.game_log.append("It's super effective!")
+        elif relation == "resist":
+            session.game_log.append("It's not very effective...")
+        elif relation == "immune":
+            session.game_log.append("It has no effect.")
+        elif relation == "absorb":
+            session.game_log.append(f"{target_name} absorbs the element!")
+
     def get_session(self, channel_id: int) -> Optional[Any]:
         mgr = self.bot.get_cog("SessionManager")
         if not mgr:
@@ -1211,13 +1224,26 @@ class BattleSystem(commands.Cog):
             session.game_log.append(
                 f"You use {ability_meta['ability_name']} and deal {result.amount} damage!"
             )
+            self._append_elemental_log(session, result, enemy["enemy_name"])
         elif result.type == "dot":
             session.game_log.append(
                 f"{enemy['enemy_name']} has been afflicted by {result.dot['effect_name']}."
             )
+            self._append_elemental_log(session, result, enemy["enemy_name"])
+        elif result.type == "hot":
+            if target in ("self", "ally"):
+                session.game_log.append(
+                    f"You are affected by {result.dot['effect_name']}."
+                )
+            else:
+                session.game_log.append(
+                    f"{enemy['enemy_name']} is affected by {result.dot['effect_name']}."
+                )
+                self._append_elemental_log(session, result, enemy["enemy_name"])
         else:
             # miss, heal, pilfer, mug, etc.
             session.game_log.extend(result.logs)
+            self._append_elemental_log(session, result, enemy["enemy_name"])
             # ── If we’re *outside* battle and this was a self‐target skill ──
             if not in_battle and target == "self":
                 # 1) Persist any status‐effects exactly as before
@@ -1273,7 +1299,7 @@ class BattleSystem(commands.Cog):
         self.reduce_player_cooldowns(session, pid)
 
         # 7) handle the result types
-        if result.type in ("damage","heal","set_hp","dot"):
+        if result.type in ("damage","heal","set_hp","dot","hot"):
             # update enemy.hp or player.hp as needed
             if result.type == "damage":
                 enemy["hp"] = max(enemy["hp"] - result.amount, 0)
@@ -1292,6 +1318,16 @@ class BattleSystem(commands.Cog):
             elif result.type == "dot":
                 enemy.setdefault("dot_effects", []).append(result.dot)
                 enemy["hp"] = max(enemy["hp"] - result.dot["damage_per_turn"], 0)
+            elif result.type == "hot":
+                heal_tick = result.dot.get("heal_per_turn", 0)
+                if target in ("self", "ally"):
+                    new_hp = min(player["hp"] + heal_tick, player["max_hp"])
+                    self._update_player_hp(pid, session.session_id, new_hp)
+                    session.game_log.append(f"You recover {heal_tick} HP!")
+                else:
+                    enemy.setdefault("dot_effects", []).append(result.dot)
+                    enemy["hp"] = min(enemy["hp"] + heal_tick, enemy["max_hp"])
+                    session.game_log.append(f"{enemy['enemy_name']} recovers {heal_tick} HP!")
 
 
         else:
@@ -1464,12 +1500,13 @@ class BattleSystem(commands.Cog):
             session.battle_state = {"player_effects": [], "enemy_effects": []}
 
         target = ability_meta.get("target_type", "self")
-        if result.type in ("damage", "heal", "set_hp", "dot"):
+        if result.type in ("damage", "heal", "set_hp", "dot", "hot"):
             if result.type == "damage":
                 enemy["hp"] = max(enemy["hp"] - result.amount, 0)
                 session.game_log.append(
                     f"{eidolon_name} uses {ability_meta['ability_name']} for {result.amount} damage!"
                 )
+                self._append_elemental_log(session, result, enemy["enemy_name"])
             elif result.type == "heal":
                 if target in ("self", "ally"):
                     new_hp = min(player["hp"] + result.amount, player["max_hp"])
@@ -1478,13 +1515,27 @@ class BattleSystem(commands.Cog):
                 else:
                     enemy["hp"] = min(enemy["hp"] + result.amount, enemy["max_hp"])
                     session.game_log.append(f"{enemy['enemy_name']} recovers {result.amount} HP!")
+                self._append_elemental_log(session, result, enemy["enemy_name"])
             elif result.type == "set_hp":
                 enemy["hp"] = result.amount
             elif result.type == "dot":
                 enemy.setdefault("dot_effects", []).append(result.dot)
                 enemy["hp"] = max(enemy["hp"] - result.dot["damage_per_turn"], 0)
+                self._append_elemental_log(session, result, enemy["enemy_name"])
+            elif result.type == "hot":
+                heal_tick = result.dot.get("heal_per_turn", 0)
+                if target in ("self", "ally"):
+                    new_hp = min(player["hp"] + heal_tick, player["max_hp"])
+                    self._update_player_hp(pid, session.session_id, new_hp)
+                    session.game_log.append(f"Eidolon restores {heal_tick} HP to you!")
+                else:
+                    enemy.setdefault("dot_effects", []).append(result.dot)
+                    enemy["hp"] = min(enemy["hp"] + heal_tick, enemy["max_hp"])
+                    session.game_log.append(f"{enemy['enemy_name']} recovers {heal_tick} HP!")
+                self._append_elemental_log(session, result, enemy["enemy_name"])
         else:
             session.game_log.extend(result.logs)
+            self._append_elemental_log(session, result, enemy["enemy_name"])
 
         for raw_se in getattr(result, "status_effects", []) or []:
             raw_se.setdefault("target", ability_meta.get("target_type", "self"))
@@ -1649,6 +1700,7 @@ class BattleSystem(commands.Cog):
             session.game_log.append(
                 f"You use {ability_meta['ability_name']} and deal {result.amount} damage!"
             )
+            self._append_elemental_log(session, result, enemy["enemy_name"])
         elif result.type == "dot":
             dot = result.dot
             enemy.setdefault("dot_effects", []).append(dot)
@@ -1656,10 +1708,28 @@ class BattleSystem(commands.Cog):
             session.game_log.append(
                 f"{enemy['enemy_name']} has been afflicted by {dot['effect_name']}."
             )
+            self._append_elemental_log(session, result, enemy["enemy_name"])
             if enemy["hp"] <= 0:
                 return await self.handle_enemy_defeat(interaction, session, enemy)
+        elif result.type == "hot":
+            dot = result.dot
+            if target in ("self", "ally"):
+                session.game_log.append(
+                    f"You are affected by {dot['effect_name']}."
+                )
+            else:
+                enemy.setdefault("dot_effects", []).append(dot)
+                enemy["hp"] = min(
+                    enemy["hp"] + dot.get("heal_per_turn", 0),
+                    enemy["max_hp"]
+                )
+                session.game_log.append(
+                    f"{enemy['enemy_name']} is affected by {dot['effect_name']}."
+                )
+                self._append_elemental_log(session, result, enemy["enemy_name"])
         else:
             session.game_log.extend(result.logs)
+            self._append_elemental_log(session, result, enemy["enemy_name"])
 
         for raw_se in getattr(result, "status_effects", []) or []:
             raw_se.setdefault("target", ability_meta.get("target_type", "self"))
@@ -1682,7 +1752,7 @@ class BattleSystem(commands.Cog):
 
         session.temp_ability_cooldowns.setdefault(pid, {})[temp_ability_id] = ability_meta.get("cooldown_turns", 0)
 
-        if result.type in ("damage", "heal", "set_hp", "dot"):
+        if result.type in ("damage", "heal", "set_hp", "dot", "hot"):
             if result.type == "damage":
                 enemy["hp"] = max(enemy["hp"] - result.amount, 0)
             elif result.type == "heal":
@@ -1698,6 +1768,12 @@ class BattleSystem(commands.Cog):
             elif result.type == "dot":
                 enemy.setdefault("dot_effects", []).append(result.dot)
                 enemy["hp"] = max(enemy["hp"] - result.dot["damage_per_turn"], 0)
+            elif result.type == "hot":
+                enemy.setdefault("dot_effects", []).append(result.dot)
+                enemy["hp"] = min(
+                    enemy["hp"] + result.dot.get("heal_per_turn", 0),
+                    enemy["max_hp"]
+                )
 
         if enemy["hp"] <= 0:
             return await self.handle_enemy_defeat(interaction, session, enemy)
@@ -1806,6 +1882,18 @@ class BattleSystem(commands.Cog):
             self._update_player_hp(pid, session.session_id, new_hp)
             session.game_log.append(
                 f"<@{pid}> has been hurt from {dot['effect_name']} for {dot['damage_per_turn']} HP."
+            )
+            await self.update_battle_embed(interaction, pid, enemy)
+            return await self._end_enemy_action(interaction)
+
+        if result.type == "hot":
+            dot = result.dot
+            session.battle_state["player_effects"].append(dot)
+            heal = dot.get("heal_per_turn", 0)
+            new_hp = min(player["hp"] + heal, player["max_hp"])
+            self._update_player_hp(pid, session.session_id, new_hp)
+            session.game_log.append(
+                f"<@{pid}> is healed by {dot['effect_name']} for {heal} HP."
             )
             await self.update_battle_embed(interaction, pid, enemy)
             return await self._end_enemy_action(interaction)
