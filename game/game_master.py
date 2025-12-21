@@ -372,10 +372,18 @@ class GameMaster(commands.Cog):
             choice = random.choice(options)
             cur.execute(
                 """
+                DELETE FROM player_temporary_abilities
+                WHERE session_id = %s
+                  AND player_id = %s
+                  AND temp_ability_id = %s
+                """,
+                (session.session_id, player_id, choice["temp_ability_id"]),
+            )
+            cur.execute(
+                """
                 INSERT INTO player_temporary_abilities
                   (session_id, player_id, temp_ability_id, remaining_turns)
                 VALUES (%s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE remaining_turns = VALUES(remaining_turns)
                 """,
                 (session.session_id, player_id, choice["temp_ability_id"], choice["duration_turns"]),
             )
