@@ -533,7 +533,7 @@ class BattleSystem(commands.Cog):
         gm = self.bot.get_cog("GameMaster")
         if gm:
             gm.append_game_log(session.session_id, f"{enemy['enemy_name']} was defeated!")
-        xp = enemy.get("xp_reward", 0)
+        xp = enemy.get("xp_reward", 0) or 0
         if xp and session:
             summoned = getattr(session, "summoned_eidolons", {}) or {}
             for eidolon_id in summoned.get(session.current_turn, set()):
@@ -547,6 +547,8 @@ class BattleSystem(commands.Cog):
             session.summoned_eidolons = summoned
         if xp and gm:
             await gm.award_experience(session.current_turn, session.session_id, xp)
+        if xp and session:
+            session.game_log.append(f"<@{session.current_turn}> gained {xp} XP.")
 
         conn = self.db_connect()
         cursor = conn.cursor(dictionary=True)
@@ -2016,9 +2018,12 @@ class BattleSystem(commands.Cog):
         if not mgr:
             return ""
         sid, pid = session.session_id, session.current_turn
+        xp = enemy.get("xp_reward", 0) or 0
         gil = enemy.get("gil_drop", 0)
         item_id, qty = enemy.get("loot_item_id"), enemy.get("loot_quantity", 0)
         lines: List[str] = []
+        if xp:
+            lines.append(f"You gained {xp} XP.")
         if gil:
             lines.append(f"You received {gil} Gil.")
 
