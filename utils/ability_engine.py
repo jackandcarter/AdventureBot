@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 class AbilityResult:
     """
     A normalized result from using an ability.
-    type: 'damage'|'heal'|'miss'|'dot'|'hot'|'set_hp'|'pilfer'|'mug'
+    type: 'damage'|'heal'|'miss'|'dot'|'hot'|'set_hp'|'pilfer'|'mug'|'scan'
     amount: numeric for damage/heal/set_hp/pilfer/mug
     dot: dict with keys 'damage_per_turn' or 'heal_per_turn', 'remaining_turns', 'effect_name'
     logs: list of strings for the battle log
@@ -20,12 +20,16 @@ class AbilityResult:
         dot: Optional[Dict[str, Any]] = None,
         logs: Optional[List[str]] = None,
         status_effects: Optional[List[Dict[str, Any]]] = None,
+        element_relation: Optional[str] = None,
+        element_multiplier: Optional[float] = None,
     ):
         self.type = type
         self.amount = amount
         self.dot = dot or {}
         self.logs = logs or []
         self.status_effects = status_effects or []
+        self.element_relation = element_relation
+        self.element_multiplier = element_multiplier
 
 
 class AbilityEngine:
@@ -99,6 +103,116 @@ class AbilityEngine:
             # remove any stray duration keys
             inst.pop("remaining_turns", None)
         return result
+
+    def _get_elemental_modifier(
+        self,
+        target: Dict[str, Any],
+        element_id: Optional[int]
+    ) -> Optional[Dict[str, Any]]:
+        if not element_id or not target or "enemy_id" not in target:
+            return None
+
+        conn = self.db_connect()
+        cur = conn.cursor(dictionary=True)
+        cur.execute(
+            """
+            SELECT relation, multiplier
+            FROM enemy_resistances
+            WHERE enemy_id = %s AND element_id = %s
+            """,
+            (target["enemy_id"], element_id),
+        )
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        if not row:
+            return None
+        return row
+
+    def _apply_elemental_modifier(
+        self,
+        result: AbilityResult,
+        ability: Dict[str, Any],
+        target: Dict[str, Any]
+    ) -> AbilityResult:
+        mod = self._get_elemental_modifier(target, ability.get("element_id"))
+        if not mod:
+            return result
+
+        relation = (mod.get("relation") or "normal").lower()
+        default_multiplier = {
+            "weak": 1.5,
+            "resist": 0.5,
+            "immune": 0.0,
+            "absorb": 1.0,
+            "normal": 1.0,
+        }
+        multiplier = mod.get("multiplier")
+        if multiplier is None:
+            multiplier = default_multiplier.get(relation, 1.0)
+
+        result.element_relation = relation
+        result.element_multiplier = multiplier
+
+        if result.type == "damage":
+            base = result.amount
+            if relation == "immune":
+                result.amount = 0
+            elif relation == "absorb":
+                result.type = "heal"
+                result.amount = max(int(base * multiplier), 0)
+                target_name = target.get("enemy_name", "The enemy")
+                result.logs = [
+                    f"{target_name} absorbs {ability['ability_name']} and recovers {result.amount} HP."
+                ]
+            else:
+                if base > 0:
+                    result.amount = max(int(base * multiplier), 1)
+                else:
+                    result.amount = 0
+        elif result.type == "dot":
+            dot_damage = result.dot.get("damage_per_turn")
+            if dot_damage is None:
+                return result
+            if relation == "immune":
+                result.dot["damage_per_turn"] = 0
+            elif relation == "absorb":
+                result.type = "hot"
+                result.dot.pop("damage_per_turn", None)
+                result.dot["heal_per_turn"] = max(int(dot_damage * multiplier), 0)
+            else:
+                if dot_damage > 0:
+                    result.dot["damage_per_turn"] = max(int(dot_damage * multiplier), 1)
+                else:
+                    result.dot["damage_per_turn"] = 0
+
+        return result
+
+    def _get_enemy_resistance_profile(self, target: Dict[str, Any]) -> Dict[str, List[str]]:
+        if not target or "enemy_id" not in target:
+            return {}
+
+        conn = self.db_connect()
+        cur = conn.cursor(dictionary=True)
+        cur.execute(
+            """
+            SELECT e.element_name, er.relation
+            FROM enemy_resistances er
+            JOIN elements e ON e.element_id = er.element_id
+            WHERE er.enemy_id = %s
+            """,
+            (target["enemy_id"],),
+        )
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        profile: Dict[str, List[str]] = {}
+        for row in rows:
+            relation = (row.get("relation") or "normal").lower()
+            if relation == "normal":
+                continue
+            profile.setdefault(relation, []).append(row["element_name"])
+        return profile
     
     def _attach_table_status_effects(
         self,
@@ -221,6 +335,24 @@ class AbilityEngine:
                 effect_data = json.loads(ability["effect"])
             except json.JSONDecodeError:
                 effect_data = {}
+
+            if result is None and effect_data.get("scan"):
+                target_name = target.get("enemy_name", "the enemy")
+                logs.append(f"{name} scans {target_name}.")
+                logs.append(
+                    f"HP: {target.get('hp', 0)}/{target.get('max_hp', 0)}"
+                )
+                profile = self._get_enemy_resistance_profile(target)
+                if not profile:
+                    logs.append("No elemental weaknesses detected.")
+                else:
+                    for relation in ("weak", "resist", "immune", "absorb"):
+                        elements = profile.get(relation, [])
+                        if elements:
+                            pretty = ", ".join(elements)
+                            label = relation.capitalize()
+                            logs.append(f"{label}: {pretty}")
+                result = AbilityResult(type="scan", logs=logs)
 
             # flat, defense‑ignoring damage (e.g., Cactuar's Needles)
             if result is None and "flat_damage" in effect_data:
@@ -353,11 +485,13 @@ class AbilityEngine:
             logs.append(f"{name} deals {dmg} damage.")
             result = AbilityResult(type="damage", amount=dmg, logs=logs)
 
+        # 6) Apply elemental modifiers (weak/resist/absorb/immune)
+        result = self._apply_elemental_modifier(result, ability, target)
         
-        # 6) Attach any table‑driven status effects (single + many‑to‑many)
+        # 7) Attach any table‑driven status effects (single + many‑to‑many)
         result = self._attach_table_status_effects(result, ability)
 
-        # 7) Enrich and normalize *all* status effects
+        # 8) Enrich and normalize *all* status effects
         result = self._enrich_status_effects(result)
         return result
 
