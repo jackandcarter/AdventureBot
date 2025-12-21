@@ -762,14 +762,15 @@ class SessionPlayerModel:
             if not row:
                 return None
 
-            new_xp = row["experience"] + xp_gain
+            total_xp = row["experience"] + xp_gain
             new_level = row["level"]
 
             while True:
                 cur.execute("SELECT required_exp FROM levels WHERE level=%s", (new_level + 1,))
                 nxt = cur.fetchone()
-                if not nxt or new_xp < nxt["required_exp"]:
+                if not nxt or total_xp < nxt["required_exp"]:
                     break
+                total_xp -= nxt["required_exp"]
                 new_level += 1
 
             cur.execute(
@@ -778,10 +779,10 @@ class SessionPlayerModel:
                    SET experience=%s, level=%s
                  WHERE session_id=%s AND player_id=%s AND eidolon_id=%s
                 """,
-                (new_xp, new_level, session_id, player_id, eidolon_id),
+                (total_xp, new_level, session_id, player_id, eidolon_id),
             )
             conn.commit()
-            return {"level": new_level, "experience": new_xp}
+            return {"level": new_level, "experience": total_xp}
         except Exception:
             logger.exception("Error awarding eidolon experience")
             return None
