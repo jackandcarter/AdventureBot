@@ -1228,25 +1228,22 @@ class BattleSystem(commands.Cog):
                         session.battle_state.get("player_effects", []) + result.status_effects
                     )
 
-            # 2) If this skill also heals immediately on use, write that to the DB now:
-            if result.type in ("heal", "set_hp"):
-                # e.g. “heal” gives you result.amount HP
-                # or “set_hp” forces to exactly result.amount
-                old_hp = self._get_player_hp(pid, session.session_id)
-                new_hp = result.amount if result.type == "set_hp" else min(
-                    old_hp + result.amount,
-                    self._get_player_max_hp(pid, session.session_id),
-                )
-                self._update_player_hp(pid, session.session_id, new_hp)
-                session.game_log.append(f"You are healed to {new_hp} HP.")
+                # 2) If this skill also heals immediately on use, write that to the DB now:
+                if result.type in ("heal", "set_hp"):
+                    # e.g. “heal” gives you result.amount HP
+                    # or “set_hp” forces to exactly result.amount
+                    old_hp = self._get_player_hp(pid, session.session_id)
+                    new_hp = result.amount if result.type == "set_hp" else min(
+                        old_hp + result.amount,
+                        self._get_player_max_hp(pid, session.session_id),
+                    )
+                    self._update_player_hp(pid, session.session_id, new_hp)
+                    session.game_log.append(f"You are healed to {new_hp} HP.")
 
-            # 3) Send the same ephemeral confirmation you already build in game_log
-            await interaction.followup.send("\n".join(session.game_log), ephemeral=True)
-
-            # 4) Finally—*after* writing to the DB— redraw the *room* (not the battle embed)
-            #    so your room embed updates with your new HP and buttons.
-            sm = self.bot.get_cog("SessionManager")
-            return await sm.refresh_current_state(interaction)
+                # 3) Finally—*after* writing to the DB— redraw the *room* (not the battle embed)
+                #    so your room embed updates with your new HP and buttons.
+                sm = self.bot.get_cog("SessionManager")
+                return await sm.refresh_current_state(interaction)
 
 
         # 5) apply any returned status effects
