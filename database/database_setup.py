@@ -1662,8 +1662,13 @@ def insert_levels(cur):
 
 def insert_intro_steps(cur):
     logger.info("Checking intro_steps seed data…")
-    if not table_is_empty(cur, "intro_steps"):
-        logger.info("intro_steps already populated – skipping")
+    cur.execute("SELECT step_order FROM intro_steps")
+    existing_steps = {row[0] for row in cur.fetchall() if row and row[0] is not None}
+    if existing_steps:
+        logger.info("intro_steps already has %d entries; seeding missing steps only", len(existing_steps))
+    rows_to_insert = [row[1:] for row in MERGED_INTRO_STEPS if row[1] not in existing_steps]
+    if not rows_to_insert:
+        logger.info("intro_steps already contains all seeded steps – skipping")
         return
     cur.executemany(
         """
@@ -1671,7 +1676,7 @@ def insert_intro_steps(cur):
           (step_order, title, description, image_url, created_at)
         VALUES (%s,%s,%s,%s,%s)
         """,
-        [row[1:] for row in MERGED_INTRO_STEPS]
+        rows_to_insert
     )
     logger.info("Inserted intro_steps.")
 
