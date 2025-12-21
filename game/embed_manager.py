@@ -42,6 +42,15 @@ class EmbedManager(commands.Cog):
 
         # channel_id ➜ asyncio.Lock to serialize rapid updates
         self._update_locks: Dict[int, asyncio.Lock] = {}
+        # channel_id ➜ last payload signature to skip identical updates
+        self._last_payload_signatures: Dict[int, str] = {}
+        # channel_id ➜ next allowed edit time to throttle rapid edits
+        self._next_edit_time: Dict[int, float] = {}
+        self._min_update_interval = (
+            float(self.config.get("embed_update_min_interval", 1.2))
+            if self.config
+            else 1.2
+        )
 
         logger.debug("EmbedManager initialised.")
 
@@ -109,8 +118,7 @@ class EmbedManager(commands.Cog):
             except Exception as e:  # pragma: no cover - defensive guard
                 logger.debug("send_or_update_embed: defer failed: %s", e)
 
-        # Obtain or create the per-channel lock
-        lock = self._update_locks.setdefault(cid, asyncio.Lock())
+        lock = self._get_lock(cid)
 
         async with lock:
             # Build or reuse embed
@@ -158,23 +166,35 @@ class EmbedManager(commands.Cog):
                                 Button(label=label, style=style, custom_id=cid_btn)
                             )
 
+            payload_signature = self._build_payload_signature(embed, view)
+
             # Send or edit
             try:
                 if cid in self.active_messages:
                     msg_id = self.active_messages[cid]
+                    if self._last_payload_signatures.get(cid) == payload_signature:
+                        logger.debug(
+                            "send_or_update_embed: unchanged payload for channel %s; skipping edit",
+                            cid,
+                        )
+                        return target.get_partial_message(msg_id)
+                    await self._throttle_edit(cid)
                     partial = target.get_partial_message(msg_id)
-                    await partial.edit(embed=embed, view=view)
+                    try:
+                        await partial.edit(embed=embed, view=view)
+                    except discord.NotFound:
+                        self.active_messages.pop(cid, None)
+                        self._next_edit_time.pop(cid, None)
+                        return await self._send_new_message(target, embed, view, cid, payload_signature)
+                    self._note_edit_time(cid)
+                    self._last_payload_signatures[cid] = payload_signature
                     return partial
-                msg = await target.send(embed=embed, view=view)
-                self.active_messages[cid] = msg.id
-                return msg
+                return await self._send_new_message(target, embed, view, cid, payload_signature)
             except Exception as e:
                 logger.error("send_or_update_embed failed: %s", e)
                 if cid in self.active_messages:
                     try:
-                        msg = await target.send(embed=embed, view=view)
-                        self.active_messages[cid] = msg.id
-                        return msg
+                        return await self._send_new_message(target, embed, view, cid, payload_signature)
                     except Exception as fb:
                         logger.error("Fallback send failed: %s", fb)
                         return None
@@ -183,6 +203,64 @@ class EmbedManager(commands.Cog):
                 except Exception as fb:
                     logger.error("Fallback send failed: %s", fb)
                     return None
+
+    def _get_lock(self, channel_id: int) -> asyncio.Lock:
+        return self._update_locks.setdefault(channel_id, asyncio.Lock())
+
+    async def _send_new_message(
+        self,
+        target: discord.abc.Messageable,
+        embed: discord.Embed,
+        view: View,
+        channel_id: int,
+        payload_signature: str,
+    ) -> discord.Message:
+        msg = await target.send(embed=embed, view=view)
+        self.active_messages[channel_id] = msg.id
+        self._last_payload_signatures[channel_id] = payload_signature
+        return msg
+
+    def _build_payload_signature(self, embed: discord.Embed, view: Optional[View]) -> str:
+        embed_payload = embed.to_dict()
+        view_payload = []
+        if view:
+            for child in view.children:
+                if isinstance(child, Button):
+                    view_payload.append(
+                        {
+                            "type": "button",
+                            "label": child.label,
+                            "custom_id": child.custom_id,
+                            "style": int(child.style),
+                            "row": child.row,
+                            "disabled": child.disabled,
+                            "emoji": str(child.emoji) if child.emoji else None,
+                        }
+                    )
+                else:
+                    view_payload.append(
+                        {
+                            "type": child.__class__.__name__,
+                            "custom_id": getattr(child, "custom_id", None),
+                            "row": getattr(child, "row", None),
+                        }
+                    )
+        return json.dumps(
+            {"embed": embed_payload, "view": view_payload},
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+
+    async def _throttle_edit(self, channel_id: int) -> None:
+        now = time.monotonic()
+        next_allowed = self._next_edit_time.get(channel_id, 0.0)
+        delay = next_allowed - now
+        if delay > 0:
+            logger.debug("Throttling channel %s for %.2fs", channel_id, delay)
+            await asyncio.sleep(delay)
+
+    def _note_edit_time(self, channel_id: int) -> None:
+        self._next_edit_time[channel_id] = time.monotonic() + self._min_update_interval
 
     # ──────────────────────────────────────────────────────────────────
     # Submenu for Save / Quit / Back
@@ -203,7 +281,22 @@ class EmbedManager(commands.Cog):
 
         try:
             msg = interaction.channel.get_partial_message(msg_id)
-            await msg.edit(view=self._get_game_menu_view())
+            lock = self._get_lock(cid)
+            async with lock:
+                await self._throttle_edit(cid)
+                view = self._get_game_menu_view()
+                try:
+                    await msg.edit(view=view)
+                except discord.NotFound:
+                    self.active_messages.pop(cid, None)
+                    self._next_edit_time.pop(cid, None)
+                    await interaction.response.send_message(
+                        "⚙️ Game Menu",
+                        view=view,
+                        ephemeral=True,
+                    )
+                    return
+                self._note_edit_time(cid)
             if not interaction.response.is_done():
                 await interaction.response.defer()
         except Exception as e:
