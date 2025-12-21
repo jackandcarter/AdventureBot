@@ -1528,20 +1528,54 @@ TABLE_ORDER = [
 
 def insert_difficulties(cur):
     logger.info("Checking difficulties seed data…")
-    if not table_is_empty(cur, "difficulties"):
-        logger.info("difficulties already populated – skipping")
-        return
+    values = [
+        (
+            name,
+            width,
+            height,
+            min_floors,
+            max_floors,
+            min_rooms,
+            enemy_chance,
+            npc_count,
+            basement_chance,
+            basement_min_rooms,
+            basement_max_rooms,
+            created_at,
+            shops_per_floor,
+            name,
+        )
+        for (
+            _,
+            name,
+            width,
+            height,
+            min_floors,
+            max_floors,
+            min_rooms,
+            enemy_chance,
+            npc_count,
+            basement_chance,
+            basement_min_rooms,
+            basement_max_rooms,
+            created_at,
+            shops_per_floor,
+        ) in MERGED_DIFFICULTIES
+    ]
     cur.executemany(
         """
         INSERT INTO difficulties
           (name, width, height, min_floors, max_floors, min_rooms,
            enemy_chance, npc_count, basement_chance,
            basement_min_rooms, basement_max_rooms, created_at, shops_per_floor)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        SELECT %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s
+        WHERE NOT EXISTS (
+            SELECT 1 FROM difficulties WHERE name = %s
+        )
         """,
-        [row[1:] for row in MERGED_DIFFICULTIES]
+        values,
     )
-    logger.info("Inserted difficulties.")
+    logger.info("Ensured difficulties.")
 
 def insert_floor_room_rules(cur):
     logger.info("Checking floor_room_rules seed data…")
@@ -1558,23 +1592,27 @@ def insert_floor_room_rules(cur):
 
 def insert_elements(cur):
     logger.info("Checking elements seed data…")
-    if not table_is_empty(cur, "elements"):
-        logger.info("elements already populated – skipping")
-        return
+    values = [
+        (element_name, created_at, element_name)
+        for (_, element_name, created_at) in MERGED_ELEMENTS
+    ]
     cur.executemany(
-        "INSERT INTO elements (element_name, created_at) VALUES (%s, %s)",
-        [row[1:] for row in MERGED_ELEMENTS]
+        """
+        INSERT INTO elements (element_name, created_at)
+        SELECT %s, %s
+        WHERE NOT EXISTS (
+            SELECT 1 FROM elements WHERE element_name = %s
+        )
+        """,
+        values,
     )
-    logger.info("Inserted elements.")
+    logger.info("Ensured elements.")
 
 def insert_element_oppositions(cur):
     logger.info("Checking element_oppositions seed data…")
-    if not table_is_empty(cur, "element_oppositions"):
-        logger.info("element_oppositions already populated – skipping")
-        return
     cur.executemany(
         """
-        INSERT INTO element_oppositions
+        INSERT IGNORE INTO element_oppositions
           (element_id, opposing_element_id)
         SELECT e.element_id, o.element_id
         FROM elements e
@@ -1584,7 +1622,7 @@ def insert_element_oppositions(cur):
         """,
         MERGED_ELEMENT_OPPOSITIONS
     )
-    logger.info("Inserted element_oppositions.")
+    logger.info("Ensured element_oppositions.")
 
 def insert_abilities_and_classes(cur):
     logger.info("Checking abilities seed data…")
@@ -1632,19 +1670,50 @@ def insert_abilities_and_classes(cur):
 
 def insert_temporary_abilities(cur):
     logger.info("Checking temporary_abilities seed data…")
-    if not table_is_empty(cur, "temporary_abilities"):
-        logger.info("temporary_abilities already populated – skipping")
-        return
+    values = [
+        (
+            class_id,
+            ability_name,
+            description,
+            effect,
+            cooldown_turns,
+            duration_turns,
+            target_type,
+            icon_url,
+            element_id,
+            created_at,
+            class_id,
+            ability_name,
+        )
+        for (
+            _,
+            class_id,
+            ability_name,
+            description,
+            effect,
+            cooldown_turns,
+            duration_turns,
+            target_type,
+            icon_url,
+            element_id,
+            created_at,
+        ) in MERGED_TEMPORARY_ABILITIES
+    ]
     cur.executemany(
         """
         INSERT INTO temporary_abilities
           (class_id, ability_name, description, effect, cooldown_turns,
            duration_turns, target_type, icon_url, element_id, created_at)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        SELECT %s,%s,%s,%s,%s,%s,%s,%s,%s,%s
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM temporary_abilities
+            WHERE class_id = %s AND ability_name = %s
+        )
         """,
-        [row[1:] for row in MERGED_TEMPORARY_ABILITIES]
+        values,
     )
-    logger.info("Inserted temporary_abilities.")
+    logger.info("Ensured temporary_abilities.")
 
 def insert_levels(cur):
     logger.info("Checking levels seed data…")
@@ -1695,63 +1764,127 @@ def insert_room_templates(cur):
 
 def insert_crystal_templates(cur):
     logger.info("Checking crystal_templates seed data…")
-    if not table_is_empty(cur, "crystal_templates"):
-        logger.info("crystal_templates already populated – skipping")
-        return
+    values = [
+        (element_id, name, description, image_url, created_at, element_id, name)
+        for (
+            _,
+            element_id,
+            name,
+            description,
+            image_url,
+            created_at,
+        ) in MERGED_CRYSTAL_TEMPLATES
+    ]
     cur.executemany(
         """
         INSERT INTO crystal_templates
           (element_id, name, description, image_url, created_at)
-        VALUES (%s,%s,%s,%s,%s)
+        SELECT %s,%s,%s,%s,%s
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM crystal_templates
+            WHERE element_id = %s AND name = %s
+        )
         """,
-        [row[1:] for row in MERGED_CRYSTAL_TEMPLATES]
+        values,
     )
-    logger.info("Inserted crystal_templates.")
+    logger.info("Ensured crystal_templates.")
 
 def insert_npc_vendors(cur):
     logger.info("Checking npc_vendors seed data…")
-    if not table_is_empty(cur, "npc_vendors"):
-        logger.info("npc_vendors already populated – skipping")
-        return
+    values = [
+        (vendor_name, description, inventory, image_url, created_at, vendor_name)
+        for (
+            _,
+            vendor_name,
+            description,
+            inventory,
+            image_url,
+            created_at,
+        ) in MERGED_NPC_VENDORS
+    ]
     cur.executemany(
         """
         INSERT INTO npc_vendors
           (vendor_name, description, inventory, image_url, created_at)
-        VALUES (%s,%s,%s,%s,%s)
+        SELECT %s,%s,%s,%s,%s
+        WHERE NOT EXISTS (
+            SELECT 1 FROM npc_vendors WHERE vendor_name = %s
+        )
         """,
-        [row[1:] for row in MERGED_NPC_VENDORS]
+        values,
     )
-    logger.info("Inserted npc_vendors.")
+    logger.info("Ensured npc_vendors.")
 
 def insert_items(cur):
     logger.info("Checking items seed data…")
-    if not table_is_empty(cur, "items"):
-        logger.info("items already populated – skipping")
-        return
+    values = [
+        (
+            item_name,
+            description,
+            effect,
+            item_type,
+            usage_limit,
+            price,
+            store_stock,
+            target_type,
+            image_url,
+            creator_id,
+            created_at,
+            item_name,
+        )
+        for (
+            _,
+            item_name,
+            description,
+            effect,
+            item_type,
+            usage_limit,
+            price,
+            store_stock,
+            target_type,
+            image_url,
+            creator_id,
+            created_at,
+        ) in MERGED_ITEMS
+    ]
     cur.executemany(
         """
         INSERT INTO items
           (item_name, description, effect, type, usage_limit, price,
            store_stock, target_type, image_url, creator_id, created_at)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        SELECT %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s
+        WHERE NOT EXISTS (
+            SELECT 1 FROM items WHERE item_name = %s
+        )
         """,
-        [row[1:] for row in MERGED_ITEMS]
+        values,
     )
-    logger.info("Inserted items.")
+    logger.info("Ensured items.")
 
 def insert_key_items(cur):
     logger.info("Checking key_items seed data…")
-    if not table_is_empty(cur, "key_items"):
-        logger.info("key_items already populated – skipping")
-        return
+    values = [
+        (name, description, image_url, created_at, name)
+        for (
+            _,
+            name,
+            description,
+            image_url,
+            created_at,
+        ) in MERGED_KEY_ITEMS
+    ]
     cur.executemany(
         """
         INSERT INTO key_items (name, description, image_url, created_at)
-        VALUES (%s,%s,%s,%s)
+        SELECT %s,%s,%s,%s
+        WHERE NOT EXISTS (
+            SELECT 1 FROM key_items WHERE name = %s
+        )
         """,
-        [row[1:] for row in MERGED_KEY_ITEMS]
+        values,
     )
-    logger.info("Inserted key_items.")
+    logger.info("Ensured key_items.")
 
 def insert_treasure_chests(cur):
     logger.info("Checking treasure_chests seed data…")
@@ -1775,18 +1908,50 @@ def insert_treasure_chests(cur):
 
 def insert_chest_def_rewards(cur):
     logger.info("Checking chest_def_rewards seed data…")
-    if not table_is_empty(cur, "chest_def_rewards"):
-        logger.info("chest_def_rewards already populated – skipping")
-        return
+    values = [
+        (
+            chest_id,
+            reward_type,
+            reward_item_id,
+            reward_key_item_id,
+            amount,
+            spawn_weight,
+            chest_id,
+            reward_type,
+            reward_item_id,
+            reward_key_item_id,
+            amount,
+            spawn_weight,
+        )
+        for (
+            _,
+            chest_id,
+            reward_type,
+            reward_item_id,
+            reward_key_item_id,
+            amount,
+            spawn_weight,
+        ) in MERGED_CHEST_DEF_REWARDS
+    ]
     cur.executemany(
         """
         INSERT INTO chest_def_rewards
           (chest_id, reward_type, reward_item_id, reward_key_item_id, amount, spawn_weight)
-        VALUES (%s,%s,%s,%s,%s,%s)
+        SELECT %s,%s,%s,%s,%s,%s
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM chest_def_rewards
+            WHERE chest_id = %s
+              AND reward_type = %s
+              AND reward_item_id <=> %s
+              AND reward_key_item_id <=> %s
+              AND amount = %s
+              AND spawn_weight = %s
+        )
         """,
-        [row[1:] for row in MERGED_CHEST_DEF_REWARDS]
+        values,
     )
-    logger.info("Inserted chest_def_rewards.")
+    logger.info("Ensured chest_def_rewards.")
 
 def insert_class_trances(cur):
     logger.info("Checking class_trances seed data…")
@@ -1882,83 +2047,119 @@ def insert_eidolons(cur):
 
 def insert_enemy_drops(cur):
     logger.info("Checking enemy_drops seed data…")
-    if not table_is_empty(cur, "enemy_drops"):
-        logger.info("enemy_drops already populated – skipping")
-        return
     cur.executemany(
         """
-        INSERT INTO enemy_drops (enemy_id,item_id,drop_chance,min_qty,max_qty)
+        INSERT IGNORE INTO enemy_drops (enemy_id,item_id,drop_chance,min_qty,max_qty)
         VALUES (%s,%s,%s,%s,%s)
         """,
         MERGED_ENEMY_DROPS
     )
-    logger.info("Inserted enemy_drops.")
+    logger.info("Ensured enemy_drops.")
 
 def insert_enemy_resistances(cur):
     logger.info("Checking enemy_resistances seed data…")
-    if not table_is_empty(cur, "enemy_resistances"):
-        logger.info("enemy_resistances already populated – skipping")
-        return
     cur.executemany(
-        "INSERT INTO enemy_resistances (enemy_id,element_id,resistance,relation,multiplier) VALUES (%s,%s,%s,%s,%s)",
+        "INSERT IGNORE INTO enemy_resistances (enemy_id,element_id,resistance,relation,multiplier) VALUES (%s,%s,%s,%s,%s)",
         MERGED_ENEMY_RESISTANCES
     )
-    logger.info("Inserted enemy_resistances.")
+    logger.info("Ensured enemy_resistances.")
 
 def insert_npc_vendor_items(cur):
     logger.info("Checking npc_vendor_items seed data…")
-    if not table_is_empty(cur, "npc_vendor_items"):
-        logger.info("npc_vendor_items already populated – skipping")
-        return
     cur.executemany(
         """
-        INSERT INTO npc_vendor_items (vendor_id,item_id,price,stock,instance_stock)
+        INSERT IGNORE INTO npc_vendor_items (vendor_id,item_id,price,stock,instance_stock)
         VALUES (%s,%s,%s,%s,%s)
         """,
         MERGED_NPC_VENDOR_ITEMS
     )
-    logger.info("Inserted npc_vendor_items.")
+    logger.info("Ensured npc_vendor_items.")
 
 def insert_status_effects(cur):
     logger.info("Checking status_effects seed data…")
-    if table_is_empty(cur, "status_effects"):
-        cur.executemany(
-            """
-            INSERT INTO status_effects
-              (effect_name,effect_type,icon_url,created_at,value,duration)
-            VALUES (%s,%s,%s,%s,%s,%s)
-            """,
-            [row[1:] for row in MERGED_STATUS_EFFECTS]
+    values = [
+        (
+            effect_name,
+            effect_type,
+            icon_url,
+            created_at,
+            value,
+            duration,
+            effect_name,
         )
-        logger.info("Inserted status_effects.")
-    else:
-        logger.info("status_effects already populated – skipping")
+        for (
+            _,
+            effect_name,
+            effect_type,
+            icon_url,
+            created_at,
+            value,
+            duration,
+        ) in MERGED_STATUS_EFFECTS
+    ]
+    cur.executemany(
+        """
+        INSERT INTO status_effects
+          (effect_name,effect_type,icon_url,created_at,value,duration)
+        SELECT %s,%s,%s,%s,%s,%s
+        WHERE NOT EXISTS (
+            SELECT 1 FROM status_effects WHERE effect_name = %s
+        )
+        """,
+        values,
+    )
+    logger.info("Ensured status_effects.")
 
 def insert_ability_status_effects(cur):
     logger.info("Checking ability_status_effects links…")
-    if table_is_empty(cur, "ability_status_effects"):
-        cur.executemany(
-            "INSERT INTO ability_status_effects (ability_id,effect_id) VALUES (%s,%s)",
-            MERGED_ABILITY_STATUS_EFFECTS
-        )
-        logger.info("Inserted ability_status_effects links.")
-    else:
-        logger.info("ability_status_effects already populated – skipping")
+    cur.executemany(
+        "INSERT IGNORE INTO ability_status_effects (ability_id,effect_id) VALUES (%s,%s)",
+        MERGED_ABILITY_STATUS_EFFECTS
+    )
+    logger.info("Ensured ability_status_effects links.")
 
 def insert_hub_embeds(cur):
     logger.info("Checking hub_embeds seed data…")
-    if not table_is_empty(cur, "hub_embeds"):
-        logger.info("hub_embeds already populated – skipping")
-        return
+    values = [
+        (
+            embed_type,
+            title,
+            description,
+            image_url,
+            text_field,
+            step_order,
+            created_at,
+            embed_type,
+            step_order,
+            title,
+        )
+        for (
+            _,
+            embed_type,
+            title,
+            description,
+            image_url,
+            text_field,
+            step_order,
+            created_at,
+        ) in MERGED_HUB_EMBEDS
+    ]
     cur.executemany(
         """
         INSERT INTO hub_embeds
           (embed_type,title,description,image_url,text_field,step_order,created_at)
-        VALUES (%s,%s,%s,%s,%s,%s,%s)
+        SELECT %s,%s,%s,%s,%s,%s,%s
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM hub_embeds
+            WHERE embed_type = %s
+              AND step_order <=> %s
+              AND title <=> %s
+        )
         """,
-        [row[1:] for row in MERGED_HUB_EMBEDS]
+        values,
     )
-    logger.info("Inserted hub_embeds.")
+    logger.info("Ensured hub_embeds.")
 
 def seed_already_applied(cur, seed_name: str = "initial_seed") -> bool:
     cur.execute("SELECT 1 FROM seed_meta WHERE seed_name = %s LIMIT 1", (seed_name,))
@@ -1996,35 +2197,31 @@ def main() -> None:
                 ensure_column(cur, "rooms", "attune_level", "INT NULL")
 
                 # ── seed data (order matters) ──────────────────────────────────
-                if seed_already_applied(cur):
-                    logger.info("Seed data already applied – skipping")
-                else:
-                    insert_difficulties(cur)
-                    insert_floor_room_rules(cur)
-                    insert_elements(cur)
-                    insert_element_oppositions(cur)
-                    insert_status_effects(cur)
-                    insert_levels(cur)
-                    insert_abilities_and_classes(cur)
-                    insert_temporary_abilities(cur)
-                    insert_class_trances(cur)
-                    insert_trance_abilities(cur)
-                    insert_intro_steps(cur)
-                    insert_npc_vendors(cur)
-                    insert_items(cur)
-                    insert_key_items(cur)
-                    insert_enemies_and_abilities(cur)
-                    insert_eidolons(cur)
-                    insert_room_templates(cur)
-                    insert_treasure_chests(cur)
-                    insert_chest_def_rewards(cur)
-                    insert_crystal_templates(cur)
-                    insert_enemy_drops(cur)
-                    insert_enemy_resistances(cur)
-                    insert_npc_vendor_items(cur)
-                    insert_ability_status_effects(cur)
-                    insert_hub_embeds(cur)
-                    mark_seed_applied(cur)
+                insert_difficulties(cur)
+                insert_floor_room_rules(cur)
+                insert_elements(cur)
+                insert_element_oppositions(cur)
+                insert_status_effects(cur)
+                insert_levels(cur)
+                insert_abilities_and_classes(cur)
+                insert_temporary_abilities(cur)
+                insert_class_trances(cur)
+                insert_trance_abilities(cur)
+                insert_intro_steps(cur)
+                insert_npc_vendors(cur)
+                insert_items(cur)
+                insert_key_items(cur)
+                insert_enemies_and_abilities(cur)
+                insert_eidolons(cur)
+                insert_room_templates(cur)
+                insert_treasure_chests(cur)
+                insert_chest_def_rewards(cur)
+                insert_crystal_templates(cur)
+                insert_enemy_drops(cur)
+                insert_enemy_resistances(cur)
+                insert_npc_vendor_items(cur)
+                insert_ability_status_effects(cur)
+                insert_hub_embeds(cur)
                 cnx.commit()
                 logger.info("Database setup complete ✔")
     except Error as err:
