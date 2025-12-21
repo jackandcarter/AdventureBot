@@ -519,6 +519,7 @@ class DungeonGenerator(commands.Cog):
                 rt for rt, cap in remaining.items()
                 if cap > 0
                 and rt not in ("staircase_up","staircase_down")
+                and rt != "trap"
                 and not (exclude_locked and rt == "locked")
                 and not (exclude_item and rt == "item")
                 and not (exclude_special and rt in self.SPECIAL_ROOM_TYPES)
@@ -527,7 +528,7 @@ class DungeonGenerator(commands.Cog):
                 return "monster" if random.random() < enemy_chance else "safe"
             choice_ = random.choices(avail, weights=[weights[a] for a in avail])[0]
             remaining[choice_] -= 1
-            if choice_ in ("trap","illusion") and not self.fetch_random_template(choice_):
+            if choice_ == "illusion" and not self.fetch_random_template(choice_):
                 return "monster" if random.random() < enemy_chance else "safe"
             return choice_
 

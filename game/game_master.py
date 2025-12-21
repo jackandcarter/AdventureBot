@@ -1754,11 +1754,7 @@ class GameMaster(commands.Cog):
         if not landed:
             return await interaction.followup.send("❌ Room data missing.", ephemeral=True)
 
-        # ── 7. special cases: trap / monster ─────────────────────────
-        if landed["room_type"] == "trap":
-            await self.trigger_trap(interaction, landed)
-            return
-
+        # ── 7. special cases: monster ─────────────────────────
         if landed["room_type"] in ("boss", "miniboss", "monster"):
             bs = self.bot.get_cog("BattleSystem")
             if bs:
@@ -1786,26 +1782,6 @@ class GameMaster(commands.Cog):
         await self.update_room_view(interaction, landed, nx, ny)
         await self.end_player_turn(interaction)
         
-
-    # ──────────────────────────────────────────────────────────
-    #  Trap dispatcher
-    # ──────────────────────────────────────────────────────────
-    async def trigger_trap(self,
-                           interaction: discord.Interaction,
-                           room: dict[str, Any]) -> None:
-        """
-        For now, trap rooms behave exactly like safe rooms:
-        just redraw the current room.  Future trap effects (e.g.,
-        periodic HP loss over several turns) go here.
-        """
-        # TODO: apply trap effects (e.g. debuff, %HP drain per turn)
-        await self.update_room_view(
-            interaction,
-            room,
-            room["coord_x"],
-            room["coord_y"],
-        )
-        await self.end_player_turn(interaction)
 
     async def handle_quit_game(self, interaction: Interaction) -> None:
         sm: SessionManager = self.bot.get_cog("SessionManager")
