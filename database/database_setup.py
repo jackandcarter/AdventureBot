@@ -1474,8 +1474,11 @@ TABLES = {
             guild_id         BIGINT NOT NULL,
             player_level     INT DEFAULT 1,
             player_class     VARCHAR(50),
+            difficulty       VARCHAR(50),
             gil              INT DEFAULT 0,
             enemies_defeated INT DEFAULT 0,
+            rooms_visited    INT DEFAULT 0,
+            items_found      INT DEFAULT 0,
             play_time        INT DEFAULT 0,
             completed_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )

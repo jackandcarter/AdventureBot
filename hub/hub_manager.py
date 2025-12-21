@@ -4,6 +4,7 @@ from discord import app_commands, InteractionType
 import logging
 from typing import Any, Dict, List
 from models.session_models import SessionModel, SessionPlayerModel, ClassModel
+from models.hub_model import HubModel
 # Import hub_embed here (helper module for constructing hub embeds)
 from hub import hub_embed
 # Import queue‐embed helpers from GameMaster
@@ -254,25 +255,21 @@ class HubManager(commands.Cog):
         # ——— MAIN HUB EMBED (non‑ephemeral) BUTTONS ———
         if cid == "hub_tutorial":
             tutorial_embed = hub_embed.get_tutorial_embed(page=1)
-            return await interaction.response.edit_message(
+            return await interaction.response.send_message(
                 embed=tutorial_embed,
-                view=TutorialView(current_page=1)
+                view=TutorialView(current_page=1),
+                ephemeral=True
             )
 
         if cid == "hub_high_scores":
-            from sessions import session_manager  # adjust as needed
-            high_scores = await session_manager.get_high_scores()
-            new_embed = hub_embed.get_high_scores_embed(high_scores)
-            return await interaction.response.edit_message(
+            guild_id = interaction.guild.id if interaction.guild else None
+            sort_key = "enemies_defeated"
+            high_scores = HubModel.get_high_scores(guild_id=guild_id, sort_key=sort_key)
+            new_embed = hub_embed.get_high_scores_embed_for_sort(high_scores, sort_key)
+            return await interaction.response.send_message(
                 embed=new_embed,
-                view=None
-            )
-
-        if cid == "hub_back":
-            main_embed = hub_embed.get_main_hub_embed()
-            return await interaction.response.edit_message(
-                embed=main_embed,
-                view=HubView()
+                view=HighScoresView(guild_id=guild_id, sort_key=sort_key),
+                ephemeral=True
             )
 
         if cid == "setup_new_game":
@@ -339,10 +336,9 @@ class TutorialView(discord.ui.View):
         super().__init__(timeout=None)
         self.current_page = current_page
 
-    @discord.ui.button(label="Back", style=discord.ButtonStyle.secondary, custom_id="hub_back", row=0)
-    async def back(self, interaction: discord.Interaction, button: discord.ui.Button):
-        main_embed = hub_embed.get_main_hub_embed()
-        await interaction.response.edit_message(embed=main_embed, view=HubView())
+    @discord.ui.button(label="Close", style=discord.ButtonStyle.secondary, row=0)
+    async def close(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(content="Tutorial closed.", embed=None, view=None)
 
     @discord.ui.button(label="Previous", style=discord.ButtonStyle.primary, custom_id="tutorial_prev", row=1)
     async def previous(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -360,6 +356,47 @@ class TutorialView(discord.ui.View):
         new_embed = hub_embed.get_tutorial_embed(page=self.current_page)
         await interaction.response.edit_message(embed=new_embed, view=self)
 
+
+class HighScoreSortSelect(discord.ui.Select):
+    def __init__(self, sort_key: str):
+        options = [
+            discord.SelectOption(
+                label=meta["label"],
+                value=key,
+                description=meta["description"],
+                default=(key == sort_key)
+            )
+            for key, meta in hub_embed.HIGH_SCORE_SORT_OPTIONS.items()
+        ]
+        super().__init__(
+            placeholder="Sort high scores by...",
+            options=options,
+            custom_id="high_scores_sort",
+            min_values=1,
+            max_values=1
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        view: HighScoresView = self.view
+        view.sort_key = self.values[0]
+        high_scores = HubModel.get_high_scores(
+            guild_id=view.guild_id,
+            sort_key=view.sort_key
+        )
+        new_embed = hub_embed.get_high_scores_embed_for_sort(high_scores, view.sort_key)
+        await interaction.response.edit_message(embed=new_embed, view=view)
+
+
+class HighScoresView(discord.ui.View):
+    def __init__(self, guild_id: int | None, sort_key: str):
+        super().__init__(timeout=300)
+        self.guild_id = guild_id
+        self.sort_key = sort_key
+        self.add_item(HighScoreSortSelect(sort_key))
+
+    @discord.ui.button(label="Close", style=discord.ButtonStyle.secondary, row=1)
+    async def close(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(content="High scores closed.", embed=None, view=None)
 
 
 class LFGView(discord.ui.View):
