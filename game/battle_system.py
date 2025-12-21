@@ -3,6 +3,7 @@ from discord.ext import commands
 import mysql.connector
 import json
 import time
+import math
 import logging
 import asyncio
 import random
@@ -200,6 +201,123 @@ class BattleSystem(commands.Cog):
         }
         out["target"] = raw.get("target", "self")
         return out
+
+    def _get_initiative_state(self, session: Any) -> Dict[str, int]:
+        if not session.battle_state:
+            session.battle_state = {"player_effects": [], "enemy_effects": []}
+        state = session.battle_state.setdefault(
+            "initiative",
+            {"player_gauge": 0, "enemy_gauge": 0, "threshold": 100},
+        )
+        state.setdefault("player_gauge", 0)
+        state.setdefault("enemy_gauge", 0)
+        state.setdefault("threshold", 100)
+        return state
+
+    def _get_battle_speed(self, session: Any, actor: str, enemy: Optional[Dict[str, Any]] = None) -> int:
+        if actor == "player":
+            conn = self.db_connect()
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                "SELECT speed FROM players WHERE player_id = %s AND session_id = %s",
+                (session.current_turn, session.session_id),
+            )
+            row = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            base_speed = (row or {}).get("speed", 10) or 10
+            effects = session.battle_state.get("player_effects", []) or []
+        else:
+            enemy = enemy or session.current_enemy or {}
+            base_speed = enemy.get("speed", 10) or 10
+            effects = session.battle_state.get("enemy_effects", []) or []
+
+        has_haste = any((e.get("effect_name") or "").lower() == "haste" for e in effects)
+        has_slow = any((e.get("effect_name") or "").lower() == "slow" for e in effects)
+        multiplier = 1.0
+        if has_haste and not has_slow:
+            multiplier = 1.5
+        elif has_slow and not has_haste:
+            multiplier = 0.5
+        return max(1, int(round(base_speed * multiplier)))
+
+    def _finalize_battle_round(self, session: Any) -> None:
+        prev_pid = session.current_turn
+        if hasattr(session, "trance_states") and session.trance_states:
+            ts = session.trance_states.get(prev_pid)
+            if ts:
+                ts["remaining"] = max(ts["remaining"] - 1, 0)
+                if ts["remaining"] <= 0:
+                    session.game_log.append(
+                        f"✨ <@{prev_pid}>'s **{ts['name']}** has ended."
+                    )
+                    del session.trance_states[prev_pid]
+                else:
+                    session.game_log.append(
+                        f"✨ <@{prev_pid}>'s **{ts['name']}** has {ts['remaining']} turn(s) remaining."
+                    )
+
+        gm = self.bot.get_cog("GameMaster")
+        if gm:
+            gm._tick_temporary_abilities(session, prev_pid)
+
+        session.active_summons = getattr(session, "active_summons", {}) or {}
+        session.active_summons.pop(prev_pid, None)
+        session.summon_used = getattr(session, "summon_used", {}) or {}
+        session.summon_used.pop(prev_pid, None)
+        session.eidolon_ability_cooldowns = getattr(session, "eidolon_ability_cooldowns", {}) or {}
+        eidolon_cds = session.eidolon_ability_cooldowns.get(prev_pid, {})
+        for aid in list(eidolon_cds):
+            eidolon_cds[aid] = max(eidolon_cds[aid] - 1, 0)
+        session.eidolon_ability_cooldowns[prev_pid] = eidolon_cds
+
+    def _advance_initiative(self, session: Any, acting_side: str, enemy: Optional[Dict[str, Any]] = None) -> str:
+        state = self._get_initiative_state(session)
+        threshold = state["threshold"]
+        if acting_side == "player":
+            state["player_gauge"] = max(state["player_gauge"] - threshold, 0)
+        else:
+            state["enemy_gauge"] = max(state["enemy_gauge"] - threshold, 0)
+
+        player_speed = self._get_battle_speed(session, "player", enemy)
+        enemy_speed = self._get_battle_speed(session, "enemy", enemy)
+
+        player_needed = max(threshold - state["player_gauge"], 0)
+        enemy_needed = max(threshold - state["enemy_gauge"], 0)
+        player_ticks = math.ceil(player_needed / player_speed) if player_speed else 0
+        enemy_ticks = math.ceil(enemy_needed / enemy_speed) if enemy_speed else 0
+        ticks = max(min(player_ticks, enemy_ticks), 0)
+
+        state["player_gauge"] += player_speed * ticks
+        state["enemy_gauge"] += enemy_speed * ticks
+
+        player_ready = state["player_gauge"] >= threshold
+        enemy_ready = state["enemy_gauge"] >= threshold
+        if player_ready and enemy_ready:
+            if state["player_gauge"] == state["enemy_gauge"]:
+                return "player" if player_speed >= enemy_speed else "enemy"
+            return "player" if state["player_gauge"] > state["enemy_gauge"] else "enemy"
+        if player_ready:
+            return "player"
+        return "enemy"
+
+    async def _advance_battle_turn(
+        self,
+        interaction: discord.Interaction,
+        session: Any,
+        enemy: Dict[str, Any],
+        acting_side: str,
+    ) -> None:
+        if not session or not session.battle_state or not enemy or enemy.get("hp", 0) <= 0:
+            return
+        next_actor = self._advance_initiative(session, acting_side, enemy)
+        if next_actor == "enemy":
+            await asyncio.sleep(1)
+            await self.enemy_turn(interaction, enemy)
+            return
+        if acting_side == "enemy":
+            self._finalize_battle_round(session)
+        await self.update_battle_embed(interaction, session.current_turn, enemy)
     # --------------------------------------------------------------------- #
     #                     Room / Template utilities                         #
     # --------------------------------------------------------------------- #
@@ -321,7 +439,7 @@ class BattleSystem(commands.Cog):
                 SELECT
                     enemy_id, enemy_name, hp, max_hp,
                     attack_power, magic_power, defense, magic_defense,
-                    accuracy, evasion, xp_reward, gil_drop,
+                    accuracy, evasion, speed, xp_reward, gil_drop,
                     loot_item_id, loot_quantity, image_url, role
                 FROM enemies
                 WHERE difficulty = %s
@@ -347,7 +465,7 @@ class BattleSystem(commands.Cog):
                 """
                 SELECT enemy_id, enemy_name, hp, max_hp,
                        attack_power, magic_power, defense, magic_defense,
-                       accuracy, evasion, xp_reward, gil_drop,
+                       accuracy, evasion, speed, xp_reward, gil_drop,
                        loot_item_id, loot_quantity, image_url, role
                 FROM enemies
                 WHERE enemy_id = %s
@@ -639,7 +757,12 @@ class BattleSystem(commands.Cog):
         if not session:
             return await interaction.response.send_message("❌ No session found.", ephemeral=True)
 
-        session.battle_state     = {"enemy": enemy, "player_effects": [], "enemy_effects": []}
+        session.battle_state     = {
+            "enemy": enemy,
+            "player_effects": [],
+            "enemy_effects": [],
+            "initiative": {"player_gauge": 0, "enemy_gauge": 0, "threshold": 100},
+        }
         session.victory_pending = False
         session.victory_embed_sent = False
         session.last_victory_enemy = None
@@ -1394,10 +1517,7 @@ class BattleSystem(commands.Cog):
             return await self.handle_enemy_defeat(interaction, session, enemy)
 
         await self.update_battle_embed(interaction, pid, enemy)
-
-        # 8) now let the enemy take their turn, then advance back
-        await asyncio.sleep(1)
-        await self.enemy_turn(interaction, enemy)
+        await self._advance_battle_turn(interaction, session, enemy, acting_side="player")
 
     async def handle_summon_select(self, interaction: discord.Interaction, eidolon_id: int) -> None:
         mgr = self.bot.get_cog("SessionManager")
@@ -1605,8 +1725,7 @@ class BattleSystem(commands.Cog):
             return await self.handle_enemy_defeat(interaction, session, enemy)
 
         await self.update_battle_embed(interaction, pid, enemy)
-        await asyncio.sleep(1)
-        await self.enemy_turn(interaction, enemy)
+        await self._advance_battle_turn(interaction, session, enemy, acting_side="player")
 
     async def handle_temp_skill_use(self, interaction: discord.Interaction, temp_ability_id: int) -> None:
         mgr = self.bot.get_cog("SessionManager")
@@ -1823,8 +1942,7 @@ class BattleSystem(commands.Cog):
             return await self.handle_enemy_defeat(interaction, session, enemy)
 
         await self.update_battle_embed(interaction, pid, enemy)
-        await asyncio.sleep(1)
-        await self.enemy_turn(interaction, enemy)
+        await self._advance_battle_turn(interaction, session, enemy, acting_side="player")
 
     # --------------------------------------------------------------------- #
     #                          Enemy –> Player turn                         #
@@ -1877,7 +1995,7 @@ class BattleSystem(commands.Cog):
             if new_hp <= 0:
                 return await self._kill_player(interaction, pid, session)
             await self.update_battle_embed(interaction, pid, enemy)
-            return await self._end_enemy_action(interaction)
+            return await self._advance_battle_turn(interaction, session, enemy, acting_side="enemy")
 
         # 5) otherwise resolve the chosen ability
         result = self.ability.resolve(enemy, player, ability)
@@ -1897,7 +2015,7 @@ class BattleSystem(commands.Cog):
                 f"{enemy['enemy_name']} uses {ability['ability_name']} but misses!"
             )
             await self.update_battle_embed(interaction, pid, enemy)
-            return await self._end_enemy_action(interaction)
+            return await self._advance_battle_turn(interaction, session, enemy, acting_side="enemy")
 
         if result.type == "heal":
             enemy["hp"] = min(enemy["hp"] + result.amount, enemy["max_hp"])
@@ -1905,7 +2023,7 @@ class BattleSystem(commands.Cog):
                 f"{enemy['enemy_name']} uses {ability['ability_name']} and heals for {result.amount} HP!"
             )
             await self.update_battle_embed(interaction, pid, enemy)
-            return await self._end_enemy_action(interaction)
+            return await self._advance_battle_turn(interaction, session, enemy, acting_side="enemy")
 
         if result.type == "set_hp":
             enemy["hp"] = result.amount
@@ -1915,7 +2033,7 @@ class BattleSystem(commands.Cog):
             if enemy["hp"] <= 0:
                 return await self.handle_enemy_defeat(interaction, session, enemy)
             await self.update_battle_embed(interaction, pid, enemy)
-            return await self._end_enemy_action(interaction)
+            return await self._advance_battle_turn(interaction, session, enemy, acting_side="enemy")
 
         if result.type == "dot":
             dot = result.dot
@@ -1928,7 +2046,7 @@ class BattleSystem(commands.Cog):
                 f"<@{pid}> has been hurt from {dot['effect_name']} for {dot['damage_per_turn']} HP."
             )
             await self.update_battle_embed(interaction, pid, enemy)
-            return await self._end_enemy_action(interaction)
+            return await self._advance_battle_turn(interaction, session, enemy, acting_side="enemy")
 
         if result.type == "hot":
             dot = result.dot
@@ -1940,7 +2058,7 @@ class BattleSystem(commands.Cog):
                 f"<@{pid}> is healed by {dot['effect_name']} for {heal} HP."
             )
             await self.update_battle_embed(interaction, pid, enemy)
-            return await self._end_enemy_action(interaction)
+            return await self._advance_battle_turn(interaction, session, enemy, acting_side="enemy")
 
         if result.type == "damage":
             dmg = result.amount
@@ -1956,7 +2074,7 @@ class BattleSystem(commands.Cog):
             if new_hp <= 0:
                 return await self._kill_player(interaction, pid, session)
             await self.update_battle_embed(interaction, pid, enemy)
-            return await self._end_enemy_action(interaction)
+            return await self._advance_battle_turn(interaction, session, enemy, acting_side="enemy")
 
         if result.type in ("pilfer", "mug"):
             if result.type == "pilfer":
@@ -1976,11 +2094,11 @@ class BattleSystem(commands.Cog):
                     return await self.handle_enemy_defeat(interaction, session, enemy)
 
             await self.update_battle_embed(interaction, pid, enemy)
-            return await self._end_enemy_action(interaction)
+            return await self._advance_battle_turn(interaction, session, enemy, acting_side="enemy")
 
         # 8) final fallback (should rarely hit)
         await self.update_battle_embed(interaction, pid, enemy)
-        return await self._end_enemy_action(interaction)
+        return await self._advance_battle_turn(interaction, session, enemy, acting_side="enemy")
 
 
 
@@ -2028,10 +2146,7 @@ class BattleSystem(commands.Cog):
 
         # 1) show your strike…
         await self.update_battle_embed(interaction, pid, enemy)
-        # 2) brief pause so it’s visible
-        await asyncio.sleep(1)
-        # 3) now let the enemy take its turn (enemy_turn will refresh and then call end‐of‐turn)
-        return await self.enemy_turn(interaction, enemy)
+        return await self._advance_battle_turn(interaction, session, enemy, acting_side="player")
 
     # --------------------------------------------------------------------- #
     #                            Victory embed                              #
@@ -2409,21 +2524,6 @@ class BattleSystem(commands.Cog):
         # 3) hand off to SessionManager/GameMaster to render the “💀 You have fallen” embed
         sm = self.bot.get_cog("SessionManager")
         return await sm.refresh_current_state(interaction)
-
-    async def _end_enemy_action(self, interaction):
-        sm = self.bot.get_cog("SessionManager")
-        session = sm.get_session(interaction.channel.id) if sm else None
-        if sm and session:
-            sm.set_room_refresh_intent(session, False)
-        gm = self.bot.get_cog("GameMaster")
-        if gm:
-            return await gm.end_player_turn(interaction)
-        if sm and session and not sm.consume_room_refresh_intent(session):
-            return None
-        if sm:
-            return await sm.refresh_current_state(interaction)
-        return None
-
 
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(BattleSystem(bot))

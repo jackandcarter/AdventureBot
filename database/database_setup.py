@@ -1307,6 +1307,7 @@ TABLES = {
             magic_defense INT DEFAULT 5,
             accuracy INT DEFAULT 95,
             evasion INT DEFAULT 5,
+            speed INT DEFAULT 10,
             difficulty VARCHAR(50),
             abilities JSON,
             image_url VARCHAR(255),
@@ -2228,6 +2229,8 @@ def main() -> None:
                     tables_to_seed.add("rooms")
                 if ensure_column(cur, "rooms", "attune_level", "INT NULL"):
                     tables_to_seed.add("rooms")
+                if ensure_column(cur, "enemies", "speed", "INT DEFAULT 10"):
+                    tables_to_seed.add("enemies")
 
                 # ── seed data (order matters) ──────────────────────────────────
                 if "difficulties" in tables_to_seed:
