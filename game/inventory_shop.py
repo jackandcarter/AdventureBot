@@ -629,8 +629,7 @@ class InventoryShop(commands.Cog):
             conn.commit()
 
         await interaction.followup.send(f"✅ Sold for {sell_price} gil!", ephemeral=True)
-        if mgr:
-            await mgr.refresh_current_state(interaction)
+        await self.display_sell_menu(interaction, vendor_id)
 
 # --------------------------------------------------------------------------- #
 # Setup
