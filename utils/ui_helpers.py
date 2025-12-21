@@ -19,11 +19,11 @@ def create_progress_bar(current: int, maximum: int, length: int = 10) -> str:
 
 def create_cooldown_bar(current_cd: float, max_cd: float, length: int = 10) -> str:
     """
-    Visualise an ability cooldown.  When current_cd ≤ 0 → “[Ready]”
+    Visualise an ability cooldown. When current_cd ≤ 0 → "".
     """
     current_cd = min(current_cd, max_cd)
     if max_cd <= 0 or current_cd <= 0:
-        return "[Ready]"
+        return ""
 
     filled = int(round(length * (max_cd - current_cd) / max_cd))
     bar    = "█" * filled + "░" * (length - filled)
