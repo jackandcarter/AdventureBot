@@ -35,11 +35,11 @@ def get_level_growth(level: int) -> dict:
         conn.close()
         if row:
             # Extract only the growth multipliers.
-        growth_keys = [
-            "hp_increase", "attack_increase", "magic_increase", "defense_increase",
-            "magic_defense_increase", "accuracy_increase", "evasion_increase", "speed_increase",
-            "mp_increase",
-        ]
+            growth_keys = [
+                "hp_increase", "attack_increase", "magic_increase", "defense_increase",
+                "magic_defense_increase", "accuracy_increase", "evasion_increase",
+                "speed_increase", "mp_increase",
+            ]
             growth = {key: row.get(key, 0) for key in growth_keys}
             return growth
         else:
