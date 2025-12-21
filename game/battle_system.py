@@ -964,6 +964,14 @@ class BattleSystem(commands.Cog):
         if not unlocked:
             return await interaction.response.send_message("❌ You have not unlocked any Eidolons yet.", ephemeral=True)
 
+        if not session.battle_state and not SessionPlayerModel.has_out_of_battle_eidolon_support(
+            session.session_id, pid
+        ):
+            return await interaction.response.send_message(
+                "❌ None of your Eidolons can support you outside of battle.",
+                ephemeral=True,
+            )
+
         session.summon_used = getattr(session, "summon_used", {}) or {}
         if session.summon_used.get(pid):
             return await interaction.response.send_message("❌ You can only summon once per turn.", ephemeral=True)

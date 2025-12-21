@@ -668,6 +668,35 @@ class SessionPlayerModel:
             conn.close()
 
     @staticmethod
+    def has_out_of_battle_eidolon_support(session_id: int, player_id: int) -> bool:
+        conn = Database().get_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT 1
+                  FROM player_eidolons pe
+                  JOIN eidolon_abilities ea
+                    ON ea.eidolon_id = pe.eidolon_id
+                   AND ea.unlock_level <= pe.level
+                  JOIN abilities a
+                    ON a.ability_id = ea.ability_id
+                 WHERE pe.session_id = %s
+                   AND pe.player_id = %s
+                   AND a.target_type IN ('self', 'ally', 'any')
+                 LIMIT 1
+                """,
+                (session_id, player_id),
+            )
+            return cur.fetchone() is not None
+        except Exception:
+            logger.exception("Error checking eidolon support abilities")
+            return False
+        finally:
+            cur.close()
+            conn.close()
+
+    @staticmethod
     def get_unlocked_eidolons(session_id: int, player_id: int) -> List[Dict[str, Any]]:
         conn = Database().get_connection()
         try:
