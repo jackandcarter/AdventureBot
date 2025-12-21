@@ -377,8 +377,10 @@ class SessionManager(commands.Cog):
 
         # ── Safety patch: if session thinks battle ongoing but room is now safe ───────
         if session.battle_state and room.get("room_type") not in ("monster", "miniboss", "boss"):
-            logger.warning("⚠️ Battle state mismatch — clearing stale battle for session %s", session.session_id)
-            session.clear_battle_state()
+            enemy = session.battle_state.get("enemy") or {}
+            if not (room.get("room_type") == "cloister" and enemy.get("role") == "eidolon"):
+                logger.warning("⚠️ Battle state mismatch — clearing stale battle for session %s", session.session_id)
+                session.clear_battle_state()
 
         # ── If still in battle, refresh battle view ───────────────────────────────────
         if session.battle_state:
