@@ -2341,6 +2341,11 @@ class GameMaster(commands.Cog):
         session.active_summons.pop(prev_pid, None)
         session.summon_used = getattr(session, "summon_used", {}) or {}
         session.summon_used.pop(prev_pid, None)
+        session.eidolon_ability_cooldowns = getattr(session, "eidolon_ability_cooldowns", {}) or {}
+        eidolon_cds = session.eidolon_ability_cooldowns.get(prev_pid, {})
+        for aid in list(eidolon_cds):
+            eidolon_cds[aid] = max(eidolon_cds[aid] - 1, 0)
+        session.eidolon_ability_cooldowns[prev_pid] = eidolon_cds
 
         # 2️⃣ Advance to the next alive player
         await self.advance_turn(interaction, interaction.channel.id)
@@ -2353,6 +2358,10 @@ class GameMaster(commands.Cog):
         # 4️⃣ Finally redraw that player’s view
         if sm.consume_room_refresh_intent(session):
             await sm.refresh_current_state(interaction)
+        elif session.current_enemy and session.battle_state:
+            bs = self.bot.get_cog("BattleSystem")
+            if bs:
+                await bs.update_battle_embed(interaction, session.current_turn, session.current_enemy)
 
 
     # ────────────────────────────────────────────────────────────────────────────
