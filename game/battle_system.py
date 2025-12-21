@@ -7,6 +7,7 @@ import math
 import logging
 import asyncio
 import random
+import statistics
 from utils.status_engine   import StatusEffectEngine
 from utils.ability_engine import AbilityEngine
 from utils.helpers import load_config
@@ -161,6 +162,121 @@ class BattleSystem(commands.Cog):
         finally:
             cur.close()
             conn.close()
+
+    def _get_max_level(self) -> int:
+        conn = self.db_connect()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT MAX(level) FROM levels")
+            row = cur.fetchone()
+            return int(row[0]) if row and row[0] is not None else 1
+        finally:
+            cur.close()
+            conn.close()
+
+    def _get_party_level(self, session: Any) -> int:
+        players = SessionPlayerModel.get_player_states(session.session_id)
+        alive_levels = [
+            int(p.get("level", 1))
+            for p in players
+            if not p.get("is_dead")
+        ]
+        if not alive_levels:
+            return 1
+        return int(statistics.median(alive_levels))
+
+    def _get_player_floor(self, session_id: int, player_id: int) -> Optional[int]:
+        conn = self.db_connect()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT current_floor_id FROM players WHERE session_id=%s AND player_id=%s",
+                (session_id, player_id),
+            )
+            row = cur.fetchone()
+            return int(row[0]) if row and row[0] is not None else None
+        finally:
+            cur.close()
+            conn.close()
+
+    def _get_enemy_target_level(
+        self,
+        session: Any,
+        floor_id: Optional[int],
+        difficulty: Optional[str],
+    ) -> Tuple[int, int]:
+        party_level = self._get_party_level(session)
+        difficulty_key = (difficulty or "").strip().lower()
+        difficulty_offset = {
+            "easy": -1,
+            "medium": 0,
+            "hard": 1,
+            "crazy catto": 2,
+        }.get(difficulty_key, 0)
+        floor_offset = 0
+        if floor_id and floor_id > 1:
+            floor_offset = max((floor_id - 1) // 2, 0)
+        jitter = random.choice([-1, 0, 1])
+        level_cap = self._get_max_level()
+        target = max(1, min(level_cap, party_level + difficulty_offset + floor_offset + jitter))
+        return target, party_level
+
+    def _scale_enemy_stats(self, enemy: Dict[str, Any], level: int) -> Dict[str, Any]:
+        growth = self._get_level_growth(level)
+        base_hp = enemy.get("max_hp", enemy.get("hp", 0)) or 0
+        scaled = {
+            "max_hp": base_hp,
+            "hp": base_hp,
+            "attack_power": enemy.get("attack_power", 0),
+            "magic_power": enemy.get("magic_power", 0),
+            "defense": enemy.get("defense", 0),
+            "magic_defense": enemy.get("magic_defense", 0),
+            "accuracy": enemy.get("accuracy", 0),
+            "evasion": enemy.get("evasion", 0),
+            "speed": enemy.get("speed", 0),
+        }
+        mapping = {
+            "max_hp": "hp_increase",
+            "attack_power": "attack_increase",
+            "magic_power": "magic_increase",
+            "defense": "defense_increase",
+            "magic_defense": "magic_defense_increase",
+            "accuracy": "accuracy_increase",
+            "evasion": "evasion_increase",
+            "speed": "speed_increase",
+        }
+        for stat_key, growth_key in mapping.items():
+            base_value = scaled.get(stat_key, 0) or 0
+            growth_factor = growth.get(growth_key, 0) or 0
+            scaled_value = int(base_value * (1 + growth_factor * (level - 1)))
+            scaled[stat_key] = max(1, scaled_value) if base_value else 0
+        scaled["hp"] = scaled["max_hp"]
+        return scaled
+
+    def _scale_enemy_rewards(self, enemy: Dict[str, Any], enemy_level: int, party_level: int) -> None:
+        base_xp = enemy.get("xp_reward", 0) or 0
+        if not base_xp:
+            return
+        level_delta = enemy_level - party_level
+        multiplier = 1 + (level_delta * 0.02)
+        multiplier = min(max(multiplier, 0.9), 1.1)
+        enemy["xp_reward"] = max(1, int(round(base_xp * multiplier)))
+
+    def _apply_enemy_level_scaling(
+        self,
+        session: Any,
+        enemy: Dict[str, Any],
+        floor_id: Optional[int],
+        difficulty: Optional[str],
+    ) -> Dict[str, Any]:
+        if not session or not enemy:
+            return enemy
+        target_level, party_level = self._get_enemy_target_level(session, floor_id, difficulty)
+        stats = self._scale_enemy_stats(enemy, target_level)
+        enemy.update(stats)
+        enemy["level"] = target_level
+        self._scale_enemy_rewards(enemy, target_level, party_level)
+        return enemy
 
     def _calculate_eidolon_stats(self, eidolon: Dict[str, Any], level: int) -> Dict[str, Any]:
         growth = self._get_level_growth(level)
@@ -451,13 +567,19 @@ class BattleSystem(commands.Cog):
             )
             enemy = cursor.fetchone()
             cursor.close(); conn.close()
+            enemy = self._apply_enemy_level_scaling(session, enemy, floor_id, difficulty)
             logger.debug("Selected enemy for %s (%s): %s", room["room_type"], expected_role, enemy)
             return enemy
         except Exception as e:
             logger.error("Error in get_enemy_for_room: %s", e)
             return None
 
-    async def get_enemy_by_id(self, enemy_id: int) -> Optional[dict]:
+    async def get_enemy_by_id(
+        self,
+        enemy_id: int,
+        session: Optional[Any] = None,
+        floor_id: Optional[int] = None,
+    ) -> Optional[dict]:
         try:
             conn = self.db_connect()
             cursor = conn.cursor(dictionary=True)
@@ -474,7 +596,25 @@ class BattleSystem(commands.Cog):
                 (enemy_id,),
             )
             enemy = cursor.fetchone()
-            cursor.close(); conn.close()
+            cursor.close()
+            conn.close()
+            if session:
+                difficulty = None
+                if floor_id is None and session.current_turn:
+                    floor_id = self._get_player_floor(session.session_id, session.current_turn)
+                conn = self.db_connect()
+                try:
+                    cur = conn.cursor(dictionary=True)
+                    cur.execute(
+                        "SELECT difficulty FROM sessions WHERE session_id = %s LIMIT 1",
+                        (session.session_id,),
+                    )
+                    row = cur.fetchone()
+                    difficulty = (row or {}).get("difficulty")
+                finally:
+                    cur.close()
+                    conn.close()
+                enemy = self._apply_enemy_level_scaling(session, enemy, floor_id, difficulty)
             logger.debug("Fetched enemy by id %s: %s", enemy_id, enemy)
             return enemy
         except Exception as e:
