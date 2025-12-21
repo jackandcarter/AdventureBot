@@ -6,6 +6,50 @@ from models.database import Database  # Centralized database helper
 logger = logging.getLogger("HubEmbed")
 logger.setLevel(logging.DEBUG)
 
+HIGH_SCORE_SORT_OPTIONS = {
+    "enemies_defeated": {
+        "label": "Enemies Defeated",
+        "description": "Total enemies defeated in a session.",
+        "direction": "DESC",
+    },
+    "rooms_visited": {
+        "label": "Rooms Explored",
+        "description": "Total rooms visited in a session.",
+        "direction": "DESC",
+    },
+    "items_found": {
+        "label": "Items Found",
+        "description": "Total items found in a session.",
+        "direction": "DESC",
+    },
+    "player_level": {
+        "label": "Highest Level",
+        "description": "Highest player level achieved in a session.",
+        "direction": "DESC",
+    },
+    "gil": {
+        "label": "Gil Earned",
+        "description": "Total gil collected during a session.",
+        "direction": "DESC",
+    },
+    "play_time": {
+        "label": "Fastest Clear",
+        "description": "Shortest session completion time.",
+        "direction": "ASC",
+    },
+}
+
+def _format_play_time(play_time: int | None) -> str:
+    if play_time is None:
+        return "N/A"
+    if play_time < 60:
+        return f"{play_time}s"
+    minutes, seconds = divmod(play_time, 60)
+    if minutes < 60:
+        return f"{minutes}m {seconds}s"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h {minutes}m"
+
 def get_main_hub_embed():
     """
     Retrieves the main hub embed configuration from the 'hub_embeds' table
@@ -80,7 +124,7 @@ def get_tutorial_embed(page: int):
         )
         if step.get("image_url"):
             embed.set_image(url=step["image_url"])
-        embed.set_footer(text="Use the Next and Previous buttons to navigate, or Back to return to the main menu.")
+        embed.set_footer(text="Use the Next and Previous buttons to navigate, or Close to exit.")
         return embed
     except Exception as e:
         logger.error("Error retrieving tutorial embed: %s", e, exc_info=True)
@@ -117,19 +161,68 @@ def get_high_scores_embed(high_scores_data):
     Constructs an embed to display high scores.
     Expects high_scores_data as a list of dictionaries containing score info.
     """
+    return get_high_scores_embed_for_sort(high_scores_data, "enemies_defeated")
+
+def get_high_scores_embed_for_sort(high_scores_data, sort_key: str):
+    """
+    Constructs an embed to display high scores for a given sort key.
+    Expects high_scores_data as a list of dictionaries containing score info.
+    """
+    sort_meta = HIGH_SCORE_SORT_OPTIONS.get(sort_key, HIGH_SCORE_SORT_OPTIONS["enemies_defeated"])
     embed = discord.Embed(
         title="High Scores",
-        description="Top players and session stats:",
+        description=(
+            "Select a sorting option from the dropdown to view the top 20 "
+            "session records for that category."
+        ),
         color=discord.Color.gold()
     )
+    embed.add_field(
+        name="Current Sort",
+        value=f"**{sort_meta['label']}** — {sort_meta['description']}",
+        inline=False
+    )
+    options_text = "\n".join(
+        f"• **{meta['label']}** — {meta['description']}"
+        for meta in HIGH_SCORE_SORT_OPTIONS.values()
+    )
+    embed.add_field(name="Sorting Options", value=options_text, inline=False)
+
     if not high_scores_data:
-        embed.add_field(name="No scores available", value="Be the first to set a record!", inline=False)
-    else:
-        for entry in high_scores_data:
-            embed.add_field(
-                name=f"{entry.get('player_name', 'Unknown')} ({entry.get('player_class', 'N/A')})",
-                value=f"Rooms: {entry.get('rooms', 'N/A')}\nEnemies: {entry.get('enemies', 'N/A')}\nGil: {entry.get('gil', 'N/A')}",
-                inline=False
+        embed.add_field(
+            name="No scores available",
+            value="Be the first to set a record!",
+            inline=False
+        )
+        return embed
+
+    lines = []
+    for idx, entry in enumerate(high_scores_data, start=1):
+        player_name = entry.get("player_name", "Unknown")
+        player_class = entry.get("player_class", "Unknown Class")
+        difficulty = entry.get("difficulty", "Unknown Difficulty")
+        enemies_defeated = entry.get("enemies_defeated", 0)
+        rooms_visited = entry.get("rooms_visited", 0)
+        items_found = entry.get("items_found", 0)
+        player_level = entry.get("player_level", 0)
+        gil = entry.get("gil", 0)
+        play_time = _format_play_time(entry.get("play_time"))
+        lines.append(
+            (
+                f"**{idx}. {player_name}** "
+                f"({player_class} · {difficulty})\n"
+                f"Enemies: {enemies_defeated} | "
+                f"Rooms: {rooms_visited} | "
+                f"Items: {items_found}\n"
+                f"Level: {player_level} | "
+                f"Gil: {gil} | "
+                f"Time: {play_time}"
             )
-    embed.set_footer(text="Press 'Back' to return to the main menu.")
+        )
+
+    embed.add_field(
+        name="Top 20 Sessions",
+        value="\n\n".join(lines),
+        inline=False
+    )
     return embed
