@@ -2351,7 +2351,8 @@ class GameMaster(commands.Cog):
             await engine.tick_world(new_pid)
 
         # 4️⃣ Finally redraw that player’s view
-        await sm.refresh_current_state(interaction)
+        if sm.consume_room_refresh_intent(session):
+            await sm.refresh_current_state(interaction)
 
 
     # ────────────────────────────────────────────────────────────────────────────

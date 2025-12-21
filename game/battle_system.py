@@ -2359,19 +2359,23 @@ class BattleSystem(commands.Cog):
         conn.close()
         SessionPlayerModel.set_player_dead(session.session_id, pid)
 
-        # 3) re‐draw the battle embed (now at 0 HP) before dropping in the death panel
-        await self.update_battle_embed(interaction, pid, session.current_enemy)
-
-        # 4) finally hand off to SessionManager/GameMaster to render the “💀 You have fallen” embed
+        # 3) hand off to SessionManager/GameMaster to render the “💀 You have fallen” embed
         sm = self.bot.get_cog("SessionManager")
         return await sm.refresh_current_state(interaction)
 
     async def _end_enemy_action(self, interaction):
+        sm = self.bot.get_cog("SessionManager")
+        session = sm.get_session(interaction.channel.id) if sm else None
+        if sm and session:
+            sm.set_room_refresh_intent(session, False)
         gm = self.bot.get_cog("GameMaster")
         if gm:
             return await gm.end_player_turn(interaction)
-        sm = self.bot.get_cog("SessionManager")
-        return await sm.refresh_current_state(interaction)
+        if sm and session and not sm.consume_room_refresh_intent(session):
+            return None
+        if sm:
+            return await sm.refresh_current_state(interaction)
+        return None
 
 
 async def setup(bot: commands.Bot) -> None:

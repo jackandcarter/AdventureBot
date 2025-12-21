@@ -71,6 +71,9 @@ class GameSession:
         # { player_id: [room_id, ...] }
         self.illusion_cleared: Dict[int, List[int]] = {}
 
+        # ── UI refresh intent ───────────────────────────────────────────
+        self.needs_room_refresh: bool = True
+
     def add_player(self, player_id: int) -> None:
         if player_id in self.players or len(self.players) >= 6:
             raise Exception("Cannot add player.")

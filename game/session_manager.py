@@ -251,6 +251,14 @@ class SessionManager(commands.Cog):
             del self.sessions[session_id]
             logger.info("Session %s removed from memory.", session_id)
 
+    def set_room_refresh_intent(self, session: GameSession, needs_room_refresh: bool) -> None:
+        session.needs_room_refresh = needs_room_refresh
+
+    def consume_room_refresh_intent(self, session: GameSession) -> bool:
+        needs_refresh = getattr(session, "needs_room_refresh", True)
+        session.needs_room_refresh = True
+        return needs_refresh
+
     async def terminate_session(self, session_id: int, reason: str) -> None:
         logger.debug("terminate_session called for %s: %s", session_id, reason)
         try:
