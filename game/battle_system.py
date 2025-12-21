@@ -42,6 +42,18 @@ class BattleSystem(commands.Cog):
         gm = self.bot.get_cog("GameMaster")
         gm.append_game_log(session_id, line)
 
+    async def _send_interaction_message(
+        self,
+        interaction: discord.Interaction,
+        message: str,
+        *,
+        ephemeral: bool = True,
+    ) -> None:
+        if interaction.response.is_done():
+            await interaction.followup.send(message, ephemeral=ephemeral)
+        else:
+            await interaction.response.send_message(message, ephemeral=ephemeral)
+
     def db_connect(self):
         try:
             return mysql.connector.connect(**self.db_config)
@@ -1483,7 +1495,7 @@ class BattleSystem(commands.Cog):
         if mp_cost:
             mp_state = self._get_player_mp(session.session_id, session.current_turn)
             if not mp_state or mp_state.get("mp", 0) < mp_cost:
-                return await interaction.response.send_message("❌ Not enough MP.", ephemeral=True)
+                return await self._send_interaction_message(interaction, "❌ Not enough MP.")
             new_mp = max(mp_state.get("mp", 0) - mp_cost, 0)
             self._set_player_mp(session.session_id, session.current_turn, new_mp)
 
@@ -1498,7 +1510,7 @@ class BattleSystem(commands.Cog):
         player = cur.fetchone()
         cur.close(); conn.close()
         if not player:
-            return await interaction.response.send_message("❌ Could not retrieve your stats.", ephemeral=True)
+            return await self._send_interaction_message(interaction, "❌ Could not retrieve your stats.")
         
 
         # 3) resolve via AbilityEngine
@@ -1801,7 +1813,7 @@ class BattleSystem(commands.Cog):
         cur.close()
         conn.close()
         if not player:
-            return await interaction.response.send_message("❌ Could not retrieve your stats.", ephemeral=True)
+            return await self._send_interaction_message(interaction, "❌ Could not retrieve your stats.")
 
         enemy = session.current_enemy if in_battle else None
         engine_target = enemy if enemy is not None else player
@@ -1986,7 +1998,7 @@ class BattleSystem(commands.Cog):
         cur.close()
         conn.close()
         if not player:
-            return await interaction.response.send_message("❌ Could not retrieve your stats.", ephemeral=True)
+            return await self._send_interaction_message(interaction, "❌ Could not retrieve your stats.")
 
         engine_target = enemy if enemy is not None else player
         result = self.ability.resolve(player, engine_target, ability_meta)
