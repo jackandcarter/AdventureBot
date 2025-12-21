@@ -246,7 +246,7 @@ class HubManager(commands.Cog):
 
             # 3) Clear the original slot picker
             return await interaction.edit_original_response(
-                content=None,
+                content="Loading your adventure…",
                 embed=None,
                 view=None
             )
