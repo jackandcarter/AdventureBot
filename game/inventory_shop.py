@@ -205,7 +205,7 @@ class InventoryShop(commands.Cog):
             elif cid == "back_from_use":
                 mgr = self.bot.get_cog("SessionManager")
                 if mgr:
-                    await mgr.refresh_current_state(interaction)
+                    await mgr.return_to_current_view(interaction)
             # --------------- Back to room ---------------
             elif cid == "shop_back_room":
                 mgr = self.bot.get_cog("SessionManager")
@@ -510,7 +510,7 @@ class InventoryShop(commands.Cog):
 
         await interaction.followup.send(txt, ephemeral=True)
         if mgr:
-            await mgr.refresh_current_state(interaction)
+            await mgr.return_to_current_view(interaction)
 
     # --------------------------------------------------------------------- #
     # BUY / SELL BACK-END
