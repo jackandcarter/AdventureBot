@@ -433,6 +433,9 @@ class BattleSystem(commands.Cog):
             return
         if acting_side == "enemy":
             self._finalize_battle_round(session)
+        else:
+            session.summon_used = getattr(session, "summon_used", {}) or {}
+            session.summon_used.pop(session.current_turn, None)
         await self.update_battle_embed(interaction, session.current_turn, enemy)
     # --------------------------------------------------------------------- #
     #                     Room / Template utilities                         #
@@ -903,6 +906,8 @@ class BattleSystem(commands.Cog):
             "enemy_effects": [],
             "initiative": {"player_gauge": 0, "enemy_gauge": 0, "threshold": 100},
         }
+        session.summon_used = getattr(session, "summon_used", {}) or {}
+        session.summon_used.pop(player_id, None)
         session.victory_pending = False
         session.victory_embed_sent = False
         session.last_victory_enemy = None
