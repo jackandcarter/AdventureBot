@@ -1200,7 +1200,11 @@ class GameMaster(commands.Cog):
         if rtype in ("monster","miniboss","boss") and room.get("default_enemy_id"):
             bs = self.bot.get_cog("BattleSystem")
             if bs:
-                enemy = await bs.get_enemy_by_id(room["default_enemy_id"])
+                enemy = await bs.get_enemy_by_id(
+                    room["default_enemy_id"],
+                    session=session,
+                    floor_id=room.get("floor_id"),
+                )
                 if enemy:
                     session.battle_state = {"enemy": enemy}
                     self.append_game_log(session.session_id, f"Encountered **{enemy['enemy_name']}**!")
@@ -1622,7 +1626,11 @@ class GameMaster(commands.Cog):
             if bs:
                 if rtype == "boss" and new_room.get("default_enemy_id"):
                     # boss rooms use their fixed enemy
-                    enemy = await bs.get_enemy_by_id(new_room["default_enemy_id"])
+                    enemy = await bs.get_enemy_by_id(
+                        new_room["default_enemy_id"],
+                        session=session,
+                        floor_id=new_room.get("floor_id"),
+                    )
                 else:
                     # miniboss & normal monster pick one dynamically
                     enemy = await bs.get_enemy_for_room(
@@ -1768,7 +1776,11 @@ class GameMaster(commands.Cog):
             if bs:
                 default_id = landed.get("default_enemy_id")
                 if landed["room_type"] == "boss" and default_id:
-                    enemy = await bs.get_enemy_by_id(default_id)
+                    enemy = await bs.get_enemy_by_id(
+                        default_id,
+                        session=session,
+                        floor_id=new_floor,
+                    )
                 else:
                     enemy = await bs.get_enemy_for_room(session, new_floor, nx, ny)
 
@@ -2462,7 +2474,11 @@ class GameMaster(commands.Cog):
         bs = self.bot.get_cog("BattleSystem")
         if not bs:
             return await interaction.response.send_message("❌ BattleSystem offline.", ephemeral=True)
-        enemy = await bs.get_enemy_by_id(eidolon["enemy_id"])
+        enemy = await bs.get_enemy_by_id(
+            eidolon["enemy_id"],
+            session=session,
+            floor_id=player.get("current_floor_id"),
+        )
         if not enemy:
             return await interaction.response.send_message("❌ Eidolon battle data missing.", ephemeral=True)
 
