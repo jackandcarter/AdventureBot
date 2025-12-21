@@ -341,11 +341,11 @@ MERGED_DIFFICULTIES: List[Tuple] = [
 
 # --- intro steps --------------------------------------------------------------
 MERGED_INTRO_STEPS: List[Tuple] = [
-    (1, 1, 'An Unexpected Discovery', 'During what began as an ordinary raid, Sophia paused. The usual golden glow marking the entrance to familiar realms was absent, replaced instead by a strange portal shimmering with dark, translucent crystals.\n\nSophia:\n"This... isn\'t the gate we\'re used to. Has anyone seen anything like this before?"', 'https://cdn.discordapp.com/attachments/1362832151485354065/1364793339538440232/step1.png?ex=680f9398&is=680e4218&hm=7832e0e8397c563e8c86ab6846989f63af51cd786cf8c2c8427d3c5d5f8b3466&', '2025-03-31 07:40:47'),
-    (2, 2, "Mog's Bold Venture", 'As the group hesitated, a tiny figure fluttered forward...\n\nA moogle, small but unmistakable, zipped toward the portal without a second thought. A collective gasp swept through the group.\n\nSophia:\n"Mog! Come back!"', 'https://cdn.discordapp.com/attachments/1362832151485354065/1364793341832464424/step2.png?ex=680f9399&is=680e4219&hm=60107523759992d117848f6e9c22602ad05e5c0312b1a59923db2031b17d914e&', '2025-03-31 07:40:47'),
-    (3, 3, 'The Moogle Returns', 'Moments felt like hours as the group waited anxiously. Just as dread began to settle, the moogle shot back out of the portal, eyes wide.\n\nMoogle:\n"I-I\'m okay, kupo! But... this place is unlike anything I\'ve ever seen."', 'https://cdn.discordapp.com/attachments/1362832151485354065/1364793342771984476/step3.png?ex=680f9399&is=680e4219&hm=02425724d417f3b9c2f6c1c32e1be0c3e267c3643f4994a44a9054b8d9e4226c&', '2025-03-31 07:40:47'),
-    (4, 4, "Sophia's Decision", "Sophia nodded solemnly.\n\nSophia:\n\"We don’t know what’s on the other side, but we can’t leave this unanswered.\"\n\nShe turned to the group.\n\nSophia:\n\"Gear up. We're going in.\"", 'https://cdn.discordapp.com/attachments/1362832151485354065/1364793344558768259/step4.png?ex=680f939a&is=680e421a&hm=3fcc4b04dc31a1cfe5eb700b86590483fc7d60b6d2e472f5ba91a227c76216a6&', '2025-04-09 14:37:27'),
-    (5, 5, 'The Call to Adventure', 'Returning to their Free Company house, Sophia gathered everyone...\n\nSoon, they stood before the portal once more, ready to uncover what lay beyond.\n\nA new adventure was about to begin.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1364793345758345246/step5.png?ex=680f939a&is=680e421a&hm=18b8f3975193a677a934553138994428d9d0fc5e8f396a9516ee9ef29a2a2b3f&', '2025-04-09 14:37:27')
+    (1, 1, 'An Unexpected Discovery', 'During what began as an ordinary raid, Sophia paused. The usual golden glow marking the entrance to familiar realms was absent, replaced instead by a strange portal shimmering with dark, translucent crystals. Curious murmurs rippled through the raid group…\n\nSophia:\n"This... isn\'t the gate we\'re used to. Has anyone seen anything like this before?"', 'https://cdn.discordapp.com/attachments/1362832151485354065/1383471362823290930/step1.png?ex=6944c95c&is=694377dc&hm=da200c360ef512691349b26ff2de0b3ea5b3c2524e97e4c4495757f01ce955b5&', '2025-03-31 07:40:47'),
+    (2, 2, "Mog's Bold Venture", 'As the group hesitated, Mog, the courageous Moogle companion, hovered near the mysterious entrance, eyes wide with intrigue.\n\nMog:\n"Let me scout it out, Kupo! Moogles portal hop all the time! If there\'s trouble, I\'ll zip right back!"\n\nSophia:\n"Wait! Mog, we don\'t know whats on the other..."\n\nWithout another word, Mog vanished through the darkened portal.', 'https://cdn.discordapp.com/attachments/1362832151485354065/1384701702602489856/Step_2.png?ex=6944a5f4&is=69435474&hm=f6e6f7916341cfc663429aa6374ee2a398ff59b1e6b4884d5f740ae52f31b0a7&', '2025-03-31 07:40:47'),
+    (3, 3, 'The Moogle Returns', 'Moments felt like hours as the group waited anxiously. Suddenly, Mog burst back through, visibly shaken.\n\nMog:\n"It\'s... a labyrinth inside! Dark and scary, I almost got lost and I felt like something was watching me, kupo. We should not enter unprepared."', 'https://cdn.discordapp.com/attachments/1362832151485354065/1451086838453239898/step3.png?ex=6944e56e&is=694393ee&hm=cd458315f668e7e96a7938ed4c9c54aca02946f6abff2a492cef5b6273d23665&', '2025-03-31 07:40:47'),
+    (4, 4, "Sophia's Decision", 'Sophia nodded solemnly, her gaze steady yet filled with resolve.\n\nSophia:\n"This discovery can\'t be ignored. Whatever lies beyond this portal demands our attention—but Mog\'s right. This will require strength, courage, and careful preparation."', 'https://cdn.discordapp.com/attachments/1362832151485354065/1451090272997085271/step4.png?ex=6944e8a1&is=69439721&hm=0192925e2aebed5d7c7ee2061f2915e11390c0772ce55c62e09bbfde43c4998f&', '2025-04-09 14:37:27'),
+    (5, 5, 'The Call to Adventure', 'Returning to the Free Company house, Sophia gathered everyone, her voice clear and inspiring.\n\nSophia:\n"Friends, we\'ve faced many challenges, but now an unknown labyrinth awaits us. The dangers are uncertain, but the potential rewards—and truths—are greater still. Will you join me in unraveling this mystery? Our next journey begins now."\n\nYour adventure starts here...', 'https://cdn.discordapp.com/attachments/1362832151485354065/1451095742214049895/step5.png?ex=6944edb8&is=69439c38&hm=eca08920f7d7823ed8dc33dcaeaaa6f7f104aea92802949c5b1003021fee579f&', '2025-04-09 14:37:27')
 ]
 
 # --- room templates -----------------------------------------------------------
@@ -1662,8 +1662,13 @@ def insert_levels(cur):
 
 def insert_intro_steps(cur):
     logger.info("Checking intro_steps seed data…")
-    if not table_is_empty(cur, "intro_steps"):
-        logger.info("intro_steps already populated – skipping")
+    cur.execute("SELECT step_order FROM intro_steps")
+    existing_steps = {row[0] for row in cur.fetchall() if row and row[0] is not None}
+    if existing_steps:
+        logger.info("intro_steps already has %d entries; seeding missing steps only", len(existing_steps))
+    rows_to_insert = [row[1:] for row in MERGED_INTRO_STEPS if row[1] not in existing_steps]
+    if not rows_to_insert:
+        logger.info("intro_steps already contains all seeded steps – skipping")
         return
     cur.executemany(
         """
@@ -1671,7 +1676,7 @@ def insert_intro_steps(cur):
           (step_order, title, description, image_url, created_at)
         VALUES (%s,%s,%s,%s,%s)
         """,
-        [row[1:] for row in MERGED_INTRO_STEPS]
+        rows_to_insert
     )
     logger.info("Inserted intro_steps.")
 
