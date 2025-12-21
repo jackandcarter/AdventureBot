@@ -275,6 +275,10 @@ class HubManager(commands.Cog):
                 view=HubView()
             )
 
+        if cid == "setup_new_game":
+            # Handled by GameMaster; avoid logging as unhandled.
+            return
+
         logger.debug(f"HubManager: unhandled custom_id='{cid}'")
 
 
