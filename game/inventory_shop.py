@@ -10,7 +10,7 @@ from discord import Interaction, InteractionType
 from discord.ext import commands
 
 from models.database import Database
-from models.session_models import SessionPlayerModel
+from models.session_models import SessionPlayerModel, ClassModel
 from utils.helpers import load_config
 
 logger = logging.getLogger("InventoryShop")
@@ -452,7 +452,7 @@ class InventoryShop(commands.Cog):
 
         with self.db.get_connection() as conn, conn.cursor(dictionary=True) as cur:
             cur.execute(
-                "SELECT inventory, hp, max_hp, mp, max_mp FROM players "
+                "SELECT inventory, hp, max_hp, mp, max_mp, class_id FROM players "
                 "WHERE player_id=%s AND session_id=%s",
                 (interaction.user.id, session.session_id)
             )
@@ -497,8 +497,16 @@ class InventoryShop(commands.Cog):
             if is_trance:
                 bs = self.bot.get_cog("BattleSystem")
                 if bs:
-                    await bs.activate_trance(session, interaction.user.id)
-                    txt += "\n*You feel a power welling up…*"
+                    allow_trance = True
+                    if ClassModel.get_class_name(player["class_id"]) == "Summoner":
+                        unlocked = SessionPlayerModel.get_unlocked_eidolons(
+                            session.session_id,
+                            interaction.user.id,
+                        )
+                        allow_trance = bool(unlocked)
+                    if allow_trance:
+                        await bs.activate_trance(session, interaction.user.id)
+                        txt += "\n*You feel a power welling up…*"
 
         await interaction.followup.send(txt, ephemeral=True)
         if mgr:
