@@ -22,6 +22,9 @@ class AbilityResult:
         status_effects: Optional[List[Dict[str, Any]]] = None,
         element_relation: Optional[str] = None,
         element_multiplier: Optional[float] = None,
+        hp_drain: int = 0,
+        mp_drain: int = 0,
+        hit_count: Optional[int] = None,
     ):
         self.type = type
         self.amount = amount
@@ -30,6 +33,9 @@ class AbilityResult:
         self.status_effects = status_effects or []
         self.element_relation = element_relation
         self.element_multiplier = element_multiplier
+        self.hp_drain = hp_drain
+        self.mp_drain = mp_drain
+        self.hit_count = hit_count
 
 
 class AbilityEngine:
@@ -67,6 +73,76 @@ class AbilityEngine:
             dmg *= factor
 
         return max(int(dmg), 1)
+
+    def _apply_damage_modifiers(
+        self,
+        dmg: int,
+        effect_data: Dict[str, Any],
+        target: Dict[str, Any]
+    ) -> int:
+        if dmg <= 0:
+            return dmg
+
+        execute = effect_data.get("execute") or {}
+        if execute:
+            threshold = float(execute.get("threshold", 0))
+            multiplier = float(execute.get("multiplier", 1.0))
+            max_hp = target.get("max_hp", 0) or 0
+            hp_pct = (target.get("hp", 0) / max_hp) if max_hp else 1.0
+            if hp_pct <= threshold:
+                dmg = int(dmg * multiplier)
+
+        bonus_vs_role = effect_data.get("bonus_vs_role") or {}
+        if bonus_vs_role:
+            roles = {r.lower() for r in bonus_vs_role.get("roles", [])}
+            multiplier = float(bonus_vs_role.get("multiplier", 1.0))
+            if roles and (target.get("role", "").lower() in roles):
+                dmg = int(dmg * multiplier)
+
+        return dmg
+
+    def _calculate_mp_drain(self, cfg: Any, target: Dict[str, Any]) -> int:
+        amount = 0
+        if isinstance(cfg, dict):
+            if "amount" in cfg:
+                amount = int(cfg.get("amount", 0))
+            elif "percent" in cfg:
+                amount = int((target.get("max_mp", 0) or 0) * cfg.get("percent", 0))
+            elif "percent_current" in cfg:
+                amount = int((target.get("mp", 0) or 0) * cfg.get("percent_current", 0))
+        else:
+            amount = int(cfg or 0)
+        return max(amount, 0)
+
+    def _extract_status_effects(
+        self,
+        effect_data: Dict[str, Any],
+        ability: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        raw_effects = []
+        if effect_data.get("status_effect"):
+            raw_effects.append(effect_data["status_effect"])
+        raw_effects.extend(effect_data.get("status_effects", []) or [])
+
+        status_effects = []
+        for se in raw_effects:
+            if not se:
+                continue
+            name = se.get("name") or se.get("effect_name")
+            if not name:
+                continue
+            chance = float(se.get("chance", 1.0))
+            if chance < 1.0 and random.random() > chance:
+                continue
+            duration = int(se.get("duration", ability.get("status_duration", 1) or 1))
+            status_effects.append(
+                {
+                    "effect_name": name,
+                    "remaining": duration,
+                    "target": se.get("target", ability.get("target_type", "enemy")),
+                }
+            )
+        return status_effects
 
     def _enrich_status_effects(self, result: AbilityResult) -> AbilityResult:
         """
@@ -354,9 +430,26 @@ class AbilityEngine:
                             logs.append(f"{label}: {pretty}")
                 result = AbilityResult(type="scan", logs=logs)
 
+            # multi-hit damage
+            if result is None and "multi_hit" in effect_data:
+                multi_cfg = effect_data.get("multi_hit")
+                if isinstance(multi_cfg, int):
+                    multi_cfg = {"hits": multi_cfg}
+                hits = int(multi_cfg.get("hits", 2))
+                base = multi_cfg.get("base_damage", effect_data.get("base_damage", 0))
+                stat = multi_cfg.get("scaling_stat", effect_data.get("scaling_stat", "attack_power"))
+                factor = float(multi_cfg.get("scaling_factor", effect_data.get("scaling_factor", 1.0)))
+                total = 0
+                for _ in range(max(hits, 1)):
+                    total += self.jrpg_damage(user, target, base, stat, factor)
+                total = self._apply_damage_modifiers(total, effect_data, target)
+                logs.append(f"{name} hits {hits} time(s) for {total} damage.")
+                result = AbilityResult(type="damage", amount=total, logs=logs, hit_count=hits)
+
             # flat, defense‑ignoring damage (e.g., Cactuar's Needles)
             if result is None and "flat_damage" in effect_data:
                 dmg = int(effect_data.get("flat_damage", 0))
+                dmg = self._apply_damage_modifiers(dmg, effect_data, target)
                 logs.append(f"{name} deals {dmg} damage.")
                 result = AbilityResult(type="damage", amount=dmg, logs=logs)
 
@@ -366,6 +459,7 @@ class AbilityEngine:
                 stat = effect_data.get("scaling_stat", "attack_power")
                 factor = effect_data.get("scaling_factor", 1.0)
                 dmg = self.jrpg_damage(user, target, base, stat, factor)
+                dmg = self._apply_damage_modifiers(dmg, effect_data, target)
                 logs.append(f"{name} deals {dmg} damage.")
                 result = AbilityResult(type="damage", amount=dmg, logs=logs)
 
@@ -395,21 +489,10 @@ class AbilityEngine:
 
             # absorb MP (drain from target to user)
             elif result is None and "absorb_mp" in effect_data:
-                cfg = effect_data["absorb_mp"]
-                amount = 0
-                if isinstance(cfg, dict):
-                    if "amount" in cfg:
-                        amount = int(cfg.get("amount", 0))
-                    elif "percent" in cfg:
-                        amount = int((target.get("max_mp", 0) or 0) * cfg.get("percent", 0))
-                    elif "percent_current" in cfg:
-                        amount = int((target.get("mp", 0) or 0) * cfg.get("percent_current", 0))
-                else:
-                    amount = int(cfg)
-                amount = max(amount, 0)
+                amount = self._calculate_mp_drain(effect_data["absorb_mp"], target)
                 target_name = target.get("enemy_name", "the target")
                 logs.append(f"{name} drains {amount} MP from {target_name}.")
-                result = AbilityResult(type="absorb_mp", amount=amount, logs=logs)
+                result = AbilityResult(type="absorb_mp", amount=amount, logs=logs, mp_drain=amount)
 
             # damage_over_time (DoT)
             elif result is None and "damage_over_time" in effect_data:
@@ -486,16 +569,23 @@ class AbilityEngine:
 
             # mug
             elif result is None and "mug" in effect_data:
-                base = effect_data["mug"].get("damage", 0)
+                mug_cfg = effect_data["mug"]
+                base = mug_cfg.get("damage", 0)
                 dmg  = self.jrpg_damage(user, target, base, "attack_power", 1.0)
                 pool = target.get("gil_pool", 0)
                 steal = 0
                 if pool > 0:
-                    low  = max(1, int(pool*0.1))
-                    high = max(low, int(pool*0.25))
+                    multiplier = float(mug_cfg.get("steal_multiplier", 1.0))
+                    low  = max(1, int(pool * 0.1 * multiplier))
+                    high = max(low, int(pool * 0.25 * multiplier))
                     steal = min(pool, random.randint(low, high))
                 logs.append(f"{name} deals {dmg} and pilfers {steal} Gil!")
                 result = AbilityResult(type="mug", amount=dmg, logs=logs)
+
+            # status-only abilities
+            if result is None and effect_data.get("status_only"):
+                logs.append(f"{name} applies lingering effects.")
+                result = AbilityResult(type="damage", amount=0, logs=logs)
 
         # 5) Fallback physical damage
         if result is None:
@@ -503,8 +593,29 @@ class AbilityEngine:
             logs.append(f"{name} deals {dmg} damage.")
             result = AbilityResult(type="damage", amount=dmg, logs=logs)
 
+        # 5b) Attach any status effects specified in JSON
+        json_effects = self._extract_status_effects(effect_data, ability)
+        if json_effects:
+            result.status_effects.extend(json_effects)
+
+        mp_cfg = effect_data.get("absorb_mp")
+        if mp_cfg and result.type != "absorb_mp":
+            result.mp_drain = self._calculate_mp_drain(mp_cfg, target)
+            if result.mp_drain:
+                target_name = target.get("enemy_name", "the target")
+                result.logs.append(f"{name} drains {result.mp_drain} MP from {target_name}.")
+
         # 6) Apply elemental modifiers (weak/resist/absorb/immune)
         result = self._apply_elemental_modifier(result, ability, target)
+
+        # 6b) Apply HP drain after elemental adjustments
+        if result.type == "damage":
+            hp_drain_pct = effect_data.get("hp_drain_pct")
+            if hp_drain_pct:
+                result.hp_drain += max(int(result.amount * float(hp_drain_pct)), 0)
+            hp_drain_flat = effect_data.get("hp_drain_flat")
+            if hp_drain_flat:
+                result.hp_drain += max(int(hp_drain_flat), 0)
         
         # 7) Attach any table‑driven status effects (single + many‑to‑many)
         result = self._attach_table_status_effects(result, ability)
