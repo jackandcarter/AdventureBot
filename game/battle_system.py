@@ -20,6 +20,7 @@ from utils.ui_helpers import (
     get_emoji_for_room_type,
 )
 from models.session_models import SessionPlayerModel
+from game.inventory_shop import filter_inventory, is_revive_key
 
 logger = logging.getLogger("BattleSystem")
 logger.setLevel(logging.DEBUG)
@@ -2702,12 +2703,71 @@ class BattleSystem(commands.Cog):
 
     async def send_inventory_menu(self, interaction: discord.Interaction) -> None:
         title, desc = "🎒 Your Inventory", "Choose an item to use in battle."
-        conn = self.db_connect()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT item_name, item_id FROM items")
-        items = cursor.fetchall()
-        cursor.close(); conn.close()
-        buttons = [(it["item_name"], discord.ButtonStyle.primary, f"item_{it['item_id']}", 0) for it in items]
+        mgr = self.bot.get_cog("SessionManager")
+        session = mgr.get_session(interaction.channel.id) if mgr else None
+        if not session:
+            buttons = [("Back", discord.ButtonStyle.secondary, "back_from_use", 0)]
+            await self.embed_manager.send_or_update_embed(
+                interaction,
+                title,
+                "No active session.",
+                buttons=buttons,
+            )
+            return
+
+        inv_cog = self.bot.get_cog("InventoryShop")
+        if inv_cog:
+            full_inv = inv_cog.get_full_inventory(interaction.user.id, session.session_id)
+        else:
+            inventory = SessionPlayerModel.get_inventory(session.session_id, interaction.user.id)
+            full_inv = []
+            if inventory:
+                conn = self.db_connect()
+                try:
+                    cursor = conn.cursor(dictionary=True)
+                    for item_id_str, qty in inventory.items():
+                        if qty <= 0:
+                            continue
+                        try:
+                            item_id = int(item_id_str)
+                        except ValueError:
+                            continue
+                        cursor.execute(
+                            "SELECT item_name, description, target_type, effect, type, price "
+                            "FROM items WHERE item_id=%s",
+                            (item_id,),
+                        )
+                        item_row = cursor.fetchone()
+                        if item_row:
+                            item_row.update(item_id=item_id, quantity=qty)
+                            full_inv.append(item_row)
+                finally:
+                    cursor.close()
+                    conn.close()
+
+        usable_items = [
+            item for item in filter_inventory(full_inv)
+            if not is_revive_key(item)
+        ]
+        if not usable_items:
+            buttons = [("Back", discord.ButtonStyle.secondary, "back_from_use", 0)]
+            await self.embed_manager.send_or_update_embed(
+                interaction,
+                title,
+                "No usable items found.",
+                buttons=buttons,
+            )
+            return
+
+        buttons = [
+            (
+                f"Use {item['item_name']} (x{item.get('quantity', 0)})",
+                discord.ButtonStyle.primary,
+                f"item_{item['item_id']}",
+                0,
+            )
+            for item in usable_items
+        ]
         await self.embed_manager.send_or_update_embed(interaction, title, desc, buttons=buttons)
 
     async def send_npc_shop_embed(
