@@ -160,6 +160,32 @@ class BattleSystem(commands.Cog):
 
         return transferable
 
+    def _apply_hp_drain(
+        self,
+        session_id: int,
+        player_id: int,
+        source: Dict[str, Any],
+        amount: int,
+        source_is_player: bool,
+    ) -> int:
+        if amount <= 0:
+            return 0
+
+        if source_is_player:
+            current_hp = self._get_player_hp(player_id, session_id)
+            max_hp = self._get_player_max_hp(player_id, session_id)
+            healed = min(amount, max(max_hp - current_hp, 0))
+            if healed > 0:
+                self._update_player_hp(player_id, session_id, current_hp + healed)
+            return healed
+
+        max_hp = source.get("max_hp", source.get("hp", 0))
+        current_hp = source.get("hp", 0)
+        healed = min(amount, max(max_hp - current_hp, 0))
+        if healed > 0:
+            source["hp"] = current_hp + healed
+        return healed
+
     def _get_eidolon_for_enemy(self, enemy_id: int) -> Optional[Dict[str, Any]]:
         conn = self.db_connect()
         try:
@@ -1611,10 +1637,35 @@ class BattleSystem(commands.Cog):
 
         # 4) Emit exactly one log line per result.type, or fall back on engine.logs for niche cases
         if result.type == "damage":
+            enemy["hp"] = max(enemy["hp"] - result.amount, 0)
             session.game_log.append(
                 f"You use {ability_meta['ability_name']} and deal {result.amount} damage!"
             )
             self._append_elemental_log(session, result, enemy["enemy_name"])
+            if getattr(result, "hp_drain", 0):
+                healed = self._apply_hp_drain(
+                    session.session_id, pid, player, result.hp_drain, source_is_player=True
+                )
+                if healed > 0:
+                    session.game_log.append(
+                        f"You drain {healed} HP from {enemy['enemy_name']}!"
+                    )
+            if getattr(result, "mp_drain", 0):
+                drained = self._transfer_mp(
+                    session.session_id,
+                    pid,
+                    player,
+                    enemy,
+                    result.mp_drain,
+                    source_is_player=True,
+                    target_is_player=False,
+                )
+                if drained > 0:
+                    session.game_log.append(
+                        f"You drain {drained} MP from {enemy['enemy_name']}!"
+                    )
+            if enemy["hp"] <= 0:
+                return await self.handle_enemy_defeat(interaction, session, enemy)
         elif result.type == "dot":
             session.game_log.append(
                 f"{enemy['enemy_name']} has been afflicted by {result.dot['effect_name']}."
@@ -1720,6 +1771,30 @@ class BattleSystem(commands.Cog):
                     enemy.setdefault("dot_effects", []).append(result.dot)
                     enemy["hp"] = min(enemy["hp"] + heal_tick, enemy["max_hp"])
                     session.game_log.append(f"{enemy['enemy_name']} recovers {heal_tick} HP!")
+
+            if enemy and result.type == "damage":
+                if getattr(result, "hp_drain", 0):
+                    healed = self._apply_hp_drain(
+                        session.session_id, pid, player, result.hp_drain, source_is_player=True
+                    )
+                    if healed > 0:
+                        session.game_log.append(
+                            f"You drain {healed} HP from {enemy['enemy_name']}!"
+                        )
+                if getattr(result, "mp_drain", 0):
+                    drained = self._transfer_mp(
+                        session.session_id,
+                        pid,
+                        player,
+                        enemy,
+                        result.mp_drain,
+                        source_is_player=True,
+                        target_is_player=False,
+                    )
+                    if drained > 0:
+                        session.game_log.append(
+                            f"You drain {drained} MP from {enemy['enemy_name']}!"
+                        )
         elif result.type == "absorb_mp":
             drained = self._transfer_mp(
                 session.session_id,
@@ -1937,6 +2012,30 @@ class BattleSystem(commands.Cog):
                     enemy["hp"] = min(enemy["hp"] + heal_tick, enemy["max_hp"])
                     session.game_log.append(f"{enemy['enemy_name']} recovers {heal_tick} HP!")
                 self._append_elemental_log(session, result, enemy["enemy_name"])
+
+            if enemy and result.type == "damage":
+                if getattr(result, "hp_drain", 0):
+                    healed = self._apply_hp_drain(
+                        session.session_id, pid, player, result.hp_drain, source_is_player=True
+                    )
+                    if healed > 0:
+                        session.game_log.append(
+                            f"{eidolon_name} drains {healed} HP from {enemy['enemy_name']}!"
+                        )
+                if getattr(result, "mp_drain", 0):
+                    drained = self._transfer_mp(
+                        session.session_id,
+                        pid,
+                        player,
+                        enemy,
+                        result.mp_drain,
+                        source_is_player=True,
+                        target_is_player=False,
+                    )
+                    if drained > 0:
+                        session.game_log.append(
+                            f"{eidolon_name} drains {drained} MP from {enemy['enemy_name']}!"
+                        )
         elif result.type == "absorb_mp":
             drained = self._transfer_mp(
                 session.session_id,
@@ -2366,6 +2465,28 @@ class BattleSystem(commands.Cog):
             session.game_log.append(
                 f"{enemy['enemy_name']} uses {ability['ability_name']} and deals {dmg} damage!"
             )
+            if getattr(result, "hp_drain", 0):
+                healed = self._apply_hp_drain(
+                    session.session_id, pid, enemy, result.hp_drain, source_is_player=False
+                )
+                if healed > 0:
+                    session.game_log.append(
+                        f"{enemy['enemy_name']} drains {healed} HP!"
+                    )
+            if getattr(result, "mp_drain", 0):
+                drained = self._transfer_mp(
+                    session.session_id,
+                    pid,
+                    enemy,
+                    player,
+                    result.mp_drain,
+                    source_is_player=False,
+                    target_is_player=True,
+                )
+                if drained > 0:
+                    session.game_log.append(
+                        f"{enemy['enemy_name']} drains {drained} MP from you!"
+                    )
             if new_hp <= 0:
                 return await self._kill_player(interaction, pid, session)
             await self.update_battle_embed(interaction, pid, enemy)
