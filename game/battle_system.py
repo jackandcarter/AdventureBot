@@ -324,6 +324,8 @@ class BattleSystem(commands.Cog):
         if not session or not enemy:
             return enemy
         target_level, party_level = self._get_enemy_target_level(session, floor_id, difficulty)
+        if enemy.get("role") not in ("boss", "miniboss"):
+            target_level = min(target_level, party_level)
         stats = self._scale_enemy_stats(enemy, target_level)
         enemy.update(stats)
         enemy["level"] = target_level
