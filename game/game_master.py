@@ -2185,6 +2185,12 @@ class GameMaster(commands.Cog):
             style=discord.ButtonStyle.primary,
             custom_id="character_class_abilities"
         ))
+        if c_name == "Summoner":
+            view.add_item(discord.ui.Button(
+                label="Eidolons",
+                style=discord.ButtonStyle.primary,
+                custom_id="character_eidolons"
+            ))
         view.add_item(discord.ui.Button(
             label="Back",
             style=discord.ButtonStyle.secondary,
@@ -2270,6 +2276,107 @@ class GameMaster(commands.Cog):
                                           view_override=view)
         else:
             await interaction.followup.send(embed=e, view=view, ephemeral=True)
+
+    async def display_eidolons(self, interaction: discord.Interaction) -> None:
+        sm = self.bot.get_cog("SessionManager")
+        session = sm.get_session(interaction.channel.id) if sm else None
+        if not session:
+            return await interaction.response.send_message("❌ No session.", ephemeral=True)
+
+        pd = next(p for p in SessionPlayerModel.get_player_states(session.session_id)
+                  if p["player_id"] == session.current_turn)
+        if ClassModel.get_class_name(pd["class_id"]) != "Summoner":
+            return await interaction.response.send_message(
+                "❌ Only Summoners can view Eidolons.",
+                ephemeral=True
+            )
+
+        unlocked = SessionPlayerModel.get_unlocked_eidolons(
+            session.session_id,
+            session.current_turn
+        )
+
+        conn = self.db_connect()
+        with conn.cursor(dictionary=True) as cur:
+            cur.execute(
+                """
+                SELECT eidolon_id, name, required_level,
+                       base_hp, base_attack, base_magic,
+                       base_defense, base_magic_defense,
+                       base_accuracy, base_evasion, base_speed,
+                       summon_mp_cost
+                  FROM eidolons
+                 ORDER BY eidolon_id
+                """
+            )
+            eidolon_rows = cur.fetchall()
+        conn.close()
+
+        eidolon_lookup = {row["eidolon_id"]: row for row in eidolon_rows}
+        unlocked_ids = {row["eidolon_id"] for row in unlocked}
+
+        active = getattr(session, "active_summons", {}).get(session.current_turn)
+        active_id = active.get("eidolon_id") if active else None
+
+        bs = self.bot.get_cog("BattleSystem")
+        embed = discord.Embed(title="Eidolons", color=discord.Color.purple())
+
+        if unlocked:
+            for entry in unlocked:
+                eidolon = eidolon_lookup.get(entry["eidolon_id"], {})
+                level = entry.get("level", 1)
+                exp = entry.get("experience", 0)
+                status = "Active" if entry["eidolon_id"] == active_id else "Idle"
+                stats = None
+                if bs and eidolon:
+                    stats = bs._calculate_eidolon_stats(eidolon, level)
+                if not stats:
+                    stats = {
+                        "hp": eidolon.get("base_hp", 0),
+                        "attack": eidolon.get("base_attack", 0),
+                        "magic": eidolon.get("base_magic", 0),
+                        "defense": eidolon.get("base_defense", 0),
+                        "magic_defense": eidolon.get("base_magic_defense", 0),
+                        "accuracy": eidolon.get("base_accuracy", 0),
+                        "evasion": eidolon.get("base_evasion", 0),
+                        "speed": eidolon.get("base_speed", 0),
+                    }
+                mp_cost = eidolon.get("summon_mp_cost", 0) or 0
+                value = (
+                    f"**Status:** {status}\n"
+                    f"**Level:** {level} | **XP:** {exp}\n"
+                    f"**HP:** {stats.get('hp', 0)} | **ATK:** {stats.get('attack', 0)} | "
+                    f"**MAG:** {stats.get('magic', 0)}\n"
+                    f"**DEF:** {stats.get('defense', 0)} | **MDEF:** {stats.get('magic_defense', 0)} | "
+                    f"**SPD:** {stats.get('speed', 0)}\n"
+                    f"**ACC:** {stats.get('accuracy', 0)} | **EVA:** {stats.get('evasion', 0)}\n"
+                    f"**Summon MP Cost:** {mp_cost}"
+                )
+                embed.add_field(
+                    name=entry.get("name", "Unknown Eidolon"),
+                    value=value,
+                    inline=False
+                )
+        else:
+            embed.add_field(
+                name="Unlocked",
+                value="You have not unlocked any Eidolons yet.",
+                inline=False
+            )
+
+        locked_lines = []
+        for row in eidolon_rows:
+            if row["eidolon_id"] in unlocked_ids:
+                continue
+            locked_lines.append(f"{row['name']} — unlocks at Lv {row['required_level']}")
+
+        if locked_lines:
+            locked_block = "```ansi\n" + "\n".join(
+                f"\u001b[2;30m{line}\u001b[0m" for line in locked_lines
+            ) + "\n```"
+            embed.add_field(name="Locked", value=locked_block, inline=False)
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     # ────────────────────────────────────────────────────────────────────────────
     #  TURN HELPERS
@@ -2689,6 +2796,8 @@ class GameMaster(commands.Cog):
 
         if cid == "character_class_abilities":
             return await self.display_class_abilities(interaction)
+        if cid == "character_eidolons":
+            return await self.display_eidolons(interaction)
 
         if cid == "class_abilities_back":
             # simply re‑show the character sheet
