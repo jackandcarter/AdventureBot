@@ -12,6 +12,8 @@ from discord.ext import commands
 from discord.ui import View, Button
 
 from models.database import Database
+from models.session_models import SessionPlayerModel
+from game.inventory_shop import filter_inventory
 from utils.helpers import load_config
 from utils.ui_helpers import (
     create_cooldown_bar,
@@ -513,11 +515,67 @@ class EmbedManager(commands.Cog):
     # Inventory menu embed
     # ──────────────────────────────────────────────────────────────────
     async def send_inventory_menu(self, interaction: discord.Interaction):
-        conn = self.db_connect()
-        with conn.cursor(dictionary=True) as cur:
-            cur.execute("SELECT item_name, item_id FROM items")
-            items = cur.fetchall()
-        buttons = [(i["item_name"], discord.ButtonStyle.primary, f"item_{i['item_id']}", 0) for i in items]
+        mgr = self.bot.get_cog("SessionManager")
+        session = mgr.get_session(interaction.channel.id) if mgr else None
+        if not session:
+            buttons = [("Back", discord.ButtonStyle.secondary, "back_from_use", 0)]
+            await self.send_or_update_embed(
+                interaction,
+                "🎒 Your Inventory",
+                "No active session.",
+                buttons=buttons,
+            )
+            return
+
+        inv_cog = self.bot.get_cog("InventoryShop")
+        if inv_cog:
+            full_inv = inv_cog.get_full_inventory(interaction.user.id, session.session_id)
+        else:
+            inventory = SessionPlayerModel.get_inventory(session.session_id, interaction.user.id)
+            full_inv = []
+            if inventory:
+                conn = self.db_connect()
+                try:
+                    with conn.cursor(dictionary=True) as cur:
+                        for item_id_str, qty in inventory.items():
+                            if qty <= 0:
+                                continue
+                            try:
+                                item_id = int(item_id_str)
+                            except ValueError:
+                                continue
+                            cur.execute(
+                                "SELECT item_name, description, target_type, effect, type, price "
+                                "FROM items WHERE item_id=%s",
+                                (item_id,),
+                            )
+                            item_row = cur.fetchone()
+                            if item_row:
+                                item_row.update(item_id=item_id, quantity=qty)
+                                full_inv.append(item_row)
+                finally:
+                    conn.close()
+
+        usable_items = filter_inventory(full_inv)
+        if not usable_items:
+            buttons = [("Back", discord.ButtonStyle.secondary, "back_from_use", 0)]
+            await self.send_or_update_embed(
+                interaction,
+                "🎒 Your Inventory",
+                "No usable items found.",
+                buttons=buttons,
+            )
+            return
+
+        buttons = [
+            (
+                f"Use {item['item_name']} (x{item.get('quantity', 0)})",
+                discord.ButtonStyle.primary,
+                f"item_{item['item_id']}",
+                0,
+            )
+            for item in usable_items
+        ]
         await self.send_or_update_embed(interaction, "🎒 Your Inventory", "Choose an item:", buttons=buttons)
 
     # ──────────────────────────────────────────────────────────────────
