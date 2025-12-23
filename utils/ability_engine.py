@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 class AbilityResult:
     """
     A normalized result from using an ability.
-    type: 'damage'|'heal'|'miss'|'dot'|'hot'|'set_hp'|'pilfer'|'mug'|'scan'
+    type: 'damage'|'heal'|'miss'|'dot'|'hot'|'set_hp'|'pilfer'|'mug'|'scan'|'absorb_mp'
     amount: numeric for damage/heal/set_hp/pilfer/mug
     dot: dict with keys 'damage_per_turn' or 'heal_per_turn', 'remaining_turns', 'effect_name'
     logs: list of strings for the battle log
@@ -392,6 +392,24 @@ class AbilityEngine:
                 dmg = int(target["hp"] * pct)
                 logs.append(f"{name} deals {dmg} ({int(pct*100)}%).")
                 result = AbilityResult(type="damage", amount=dmg, logs=logs)
+
+            # absorb MP (drain from target to user)
+            elif result is None and "absorb_mp" in effect_data:
+                cfg = effect_data["absorb_mp"]
+                amount = 0
+                if isinstance(cfg, dict):
+                    if "amount" in cfg:
+                        amount = int(cfg.get("amount", 0))
+                    elif "percent" in cfg:
+                        amount = int((target.get("max_mp", 0) or 0) * cfg.get("percent", 0))
+                    elif "percent_current" in cfg:
+                        amount = int((target.get("mp", 0) or 0) * cfg.get("percent_current", 0))
+                else:
+                    amount = int(cfg)
+                amount = max(amount, 0)
+                target_name = target.get("enemy_name", "the target")
+                logs.append(f"{name} drains {amount} MP from {target_name}.")
+                result = AbilityResult(type="absorb_mp", amount=amount, logs=logs)
 
             # damage_over_time (DoT)
             elif result is None and "damage_over_time" in effect_data:
