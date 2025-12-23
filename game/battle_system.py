@@ -120,6 +120,45 @@ class BattleSystem(commands.Cog):
             cur.close()
             conn.close()
 
+    def _transfer_mp(
+        self,
+        session_id: int,
+        player_id: int,
+        source: Dict[str, Any],
+        target: Dict[str, Any],
+        amount: int,
+        source_is_player: bool,
+        target_is_player: bool,
+    ) -> int:
+        if amount <= 0:
+            return 0
+
+        source_state = self._get_player_mp(session_id, player_id) if source_is_player else None
+        target_state = self._get_player_mp(session_id, player_id) if target_is_player else None
+
+        source_mp = (source_state or {}).get("mp", source.get("mp", 0) or 0)
+        source_max = (source_state or {}).get("max_mp", source.get("max_mp", 0) or 0)
+        target_mp = (target_state or {}).get("mp", target.get("mp", 0) or 0)
+
+        transferable = min(amount, target_mp)
+        if source_max:
+            transferable = min(transferable, max(source_max - source_mp, 0))
+
+        if transferable <= 0:
+            return 0
+
+        if target_is_player:
+            self._set_player_mp(session_id, player_id, max(target_mp - transferable, 0))
+        else:
+            target["mp"] = max(target_mp - transferable, 0)
+
+        if source_is_player:
+            self._set_player_mp(session_id, player_id, min(source_mp + transferable, source_max))
+        else:
+            source["mp"] = min(source_mp + transferable, source_max) if source_max else source_mp + transferable
+
+        return transferable
+
     def _get_eidolon_for_enemy(self, enemy_id: int) -> Optional[Dict[str, Any]]:
         conn = self.db_connect()
         try:
@@ -568,7 +607,7 @@ class BattleSystem(commands.Cog):
             cursor.execute(
                 """
                 SELECT
-                    enemy_id, enemy_name, hp, max_hp,
+                    enemy_id, enemy_name, hp, max_hp, mp, max_mp,
                     attack_power, magic_power, defense, magic_defense,
                     accuracy, evasion, speed, xp_reward, gil_drop,
                     loot_item_id, loot_quantity, image_url, role
@@ -601,7 +640,7 @@ class BattleSystem(commands.Cog):
             cursor.execute(
                 """
                 SELECT enemy_id, enemy_name, hp, max_hp,
-                       attack_power, magic_power, defense, magic_defense,
+                       mp, max_mp, attack_power, magic_power, defense, magic_defense,
                        accuracy, evasion, speed, xp_reward, gil_drop,
                        loot_item_id, loot_quantity, image_url, role
                 FROM enemies
@@ -1588,6 +1627,8 @@ class BattleSystem(commands.Cog):
                     f"{enemy['enemy_name']} is affected by {result.dot['effect_name']}."
                 )
                 self._append_elemental_log(session, result, enemy["enemy_name"])
+        elif result.type == "absorb_mp":
+            pass
         else:
             # miss, heal, pilfer, mug, etc.
             session.game_log.extend(result.logs)
@@ -1647,7 +1688,7 @@ class BattleSystem(commands.Cog):
         self.reduce_player_cooldowns(session, pid)
 
         # 7) handle the result types
-        if result.type in ("damage","heal","set_hp","dot","hot"):
+        if result.type in ("damage", "heal", "set_hp", "dot", "hot"):
             # update enemy.hp or player.hp as needed
             if result.type == "damage":
                 enemy["hp"] = max(enemy["hp"] - result.amount, 0)
@@ -1676,7 +1717,22 @@ class BattleSystem(commands.Cog):
                     enemy.setdefault("dot_effects", []).append(result.dot)
                     enemy["hp"] = min(enemy["hp"] + heal_tick, enemy["max_hp"])
                     session.game_log.append(f"{enemy['enemy_name']} recovers {heal_tick} HP!")
-
+        elif result.type == "absorb_mp":
+            drained = self._transfer_mp(
+                session.session_id,
+                pid,
+                player,
+                enemy,
+                result.amount,
+                source_is_player=True,
+                target_is_player=False,
+            )
+            if drained > 0:
+                session.game_log.append(
+                    f"You absorb {drained} MP from {enemy['enemy_name']}!"
+                )
+            else:
+                session.game_log.append("No MP could be absorbed.")
 
         else:
             # for “miss”, “pilfer”, “mug”, etc.
@@ -1878,6 +1934,22 @@ class BattleSystem(commands.Cog):
                     enemy["hp"] = min(enemy["hp"] + heal_tick, enemy["max_hp"])
                     session.game_log.append(f"{enemy['enemy_name']} recovers {heal_tick} HP!")
                 self._append_elemental_log(session, result, enemy["enemy_name"])
+        elif result.type == "absorb_mp":
+            drained = self._transfer_mp(
+                session.session_id,
+                pid,
+                player,
+                enemy,
+                result.amount,
+                source_is_player=True,
+                target_is_player=False,
+            )
+            if drained > 0:
+                session.game_log.append(
+                    f"{eidolon_name} absorbs {drained} MP from {enemy['enemy_name']}!"
+                )
+            else:
+                session.game_log.append(f"{eidolon_name} fails to absorb any MP.")
         else:
             session.game_log.extend(result.logs)
             self._append_elemental_log(session, result, enemy["enemy_name"])
@@ -2071,6 +2143,8 @@ class BattleSystem(commands.Cog):
                     f"{enemy['enemy_name']} is affected by {dot['effect_name']}."
                 )
                 self._append_elemental_log(session, result, enemy["enemy_name"])
+        elif result.type == "absorb_mp":
+            pass
         else:
             session.game_log.extend(result.logs)
             self._append_elemental_log(session, result, enemy["enemy_name"])
@@ -2118,6 +2192,22 @@ class BattleSystem(commands.Cog):
                     enemy["hp"] + result.dot.get("heal_per_turn", 0),
                     enemy["max_hp"]
                 )
+        elif result.type == "absorb_mp":
+            drained = self._transfer_mp(
+                session.session_id,
+                pid,
+                player,
+                enemy,
+                result.amount,
+                source_is_player=True,
+                target_is_player=False,
+            )
+            if drained > 0:
+                session.game_log.append(
+                    f"You absorb {drained} MP from {enemy['enemy_name']}!"
+                )
+            else:
+                session.game_log.append("No MP could be absorbed.")
 
         if enemy["hp"] <= 0:
             return await self.handle_enemy_defeat(interaction, session, enemy)
@@ -2152,7 +2242,7 @@ class BattleSystem(commands.Cog):
         conn = self.db_connect()
         cursor = conn.cursor(dictionary=True)
         cursor.execute(
-            "SELECT hp, max_hp, defense, magic_defense, accuracy, evasion "
+            "SELECT hp, max_hp, mp, max_mp, defense, magic_defense, accuracy, evasion "
             "FROM players WHERE player_id = %s AND session_id = %s",
             (pid, session.session_id),
         )
@@ -2238,6 +2328,27 @@ class BattleSystem(commands.Cog):
             session.game_log.append(
                 f"<@{pid}> is healed by {dot['effect_name']} for {heal} HP."
             )
+            await self.update_battle_embed(interaction, pid, enemy)
+            return await self._advance_battle_turn(interaction, session, enemy, acting_side="enemy")
+
+        if result.type == "absorb_mp":
+            drained = self._transfer_mp(
+                session.session_id,
+                pid,
+                enemy,
+                player,
+                result.amount,
+                source_is_player=False,
+                target_is_player=True,
+            )
+            if drained > 0:
+                session.game_log.append(
+                    f"{enemy['enemy_name']} drains {drained} MP from you!"
+                )
+            else:
+                session.game_log.append(
+                    f"{enemy['enemy_name']} tries to drain MP but fails."
+                )
             await self.update_battle_embed(interaction, pid, enemy)
             return await self._advance_battle_turn(interaction, session, enemy, acting_side="enemy")
 

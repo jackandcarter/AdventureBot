@@ -202,7 +202,8 @@ MERGED_ABILITIES: List[Tuple] = [
     (90, 'Blue Bullet', None, '{"base_damage": 100}', 0, '⚔️', 'enemy', None, None, None, None, '2025-05-14 01:45:27', 'attack_power'),
     (91, 'Karma', 'Deals Damage based on turn amount', '{"karma": true}', 3, None, 'any', None, None, None, None, '2025-05-16 16:13:30', 'attack_power'),
     (92, '50 Needles', 'Deals 50 damage with 100% hit rate and ignores defense.', '{"flat_damage": 50}', 0, None, 'any', None, None, None, None, '2025-05-22 15:21:04', 'attack_power'),
-    (93, '1,000 Needles', 'Deals 1,000 damage with 100% hit rate and ignores defense.', '{"flat_damage": 1000}', 0, None, 'any', None, None, None, None, '2025-05-22 15:21:04', 'attack_power')
+    (93, '1,000 Needles', 'Deals 1,000 damage with 100% hit rate and ignores defense.', '{"flat_damage": 1000}', 0, None, 'any', None, None, None, None, '2025-05-22 15:21:04', 'attack_power'),
+    (94, 'Absorb MP', 'Drain MP from an enemy and restore it to yourself.', '{"absorb_mp": {"amount": 25}}', 2, '💧', 'enemy', None, None, None, None, '2025-05-22 15:21:04', 'magic_power')
 ]
 
 # --- eidolon abilities (with mp_cost) -----------------------------------------
@@ -1301,6 +1302,8 @@ TABLES = {
             description TEXT,
             hp INT NOT NULL,
             max_hp INT NOT NULL,
+            mp INT DEFAULT 0,
+            max_mp INT DEFAULT 0,
             attack_power INT DEFAULT 10,
             defense INT DEFAULT 5,
             magic_power INT DEFAULT 10,
@@ -2221,6 +2224,10 @@ def main() -> None:
                     tables_to_seed.add("players")
                 if ensure_column(cur, "players", "max_mp", "INT DEFAULT 0"):
                     tables_to_seed.add("players")
+                if ensure_column(cur, "enemies", "mp", "INT DEFAULT 0"):
+                    tables_to_seed.add("enemies")
+                if ensure_column(cur, "enemies", "max_mp", "INT DEFAULT 0"):
+                    tables_to_seed.add("enemies")
                 if ensure_column(cur, "room_templates", "eidolon_id", "INT NULL"):
                     tables_to_seed.add("room_templates")
                 if ensure_column(cur, "room_templates", "attune_level", "INT NULL"):
