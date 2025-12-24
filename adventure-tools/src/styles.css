@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  background: radial-gradient(circle at top, rgba(34, 52, 92, 0.6), transparent 55%),
+    radial-gradient(circle at 20% 20%, rgba(80, 30, 150, 0.35), transparent 45%),
+    #0b0f1a;
+  min-height: 100vh;
+}
+
+.glass-panel {
+  @apply bg-white/5 border border-white/10 backdrop-blur-xl shadow-glass;
+}
+
+.luminous-line {
+  background: linear-gradient(90deg, rgba(75, 214, 255, 0), rgba(75, 214, 255, 0.7), rgba(75, 214, 255, 0));
+}
