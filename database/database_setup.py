@@ -217,7 +217,17 @@ MERGED_ABILITIES: List[Tuple] = [
     (105, 'Healing Carol', 'A gentle carol that restores health over time.', '{"healing_over_time": {"percent": 0.1, "duration": 5}, "hot_name": "Regen"}', 3, '🎵❤️', 'self', None, None, None, None, '2025-09-20 00:00:00', 'magic_power'),
     (106, 'Dissonant Requiem', 'A discordant refrain that weakens defenses.', '{"status_effects": [{"name": "Defense Down", "duration": 3, "chance": 0.75}, {"name": "Mag.Def Down", "duration": 3, "chance": 0.75}], "status_only": true}', 3, '🎵🔽', 'enemy', None, None, None, None, '2025-09-20 00:00:00', 'magic_power'),
     (107, 'Soothing Lullaby', 'A lullaby that can briefly stun a foe.', '{"status_effects": [{"name": "Stun", "duration": 1, "chance": 0.6}], "status_only": true}', 3, '🎵💤', 'enemy', None, None, None, None, '2025-09-20 00:00:00', 'magic_power'),
-    (108, 'Silencing Coda', 'A sharp coda that can silence a foe.', '{"status_effects": [{"name": "Silence", "duration": 2, "chance": 0.6}], "status_only": true}', 3, '🎵🤐', 'enemy', None, None, None, None, '2025-09-20 00:00:00', 'magic_power')
+    (108, 'Silencing Coda', 'A sharp coda that can silence a foe.', '{"status_effects": [{"name": "Silence", "duration": 2, "chance": 0.6}], "status_only": true}', 3, '🎵🤐', 'enemy', None, None, None, None, '2025-09-20 00:00:00', 'magic_power'),
+    (109, 'Defend', 'Brace to reduce incoming damage for a short time.', '{"status_effects": [{"name": "Defense Up", "duration": 2}], "status_only": true}', 1, '🛡️', 'self', None, None, None, None, '2025-09-20 00:00:00', 'defense'),
+    (110, 'Cover', 'Protect an ally by taking hits meant for them.', '{"status_effects": [{"name": "Defense Up", "duration": 3}], "status_only": true}', 2, '🛡️❤️', 'ally', None, None, None, None, '2025-09-20 00:00:00', 'defense'),
+    (111, 'Provoke', 'Draw enemy attention, leaving them exposed.', '{"status_effects": [{"name": "Defense Down", "duration": 2, "chance": 0.6}], "status_only": true}', 1, '📢', 'enemy', None, None, None, None, '2025-09-20 00:00:00', 'attack_power'),
+    (112, 'Shield Bash', 'Bash with a shield to damage and possibly stun.', '{"base_damage": 80, "status_effects": [{"name": "Stun", "duration": 1, "chance": 0.3}]}', 1, '🛡️', 'enemy', None, None, None, None, '2025-09-20 00:00:00', 'attack_power'),
+    (113, 'Shield Break', 'Crush the foe’s guard, lowering defense.', '{"base_damage": 100, "status_effects": [{"name": "Defense Down", "duration": 3, "chance": 0.5}]}', 1, '🛡️🔽', 'enemy', None, None, None, None, '2025-09-20 00:00:00', 'attack_power'),
+    (114, 'Magic Break', 'Shatter magical strength to lower magic power.', '{"magic_power_down": 25}', 1, '🔮🔽', 'enemy', None, None, None, None, '2025-09-20 00:00:00', 'attack_power'),
+    (115, 'Speed Break', 'Hinder the target’s speed and reaction time.', '{"status_effects": [{"name": "Slow", "duration": 2, "chance": 0.6}], "status_only": true}', 1, '⏳🔽', 'enemy', None, None, None, None, '2025-09-20 00:00:00', 'attack_power'),
+    (116, 'Full Break', 'Cripple the target’s offensive and defensive power.', '{"attack_power_down": 15, "defense_down": 15, "magic_power_down": 15, "magic_defense_down": 15}', 3, '💥🔽', 'enemy', None, None, None, None, '2025-09-20 00:00:00', 'attack_power'),
+    (117, 'Cleave', 'A wide, heavy swing that cuts through the foe.', '{"base_damage": 120}', 1, '⚔️', 'enemy', None, None, None, None, '2025-09-20 00:00:00', 'attack_power'),
+    (118, 'Double Cut', 'Strike twice in rapid succession.', '{"multi_hit": {"hits": 2, "base_damage": 80, "scaling_stat": "attack_power", "scaling_factor": 1.0}}', 1, '⚔️', 'enemy', None, None, None, None, '2025-09-20 00:00:00', 'attack_power')
 ]
 
 # --- eidolon abilities (with mp_cost) -----------------------------------------
@@ -241,6 +251,8 @@ MERGED_ABILITY_STATUS_EFFECTS: List[Tuple[int, int]] = [
 # --- class ↔ ability links ----------------------------------------------------
 MERGED_CLASS_ABILITIES: List[Tuple[int, int, int]] = [
     (1, 7, 1),
+    (1, 109, 1),
+    (1, 111, 1),
     (1, 14, 1),
     (2, 7, 1),
     (2, 10, 1),
@@ -263,6 +275,8 @@ MERGED_CLASS_ABILITIES: List[Tuple[int, int, int]] = [
     (10, 97, 3),
     (11, 88, 1),
     (1, 15, 2),
+    (1, 110, 2),
+    (1, 112, 2),
     (1, 41, 2),
     (7, 52, 2),
     (9, 17, 2),
@@ -274,10 +288,14 @@ MERGED_CLASS_ABILITIES: List[Tuple[int, int, int]] = [
     (9, 19, 3),
     (11, 89, 3),
     (7, 100, 3),
+    (1, 117, 3),
     (7, 53, 4),
     (9, 21, 4),
+    (1, 113, 4),
+    (1, 118, 4),
     (7, 101, 5),
     (1, 16, 5),
+    (1, 114, 5),
     (3, 47, 5),
     (4, 51, 5),
     (5, 32, 5),
@@ -290,6 +308,7 @@ MERGED_CLASS_ABILITIES: List[Tuple[int, int, int]] = [
     (11, 90, 5),
     (7, 102, 7),
     (1, 42, 6),
+    (1, 115, 6),
     (7, 103, 9),
     (10, 96, 7),
     (3, 45, 10),
@@ -300,6 +319,7 @@ MERGED_CLASS_ABILITIES: List[Tuple[int, int, int]] = [
     (9, 23, 10),
     (10, 23, 10),
     (10, 98, 10),
+    (1, 116, 10),
     (7, 104, 11),
     (7, 105, 12),
     (1, 43, 15),
