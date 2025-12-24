@@ -1,0 +1,15 @@
+[Unit]
+Description=Adventure Tools Suite
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/AdventureTools
+ExecStart=/usr/bin/node /opt/AdventureTools/server/index.js
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+Environment=PORT=4173
+
+[Install]
+WantedBy=multi-user.target
