@@ -510,7 +510,7 @@ class InventoryShop(commands.Cog):
             effect = json.loads(item_row["effect"]) if item_row.get("effect") else {}
             if (
                 prompt_for_target
-                session.current_enemy
+                and session.current_enemy
                 and self._item_has_healing_effect(effect)
                 and target == "player"
                 and getattr(session, "active_beasts", None)
