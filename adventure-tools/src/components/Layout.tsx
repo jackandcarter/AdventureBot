@@ -13,10 +13,18 @@ const navItems = [
   "Vendors"
 ];
 
-export function Layout({ children }: { children: React.ReactNode }) {
+export function Layout({
+  children,
+  active,
+  onNavChange
+}: {
+  children: React.ReactNode;
+  active: string;
+  onNavChange: (item: string) => void;
+}) {
   return (
     <div className="min-h-screen flex text-slate-100">
-      <Sidebar items={navItems} active="Enemies" />
+      <Sidebar items={navItems} active={active} onSelect={onNavChange} />
       <div className="flex-1 flex flex-col">
         <header className="px-8 py-6 border-b border-white/10 bg-night-850/70 backdrop-blur">
           <div className="flex items-center justify-between">

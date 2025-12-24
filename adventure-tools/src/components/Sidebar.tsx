@@ -1,6 +1,14 @@
 import clsx from "clsx";
 
-export function Sidebar({ items, active }: { items: string[]; active: string }) {
+export function Sidebar({
+  items,
+  active,
+  onSelect
+}: {
+  items: string[];
+  active: string;
+  onSelect: (item: string) => void;
+}) {
   return (
     <aside className="w-72 border-r border-white/10 bg-night-850/80 backdrop-blur-xl px-6 py-8 flex flex-col">
       <div className="glass-panel rounded-2xl p-4">
@@ -15,6 +23,7 @@ export function Sidebar({ items, active }: { items: string[]; active: string }) 
           <button
             key={item}
             type="button"
+            onClick={() => onSelect(item)}
             className={clsx(
               "w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm transition",
               item === active
