@@ -2190,11 +2190,9 @@ class BattleSystem(commands.Cog):
         self.reduce_player_cooldowns(session, pid)
 
         # 7) handle the result types
-        if result.type in ("damage", "heal", "set_hp", "dot", "hot"):
+        if result.type in ("heal", "set_hp", "dot", "hot"):
             # update enemy.hp or player.hp as needed
-            if result.type == "damage":
-                enemy["hp"] = max(enemy["hp"] - result.amount, 0)
-            elif result.type == "heal":
+            if result.type == "heal":
                 if target in ("self","ally"):
                     # heal the player
                     new_hp = min(player["hp"] + result.amount, player["max_hp"])
@@ -2220,29 +2218,6 @@ class BattleSystem(commands.Cog):
                     enemy["hp"] = min(enemy["hp"] + heal_tick, enemy["max_hp"])
                     session.game_log.append(f"{enemy['enemy_name']} recovers {heal_tick} HP!")
 
-            if enemy and result.type == "damage":
-                if getattr(result, "hp_drain", 0):
-                    healed = self._apply_hp_drain(
-                        session.session_id, pid, player, result.hp_drain, source_is_player=True
-                    )
-                    if healed > 0:
-                        session.game_log.append(
-                            f"You drain {healed} HP from {enemy['enemy_name']}!"
-                        )
-                if getattr(result, "mp_drain", 0):
-                    drained = self._transfer_mp(
-                        session.session_id,
-                        pid,
-                        player,
-                        enemy,
-                        result.mp_drain,
-                        source_is_player=True,
-                        target_is_player=False,
-                    )
-                    if drained > 0:
-                        session.game_log.append(
-                            f"You drain {drained} MP from {enemy['enemy_name']}!"
-                        )
         elif result.type == "absorb_mp":
             drained = self._transfer_mp(
                 session.session_id,
