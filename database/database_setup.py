@@ -810,7 +810,7 @@ MERGED_CLASS_TRANCES: List[Tuple] = [
     (10, 10, 'Enviro', 15),
     (11, 11, 'Eat', 15),
     (12, 12, 'Esper', 15),
-    (13, 13, 'Angelo Trance', 15),
+    (13, 13, 'Angelo', 15),
 ]
 
 # --- trance abilities ---------------------------------------------------------
