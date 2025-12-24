@@ -1849,15 +1849,96 @@ class BattleSystem(commands.Cog):
         result = self.ability.resolve(beast_stats, enemy, ability_meta)
         session.beast_ability_cooldowns.setdefault(pid, {})[ability_id] = ability_meta.get("cooldown", 0)
         self.reduce_beast_cooldowns(session, pid)
+        target = ability_meta.get("target_type", "enemy")
         if result.type == "damage":
             enemy["hp"] = max(enemy["hp"] - result.amount, 0)
             session.game_log.append(
                 f"{beast_state['name']} uses {ability_meta['ability_name']} for {result.amount} damage!"
             )
+            self._append_elemental_log(session, result, enemy["enemy_name"])
             if enemy["hp"] <= 0:
                 return await self.handle_enemy_defeat(interaction, session, enemy)
+        elif result.type == "dot":
+            dot = result.dot
+            if target in ("self", "ally"):
+                session.game_log.append(
+                    f"{beast_state['name']} is affected by {dot['effect_name']}."
+                )
+            else:
+                enemy.setdefault("dot_effects", []).append(dot)
+                enemy["hp"] = max(enemy["hp"] - dot["damage_per_turn"], 0)
+                session.game_log.append(
+                    f"{enemy['enemy_name']} has been afflicted by {dot['effect_name']}."
+                )
+                self._append_elemental_log(session, result, enemy["enemy_name"])
+                if enemy["hp"] <= 0:
+                    return await self.handle_enemy_defeat(interaction, session, enemy)
+        elif result.type == "hot":
+            dot = result.dot
+            if target in ("self", "ally"):
+                heal_tick = dot.get("heal_per_turn", 0)
+                max_hp = beast_stats.get("max_hp", beast_state["current_hp"])
+                new_hp = min(beast_state["current_hp"] + heal_tick, max_hp)
+                SessionPlayerModel.update_beast_hp_mp(
+                    session.session_id, pid, beast_state["beast_id"], new_hp, beast_state["current_mp"]
+                )
+                beast_state["current_hp"] = new_hp
+                session.game_log.append(
+                    f"{beast_state['name']} is affected by {dot['effect_name']}."
+                )
+            else:
+                enemy.setdefault("dot_effects", []).append(dot)
+                enemy["hp"] = min(
+                    enemy["hp"] + dot.get("heal_per_turn", 0),
+                    enemy["max_hp"]
+                )
+                session.game_log.append(
+                    f"{enemy['enemy_name']} is affected by {dot['effect_name']}."
+                )
+                self._append_elemental_log(session, result, enemy["enemy_name"])
+        elif result.type in ("heal", "set_hp"):
+            if target in ("self", "ally"):
+                max_hp = beast_stats.get("max_hp", beast_state["current_hp"])
+                new_hp = result.amount if result.type == "set_hp" else min(
+                    beast_state["current_hp"] + result.amount, max_hp
+                )
+                SessionPlayerModel.update_beast_hp_mp(
+                    session.session_id, pid, beast_state["beast_id"], new_hp, beast_state["current_mp"]
+                )
+                beast_state["current_hp"] = new_hp
+                session.game_log.append(
+                    f"{beast_state['name']} recovers {result.amount} HP."
+                )
+            else:
+                enemy["hp"] = result.amount if result.type == "set_hp" else min(
+                    enemy["hp"] + result.amount, enemy["max_hp"]
+                )
+                session.game_log.append(
+                    f"{enemy['enemy_name']} recovers {result.amount} HP!"
+                )
+        elif result.type == "absorb_mp":
+            session.game_log.extend(result.logs)
         else:
             session.game_log.extend(result.logs)
+            self._append_elemental_log(session, result, enemy["enemy_name"])
+
+        for raw_se in getattr(result, "status_effects", []) or []:
+            raw_se.setdefault("target", ability_meta.get("target_type", "self"))
+            se = self._normalize_se(raw_se)
+            bucket = "player_effects" if se["target"] == "self" else "enemy_effects"
+            session.battle_state[bucket].append(se)
+            if se["target"] == "self":
+                session.game_log.append(
+                    f"{se['effect_name']} has been applied to <@{pid}>."
+                )
+                SessionPlayerModel.update_status_effects(
+                    session.session_id, pid, session.battle_state[bucket]
+                )
+            else:
+                name = session.current_enemy.get("enemy_name", "The enemy")
+                session.game_log.append(
+                    f"{name} has been afflicted by {se['effect_name']}."
+                )
         await self.update_battle_embed(interaction, pid, enemy)
         return await self._advance_battle_turn(interaction, session, enemy, acting_side="player")
 
