@@ -1275,10 +1275,9 @@ class BattleSystem(commands.Cog):
         eb.add_field(name=player_label, value=stats_text, inline=False)
 
         pid = session.current_turn or player_id
-        pid = player_id
-        active_beast = getattr(session, "active_beasts", {}).get(pid) if session else None
+        active_beast = getattr(session, "active_beasts", {}).get(player_id) if session else None
         if active_beast:
-            beast_state = self._get_beast_state(session.session_id, pid, active_beast["beast_id"])
+            beast_state = self._get_beast_state(session.session_id, player_id, active_beast["beast_id"])
             if beast_state:
                 beast_stats = self._calculate_beast_stats(beast_state, beast_state["level"])
                 beast_hp = beast_state.get("current_hp", beast_stats.get("hp", 0))
@@ -1420,8 +1419,8 @@ class BattleSystem(commands.Cog):
         if enemy.get("image_url"):
             eb.set_image(url=enemy["image_url"] + f"?t={int(time.time())}")
 
-        pid    = session.current_turn
-        trance = getattr(session, "trance_states", {}).get(pid)
+        turn_pid = session.current_turn
+        trance = getattr(session, "trance_states", {}).get(turn_pid)
         if trance:
             bar   = create_progress_bar(trance["remaining"], trance["max"], length=6)
             label = f"{trance['name']} {bar}"
@@ -1439,20 +1438,20 @@ class BattleSystem(commands.Cog):
                 ("Flee",   discord.ButtonStyle.secondary,"combat_flee",        0),
             ]
 
-        class_name = self._get_player_class_name(session.session_id, pid)
-        unlocked = SessionPlayerModel.get_unlocked_eidolons(session.session_id, pid)
+        class_name = self._get_player_class_name(session.session_id, turn_pid)
+        unlocked = SessionPlayerModel.get_unlocked_eidolons(session.session_id, turn_pid)
         session.active_summons = getattr(session, "active_summons", {}) or {}
         if class_name == "Summoner" and unlocked:
             session.summon_used = getattr(session, "summon_used", {}) or {}
-            if not session.summon_used.get(pid) and not session.active_summons.get(pid):
+            if not session.summon_used.get(turn_pid) and not session.active_summons.get(turn_pid):
                 buttons.append(("Summon", discord.ButtonStyle.primary, "combat_summon_menu", 1))
-        if session.active_summons.get(pid):
-            eidolon_name = session.active_summons[pid]["name"]
+        if session.active_summons.get(turn_pid):
+            eidolon_name = session.active_summons[turn_pid]["name"]
             buttons[0] = (eidolon_name, discord.ButtonStyle.danger, "combat_eidolon_menu", 0)
         session.active_beasts = getattr(session, "active_beasts", {}) or {}
-        beast_list = SessionPlayerModel.get_unlocked_beasts(session.session_id, pid)
+        beast_list = SessionPlayerModel.get_unlocked_beasts(session.session_id, turn_pid)
         if class_name == "Beast Master" and beast_list:
-            active_beast = session.active_beasts.get(pid)
+            active_beast = session.active_beasts.get(turn_pid)
             label = active_beast["name"] if active_beast else "Beast"
             buttons.append((label, discord.ButtonStyle.primary, "combat_beast_menu", 1))
 
