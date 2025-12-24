@@ -2014,6 +2014,35 @@ class BattleSystem(commands.Cog):
                 session.game_log.extend(result.logs)
         else:
             session.game_log.extend(result.logs)
+
+        if not session.battle_state:
+            session.battle_state = {"player_effects": [], "enemy_effects": []}
+
+        for raw_se in getattr(result, "status_effects", []) or []:
+            if target == "enemy":
+                raw_se.setdefault("target", "enemy")
+            else:
+                raw_se.setdefault("target", "self")
+            se = self._normalize_se(raw_se)
+            bucket = "enemy_effects" if se["target"] == "enemy" else "player_effects"
+            session.battle_state[bucket].append(se)
+            if bucket == "player_effects":
+                if target == "beast":
+                    session.game_log.append(
+                        f"{beast_state['name']} gains {se['effect_name']}."
+                    )
+                else:
+                    session.game_log.append(
+                        f"{se['effect_name']} has been applied to <@{pid}>."
+                    )
+                SessionPlayerModel.update_status_effects(
+                    session.session_id, pid, session.battle_state[bucket]
+                )
+            else:
+                name = session.current_enemy.get("enemy_name", "The enemy")
+                session.game_log.append(
+                    f"{name} has been afflicted by {se['effect_name']}."
+                )
         await self.update_battle_embed(interaction, pid, enemy)
         return await self._advance_battle_turn(interaction, session, enemy, acting_side="player")
 
