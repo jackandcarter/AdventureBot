@@ -203,7 +203,12 @@ MERGED_ABILITIES: List[Tuple] = [
     (91, 'Karma', 'Deals Damage based on turn amount', '{"karma": true}', 3, None, 'any', None, None, None, None, '2025-05-16 16:13:30', 'attack_power'),
     (92, '50 Needles', 'Deals 50 damage with 100% hit rate and ignores defense.', '{"flat_damage": 50}', 0, None, 'any', None, None, None, None, '2025-05-22 15:21:04', 'attack_power'),
     (93, '1,000 Needles', 'Deals 1,000 damage with 100% hit rate and ignores defense.', '{"flat_damage": 1000}', 0, None, 'any', None, None, None, None, '2025-05-22 15:21:04', 'attack_power'),
-    (94, 'Absorb MP', 'Drain MP from an enemy and restore it to yourself.', '{"absorb_mp": {"amount": 25}}', 2, '💧', 'enemy', None, None, None, None, '2025-05-22 15:21:04', 'magic_power')
+    (94, 'Absorb MP', 'Drain MP from an enemy and restore it to yourself.', '{"absorb_mp": {"amount": 25}}', 2, '💧', 'enemy', None, None, None, None, '2025-05-22 15:21:04', 'magic_power'),
+    (95, 'Quake', 'Shake the earth to damage enemies.', '{"base_damage": 90}', 1, '🌎', 'enemy', None, 8, None, None, '2025-09-13 00:00:00', 'magic_power'),
+    (96, 'Flood', 'Summon a surge of water that crashes into foes.', '{"base_damage": 90}', 1, '🌊', 'enemy', None, 7, None, None, '2025-09-13 00:00:00', 'magic_power'),
+    (97, 'Aero', 'Slice enemies with razor-sharp wind.', '{"base_damage": 70}', 1, '🌪️', 'enemy', None, 5, None, None, '2025-09-13 00:00:00', 'magic_power'),
+    (98, 'Wind Slash', 'Unleash a cutting gust that tears through foes.', '{"base_damage": 85}', 1, '🍃', 'enemy', None, 5, None, None, '2025-09-13 00:00:00', 'magic_power'),
+    (99, 'Gaia\'s Wrath', 'Call on the land itself to crush enemies.', '{"base_damage": 120}', 2, '🪨', 'enemy', None, 8, None, None, '2025-09-13 00:00:00', 'magic_power')
 ]
 
 # --- eidolon abilities (with mp_cost) -----------------------------------------
@@ -246,6 +251,7 @@ MERGED_CLASS_ABILITIES: List[Tuple[int, int, int]] = [
     (9, 12, 1),
     (10, 13, 1),
     (10, 37, 1),
+    (10, 97, 3),
     (11, 88, 1),
     (1, 15, 2),
     (1, 41, 2),
@@ -269,8 +275,10 @@ MERGED_CLASS_ABILITIES: List[Tuple[int, int, int]] = [
     (9, 5, 5),
     (9, 36, 5),
     (10, 31, 5),
+    (10, 95, 5),
     (11, 90, 5),
     (1, 42, 6),
+    (10, 96, 7),
     (3, 45, 10),
     (5, 17, 10),
     (7, 33, 10),
@@ -278,6 +286,7 @@ MERGED_CLASS_ABILITIES: List[Tuple[int, int, int]] = [
     (8, 28, 10),
     (9, 23, 10),
     (10, 23, 10),
+    (10, 98, 10),
     (1, 43, 15),
     (3, 44, 15),
     (5, 25, 15),
@@ -285,6 +294,7 @@ MERGED_CLASS_ABILITIES: List[Tuple[int, int, int]] = [
     (9, 18, 15),
     (9, 20, 15),
     (9, 22, 15),
+    (10, 99, 15),
     (3, 43, 20),
     (3, 49, 20),
     (9, 24, 20)
