@@ -518,6 +518,18 @@ class BattleSystem(commands.Cog):
             return f"✅ {template['name']} has already been tamed."
         return f"❌ Tame failed ({int(chance * 100)}% chance)."
 
+    def _get_ability_effect_data(self, ability_meta: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            return json.loads(ability_meta.get("effect") or "{}")
+        except json.JSONDecodeError:
+            return {}
+
+    def _is_healing_ability(self, ability_meta: Dict[str, Any]) -> bool:
+        if ability_meta.get("can_heal"):
+            return True
+        effect_data = self._get_ability_effect_data(ability_meta)
+        return any(key in effect_data for key in ("heal_current_pct", "healing_over_time"))
+
     def _normalize_se(self, raw: Dict[str,Any]) -> Dict[str,Any]:
         """
         Turn raw engine output into exactly the 3 keys our UI helper wants:
@@ -1387,6 +1399,19 @@ class BattleSystem(commands.Cog):
             player_label += f" (Lv {player_level})"
         eb.add_field(name=player_label, value=stats_text, inline=False)
 
+        active_beast = getattr(session, "active_beasts", {}).get(pid) if session else None
+        if active_beast:
+            beast_state = self._get_beast_state(session.session_id, pid, active_beast["beast_id"])
+            if beast_state:
+                beast_stats = self._calculate_beast_stats(beast_state, beast_state["level"])
+                beast_hp = beast_state.get("current_hp", beast_stats.get("hp", 0))
+                beast_mp = beast_state.get("current_mp", beast_stats.get("mp", 0))
+                beast_text = f"❤️ HP: {create_health_bar(beast_hp, beast_stats.get('max_hp', beast_hp))}"
+                if beast_stats.get("max_mp"):
+                    beast_text += f"\n💠 MP: {create_health_bar(beast_mp, beast_stats.get('max_mp', beast_mp))}"
+                beast_text += f"\n⚔️ ATK: {beast_stats.get('attack', 0)}\n🛡️ DEF: {beast_stats.get('defense', 0)}"
+                eb.add_field(name=f"Beast: {beast_state['name']} (Lv {beast_state['level']})", value=beast_text, inline=False)
+
         eb.add_field(name="Battle Log",
                      value="\n".join(session.game_log[-5:]) or "No actions recorded.",
                      inline=False)
@@ -1762,6 +1787,47 @@ class BattleSystem(commands.Cog):
             buttons=buttons,
         )
 
+    async def show_beast_ability_target_menu(
+        self,
+        interaction: discord.Interaction,
+        ability_id: int,
+        beast_name: str,
+    ) -> None:
+        buttons = [
+            ("Heal You", discord.ButtonStyle.primary, f"beast_ability_target_{ability_id}_player", 0),
+            (f"Heal {beast_name}", discord.ButtonStyle.primary, f"beast_ability_target_{ability_id}_beast", 0),
+            ("Back", discord.ButtonStyle.secondary, "combat_beast_skill_menu", 1),
+        ]
+        await self.embed_manager.send_or_update_embed(
+            interaction,
+            title="🐾 Choose Healing Target",
+            description="Select who should receive the healing.",
+            buttons=buttons,
+        )
+
+    async def handle_beast_ability_select(self, interaction: discord.Interaction, ability_id: int) -> None:
+        session = self.bot.get_cog("SessionManager").get_session(interaction.channel.id)
+        if not session or not session.current_enemy:
+            return await interaction.response.send_message("❌ No active battle found.", ephemeral=True)
+        pid = session.current_turn
+        active = getattr(session, "active_beasts", {}).get(pid)
+        if not active:
+            return await interaction.response.send_message("❌ No active beast to command.", ephemeral=True)
+
+        conn = self.db_connect()
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT * FROM abilities WHERE ability_id = %s", (ability_id,))
+        ability_meta = cur.fetchone()
+        cur.close()
+        conn.close()
+        if not ability_meta:
+            return await interaction.response.send_message("❌ Ability not found.", ephemeral=True)
+
+        if self._is_healing_ability(ability_meta):
+            return await self.show_beast_ability_target_menu(interaction, ability_id, active["name"])
+
+        return await self.handle_beast_ability_use(interaction, ability_id, ability_meta=ability_meta)
+
     async def handle_beast_select(self, interaction: discord.Interaction, beast_id: int) -> None:
         session = self.bot.get_cog("SessionManager").get_session(interaction.channel.id)
         pid = session.current_turn
@@ -1807,7 +1873,14 @@ class BattleSystem(commands.Cog):
         await self.update_battle_embed(interaction, pid, enemy)
         return await self._advance_battle_turn(interaction, session, enemy, acting_side="player")
 
-    async def handle_beast_ability_use(self, interaction: discord.Interaction, ability_id: int) -> None:
+    async def handle_beast_ability_use(
+        self,
+        interaction: discord.Interaction,
+        ability_id: int,
+        *,
+        target: str = "enemy",
+        ability_meta: Optional[Dict[str, Any]] = None,
+    ) -> None:
         session = self.bot.get_cog("SessionManager").get_session(interaction.channel.id)
         if not session or not session.current_enemy:
             return await interaction.response.send_message("❌ No active battle found.", ephemeral=True)
@@ -1824,14 +1897,15 @@ class BattleSystem(commands.Cog):
         if current_cd:
             return await interaction.response.send_message("❌ That beast ability is cooling down.", ephemeral=True)
 
-        conn = self.db_connect()
-        cur = conn.cursor(dictionary=True)
-        cur.execute("SELECT * FROM abilities WHERE ability_id = %s", (ability_id,))
-        ability_meta = cur.fetchone()
-        cur.close()
-        conn.close()
         if not ability_meta:
-            return await interaction.response.send_message("❌ Ability not found.", ephemeral=True)
+            conn = self.db_connect()
+            cur = conn.cursor(dictionary=True)
+            cur.execute("SELECT * FROM abilities WHERE ability_id = %s", (ability_id,))
+            ability_meta = cur.fetchone()
+            cur.close()
+            conn.close()
+            if not ability_meta:
+                return await interaction.response.send_message("❌ Ability not found.", ephemeral=True)
 
         level = beast_state["level"]
         beast_stats = self._calculate_beast_stats(beast_state, level)
@@ -1846,16 +1920,98 @@ class BattleSystem(commands.Cog):
             )
             beast_state["current_mp"] = new_mp
         enemy = session.current_enemy
-        result = self.ability.resolve(beast_stats, enemy, ability_meta)
+        player = None
+        target_stats = enemy
+        if target == "player":
+            conn = self.db_connect()
+            cur = conn.cursor(dictionary=True)
+            cur.execute(
+                "SELECT hp, max_hp, mp, max_mp FROM players WHERE player_id=%s AND session_id=%s",
+                (pid, session.session_id),
+            )
+            player = cur.fetchone()
+            cur.close()
+            conn.close()
+            if not player:
+                return await interaction.response.send_message("❌ Player data missing.", ephemeral=True)
+            target_stats = player
+        elif target == "beast":
+            target_stats = {
+                **beast_stats,
+                "hp": beast_state.get("current_hp", beast_stats.get("hp", 0)),
+                "max_hp": beast_stats.get("max_hp", beast_state.get("current_hp", 0)),
+                "mp": beast_state.get("current_mp", beast_stats.get("mp", 0)),
+                "max_mp": beast_stats.get("max_mp", beast_state.get("current_mp", 0)),
+            }
+
+        result = self.ability.resolve(beast_stats, target_stats, ability_meta)
         session.beast_ability_cooldowns.setdefault(pid, {})[ability_id] = ability_meta.get("cooldown", 0)
         self.reduce_beast_cooldowns(session, pid)
         if result.type == "damage":
-            enemy["hp"] = max(enemy["hp"] - result.amount, 0)
-            session.game_log.append(
-                f"{beast_state['name']} uses {ability_meta['ability_name']} for {result.amount} damage!"
-            )
-            if enemy["hp"] <= 0:
-                return await self.handle_enemy_defeat(interaction, session, enemy)
+            if target != "enemy":
+                session.game_log.extend(result.logs)
+            else:
+                enemy["hp"] = max(enemy["hp"] - result.amount, 0)
+                session.game_log.append(
+                    f"{beast_state['name']} uses {ability_meta['ability_name']} for {result.amount} damage!"
+                )
+                if enemy["hp"] <= 0:
+                    return await self.handle_enemy_defeat(interaction, session, enemy)
+        elif result.type == "heal":
+            if target == "player" and player:
+                new_hp = min(player["hp"] + result.amount, player["max_hp"])
+                self._update_player_hp(pid, session.session_id, new_hp)
+                session.game_log.append(
+                    f"{beast_state['name']} restores {result.amount} HP to you!"
+                )
+            elif target == "beast":
+                max_hp = beast_stats.get("max_hp", beast_state["current_hp"])
+                new_hp = min(beast_state["current_hp"] + result.amount, max_hp)
+                SessionPlayerModel.update_beast_hp_mp(
+                    session.session_id, pid, beast_state["beast_id"], new_hp, beast_state["current_mp"]
+                )
+                session.game_log.append(
+                    f"{beast_state['name']} heals for {result.amount} HP!"
+                )
+            else:
+                session.game_log.extend(result.logs)
+        elif result.type == "hot":
+            heal = result.dot.get("heal_per_turn", 0)
+            if target == "player" and player:
+                new_hp = min(player["hp"] + heal, player["max_hp"])
+                self._update_player_hp(pid, session.session_id, new_hp)
+                session.game_log.append(
+                    f"{beast_state['name']} grants you {heal} HP!"
+                )
+            elif target == "beast":
+                max_hp = beast_stats.get("max_hp", beast_state["current_hp"])
+                new_hp = min(beast_state["current_hp"] + heal, max_hp)
+                SessionPlayerModel.update_beast_hp_mp(
+                    session.session_id, pid, beast_state["beast_id"], new_hp, beast_state["current_mp"]
+                )
+                session.game_log.append(
+                    f"{beast_state['name']} recovers {heal} HP!"
+                )
+            else:
+                session.game_log.extend(result.logs)
+        elif result.type == "set_hp":
+            if target == "player" and player:
+                new_hp = min(result.amount, player["max_hp"])
+                self._update_player_hp(pid, session.session_id, new_hp)
+                session.game_log.append(
+                    f"{beast_state['name']} sets your HP to {new_hp}!"
+                )
+            elif target == "beast":
+                max_hp = beast_stats.get("max_hp", beast_state["current_hp"])
+                new_hp = min(result.amount, max_hp)
+                SessionPlayerModel.update_beast_hp_mp(
+                    session.session_id, pid, beast_state["beast_id"], new_hp, beast_state["current_mp"]
+                )
+                session.game_log.append(
+                    f"{beast_state['name']} sets its HP to {new_hp}!"
+                )
+            else:
+                session.game_log.extend(result.logs)
         else:
             session.game_log.extend(result.logs)
         await self.update_battle_embed(interaction, pid, enemy)
@@ -3257,9 +3413,12 @@ class BattleSystem(commands.Cog):
         if cid.startswith("beast_select_"):
             beast_id = int(cid.split("_", 2)[2])
             return await self.handle_beast_select(interaction, beast_id)
+        if cid.startswith("beast_ability_target_"):
+            _, _, _, ability_id, target = cid.split("_", 4)
+            return await self.handle_beast_ability_use(interaction, int(ability_id), target=target)
         if cid.startswith("beast_ability_"):
             ability_id = int(cid.split("_", 2)[2])
-            return await self.handle_beast_ability_use(interaction, ability_id)
+            return await self.handle_beast_ability_select(interaction, ability_id)
         if cid == "summon_back":
             if session and session.current_enemy:
                 return await self.update_battle_embed(interaction, session.current_turn, session.current_enemy)

@@ -128,6 +128,9 @@ class InventoryShop(commands.Cog):
                     inventory.append(item_row)
         return inventory
 
+    def _item_has_healing_effect(self, effect: Dict[str, Any]) -> bool:
+        return bool(effect.get("heal") or effect.get("restore_mp"))
+
     # --------------------------------------------------------------------- #
     # Interaction router
     # --------------------------------------------------------------------- #
@@ -151,6 +154,7 @@ class InventoryShop(commands.Cog):
             "buy_",
             "sell_",
             "use_item_",
+            "use_item_target_",
         )
         handled_exacts = {"back_from_use", "shop_back_room"}
         if not (cid.startswith(handled_prefixes) or cid in handled_exacts):
@@ -200,6 +204,14 @@ class InventoryShop(commands.Cog):
                     except discord.errors.HTTPException:
                         pass
                     await self.process_use_item(interaction, iid)
+                else:
+                    await self.display_use_item_menu(interaction)
+            elif cid.startswith("use_item_target_"):
+                parts = cid.split("_", 4)
+                if len(parts) >= 5:
+                    item_id = int(parts[3])
+                    target = parts[4]
+                    await self.process_use_item(interaction, item_id, target=target, prompt_for_target=False)
                 else:
                     await self.display_use_item_menu(interaction)
             elif cid == "back_from_use":
@@ -435,7 +447,36 @@ class InventoryShop(commands.Cog):
         else:
             await interaction.followup.send("❌ EmbedManager unavailable.", ephemeral=True)
 
-    async def process_use_item(self, interaction: Interaction, item_id: int) -> None:
+    async def display_use_item_target_menu(
+        self,
+        interaction: Interaction,
+        item_row: Dict[str, Any],
+        beast_name: str,
+    ) -> None:
+        emb_mgr = self.bot.get_cog("EmbedManager")
+        if not emb_mgr:
+            return await interaction.followup.send("❌ EmbedManager unavailable.", ephemeral=True)
+
+        buttons = [
+            ("Use on You", discord.ButtonStyle.primary, f"use_item_target_{item_row['item_id']}_player", 0),
+            (f"Use on {beast_name}", discord.ButtonStyle.primary, f"use_item_target_{item_row['item_id']}_beast", 0),
+            ("Back", discord.ButtonStyle.secondary, "back_from_use", 1),
+        ]
+        await emb_mgr.send_or_update_embed(
+            interaction,
+            "🎒 Choose Item Target",
+            "Select who should receive the item effects.",
+            buttons=buttons,
+        )
+
+    async def process_use_item(
+        self,
+        interaction: Interaction,
+        item_id: int,
+        *,
+        target: str = "player",
+        prompt_for_target: bool = True,
+    ) -> None:
         mgr = self.bot.get_cog("SessionManager")
         session = mgr.get_session(interaction.channel.id) if mgr else None
         if not session:
@@ -467,24 +508,75 @@ class InventoryShop(commands.Cog):
                 return
 
             effect = json.loads(item_row["effect"]) if item_row.get("effect") else {}
+            if (
+                prompt_for_target
+                session.current_enemy
+                and self._item_has_healing_effect(effect)
+                and target == "player"
+                and getattr(session, "active_beasts", None)
+                and session.active_beasts.get(interaction.user.id)
+            ):
+                return await self.display_use_item_target_menu(
+                    interaction,
+                    item_row,
+                    session.active_beasts[interaction.user.id]["name"],
+                )
             heal = effect.get("heal", 0)
             restore_mp = effect.get("restore_mp", 0)
             is_trance = effect.get("trance", False)
             txt = f"You used **{item_row['item_name']}**."
-            if heal:
-                new_hp = min(player["hp"] + heal, player["max_hp"])
-                cur.execute(
-                    "UPDATE players SET hp=%s WHERE player_id=%s AND session_id=%s",
-                    (new_hp, interaction.user.id, session.session_id)
+            if target == "beast":
+                bs = self.bot.get_cog("BattleSystem")
+                active = getattr(session, "active_beasts", {}).get(interaction.user.id)
+                if not active or not bs:
+                    await interaction.followup.send("❌ No active beast to heal.", ephemeral=True)
+                    return
+                beast_state = bs._get_beast_state(session.session_id, interaction.user.id, active["beast_id"])
+                if not beast_state:
+                    await interaction.followup.send("❌ Beast data missing.", ephemeral=True)
+                    return
+                if beast_state.get("current_hp", 0) <= 0:
+                    await interaction.followup.send("❌ That beast is KO'd and cannot be healed.", ephemeral=True)
+                    return
+                beast_stats = bs._calculate_beast_stats(beast_state, beast_state["level"])
+                if heal:
+                    max_hp = beast_stats.get("max_hp", beast_state["current_hp"])
+                    new_hp = min(beast_state["current_hp"] + heal, max_hp)
+                else:
+                    new_hp = beast_state["current_hp"]
+                if restore_mp and beast_stats.get("max_mp"):
+                    new_mp = min(
+                        (beast_state.get("current_mp") or 0) + restore_mp,
+                        beast_stats.get("max_mp") or 0,
+                    )
+                else:
+                    new_mp = beast_state.get("current_mp")
+                SessionPlayerModel.update_beast_hp_mp(
+                    session.session_id,
+                    interaction.user.id,
+                    beast_state["beast_id"],
+                    new_hp,
+                    new_mp,
                 )
-                txt += f" Healed **{heal}** HP! (HP: {new_hp}/{player['max_hp']})"
-            if restore_mp and player.get("max_mp"):
-                new_mp = min((player.get("mp") or 0) + restore_mp, player.get("max_mp") or 0)
-                cur.execute(
-                    "UPDATE players SET mp=%s WHERE player_id=%s AND session_id=%s",
-                    (new_mp, interaction.user.id, session.session_id)
-                )
-                txt += f" Restored **{restore_mp}** MP! (MP: {new_mp}/{player['max_mp']})"
+                if heal:
+                    txt += f" Healed **{beast_state['name']}** for **{heal}** HP!"
+                if restore_mp and beast_stats.get("max_mp"):
+                    txt += f" Restored **{restore_mp}** MP to **{beast_state['name']}**!"
+            else:
+                if heal:
+                    new_hp = min(player["hp"] + heal, player["max_hp"])
+                    cur.execute(
+                        "UPDATE players SET hp=%s WHERE player_id=%s AND session_id=%s",
+                        (new_hp, interaction.user.id, session.session_id)
+                    )
+                    txt += f" Healed **{heal}** HP! (HP: {new_hp}/{player['max_hp']})"
+                if restore_mp and player.get("max_mp"):
+                    new_mp = min((player.get("mp") or 0) + restore_mp, player.get("max_mp") or 0)
+                    cur.execute(
+                        "UPDATE players SET mp=%s WHERE player_id=%s AND session_id=%s",
+                        (new_mp, interaction.user.id, session.session_id)
+                    )
+                    txt += f" Restored **{restore_mp}** MP! (MP: {new_mp}/{player['max_mp']})"
 
             inv_dict[str(item_id)] -= 1
             if inv_dict[str(item_id)] <= 0:
