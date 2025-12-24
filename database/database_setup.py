@@ -208,7 +208,16 @@ MERGED_ABILITIES: List[Tuple] = [
     (96, 'Flood', 'Summon a surge of water that crashes into foes.', '{"base_damage": 90}', 1, '🌊', 'enemy', None, 7, None, None, '2025-09-13 00:00:00', 'magic_power'),
     (97, 'Aero', 'Slice enemies with razor-sharp wind.', '{"base_damage": 70}', 1, '🌪️', 'enemy', None, 5, None, None, '2025-09-13 00:00:00', 'magic_power'),
     (98, 'Wind Slash', 'Unleash a cutting gust that tears through foes.', '{"base_damage": 85}', 1, '🍃', 'enemy', None, 5, None, None, '2025-09-13 00:00:00', 'magic_power'),
-    (99, 'Gaia\'s Wrath', 'Call on the land itself to crush enemies.', '{"base_damage": 120}', 2, '🪨', 'enemy', None, 8, None, None, '2025-09-13 00:00:00', 'magic_power')
+    (99, 'Gaia\'s Wrath', 'Call on the land itself to crush enemies.', '{"base_damage": 120}', 2, '🪨', 'enemy', None, 8, None, None, '2025-09-13 00:00:00', 'magic_power'),
+    (100, 'Ballad of Might', 'A stirring song that raises attack power.', '{"status_effects": [{"name": "Attack Up", "duration": 5}], "status_only": true}', 2, '🎵⚔️', 'self', None, None, None, None, '2025-09-20 00:00:00', 'magic_power'),
+    (101, 'Ballad of Guarding', 'A protective melody that raises defense.', '{"status_effects": [{"name": "Defense Up", "duration": 5}], "status_only": true}', 2, '🎵🛡️', 'self', None, None, None, None, '2025-09-20 00:00:00', 'magic_power'),
+    (102, 'Ballad of Warding', 'A warding hymn that raises magic defense.', '{"status_effects": [{"name": "Mag.Def Up", "duration": 5}], "status_only": true}', 2, '🎵🔮🛡️', 'self', None, None, None, None, '2025-09-20 00:00:00', 'magic_power'),
+    (103, 'Ballad of Clarity', 'A song that heightens magical focus.', '{"status_effects": [{"name": "Magic Up", "duration": 5}], "status_only": true}', 2, '🎵🔮', 'self', None, None, None, None, '2025-09-20 00:00:00', 'magic_power'),
+    (104, 'Swift Etude', 'A quick tempo that raises evasion.', '{"status_effects": [{"name": "Evasion Up", "duration": 4}], "status_only": true}', 2, '🎵🎯', 'self', None, None, None, None, '2025-09-20 00:00:00', 'magic_power'),
+    (105, 'Healing Carol', 'A gentle carol that restores health over time.', '{"healing_over_time": {"percent": 0.1, "duration": 5}, "hot_name": "Regen"}', 3, '🎵❤️', 'self', None, None, None, None, '2025-09-20 00:00:00', 'magic_power'),
+    (106, 'Dissonant Requiem', 'A discordant refrain that weakens defenses.', '{"status_effects": [{"name": "Defense Down", "duration": 3, "chance": 0.75}, {"name": "Mag.Def Down", "duration": 3, "chance": 0.75}], "status_only": true}', 3, '🎵🔽', 'enemy', None, None, None, None, '2025-09-20 00:00:00', 'magic_power'),
+    (107, 'Soothing Lullaby', 'A lullaby that can briefly stun a foe.', '{"status_effects": [{"name": "Stun", "duration": 1, "chance": 0.6}], "status_only": true}', 3, '🎵💤', 'enemy', None, None, None, None, '2025-09-20 00:00:00', 'magic_power'),
+    (108, 'Silencing Coda', 'A sharp coda that can silence a foe.', '{"status_effects": [{"name": "Silence", "duration": 2, "chance": 0.6}], "status_only": true}', 3, '🎵🤐', 'enemy', None, None, None, None, '2025-09-20 00:00:00', 'magic_power')
 ]
 
 # --- eidolon abilities (with mp_cost) -----------------------------------------
@@ -264,8 +273,10 @@ MERGED_CLASS_ABILITIES: List[Tuple[int, int, int]] = [
     (8, 11, 3),
     (9, 19, 3),
     (11, 89, 3),
+    (7, 100, 3),
     (7, 53, 4),
     (9, 21, 4),
+    (7, 101, 5),
     (1, 16, 5),
     (3, 47, 5),
     (4, 51, 5),
@@ -277,7 +288,9 @@ MERGED_CLASS_ABILITIES: List[Tuple[int, int, int]] = [
     (10, 31, 5),
     (10, 95, 5),
     (11, 90, 5),
+    (7, 102, 7),
     (1, 42, 6),
+    (7, 103, 9),
     (10, 96, 7),
     (3, 45, 10),
     (5, 17, 10),
@@ -287,16 +300,21 @@ MERGED_CLASS_ABILITIES: List[Tuple[int, int, int]] = [
     (9, 23, 10),
     (10, 23, 10),
     (10, 98, 10),
+    (7, 104, 11),
+    (7, 105, 12),
     (1, 43, 15),
     (3, 44, 15),
     (5, 25, 15),
+    (7, 106, 14),
     (8, 27, 15),
     (9, 18, 15),
     (9, 20, 15),
     (9, 22, 15),
     (10, 99, 15),
+    (7, 107, 16),
     (3, 43, 20),
     (3, 49, 20),
+    (7, 108, 18),
     (9, 24, 20)
 ]
 

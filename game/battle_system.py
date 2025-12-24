@@ -398,6 +398,48 @@ class BattleSystem(commands.Cog):
         out["target"] = raw.get("target", "self")
         return out
 
+    def _apply_status_stat_modifiers(self, stats: Dict[str, Any], effects: List[Dict[str, Any]]) -> Dict[str, Any]:
+        if not effects:
+            return dict(stats)
+
+        names = {(eff.get("effect_name") or "").lower() for eff in effects}
+        attack_mult = 1.0
+        defense_mult = 1.0
+        magic_mult = 1.0
+        magic_def_mult = 1.0
+        evasion_bonus = 0
+
+        if "attack up" in names:
+            attack_mult *= 1.3
+        if "berserk" in names:
+            attack_mult *= 1.5
+            defense_mult *= 0.8
+        if "defense up" in names:
+            defense_mult *= 1.3
+        if "defense down" in names:
+            defense_mult *= 0.75
+        if "magic up" in names:
+            magic_mult *= 1.3
+        if "mag.def up" in names:
+            magic_def_mult *= 1.3
+        if "mag.def down" in names:
+            magic_def_mult *= 0.75
+        if "evasion up" in names:
+            evasion_bonus += 30
+
+        modified = dict(stats)
+        if "attack_power" in modified:
+            modified["attack_power"] = max(int(modified["attack_power"] * attack_mult), 0)
+        if "defense" in modified:
+            modified["defense"] = max(int(modified["defense"] * defense_mult), 0)
+        if "magic_power" in modified:
+            modified["magic_power"] = max(int(modified["magic_power"] * magic_mult), 0)
+        if "magic_defense" in modified:
+            modified["magic_defense"] = max(int(modified["magic_defense"] * magic_def_mult), 0)
+        if "evasion" in modified:
+            modified["evasion"] = max(int(modified["evasion"]) + evasion_bonus, 0)
+        return modified
+
     def _get_initiative_state(self, session: Any) -> Dict[str, int]:
         if not session.battle_state:
             session.battle_state = {"player_effects": [], "enemy_effects": []}
@@ -1580,10 +1622,14 @@ class BattleSystem(commands.Cog):
         if not player:
             return await self._send_interaction_message(interaction, "❌ Could not retrieve your stats.")
         
+        player_effects = session.battle_state.get("player_effects", [])
+        enemy_effects = session.battle_state.get("enemy_effects", [])
+        player = self._apply_status_stat_modifiers(player, player_effects)
+        enemy_effective = self._apply_status_stat_modifiers(enemy, enemy_effects) if enemy else None
 
         # 3) resolve via AbilityEngine
         # if we’re outside battle, treat the player as the “target” for self‑buffs/heals
-        engine_target = enemy if enemy is not None else player
+        engine_target = enemy_effective if enemy_effective is not None else player
         result = self.ability.resolve(player, engine_target, ability_meta)
         target = ability_meta.get("target_type", "self")
         # ── out‑of‑battle self‑buff / HoT ──
@@ -1950,7 +1996,12 @@ class BattleSystem(commands.Cog):
             return await self._send_interaction_message(interaction, "❌ Could not retrieve your stats.")
 
         enemy = session.current_enemy if in_battle else None
-        engine_target = enemy if enemy is not None else player
+        player_effects = session.battle_state.get("player_effects", []) if session.battle_state else []
+        enemy_effects = session.battle_state.get("enemy_effects", []) if session.battle_state else []
+        enemy_effective = self._apply_status_stat_modifiers(enemy, enemy_effects) if enemy else None
+        if not enemy:
+            player = self._apply_status_stat_modifiers(player, player_effects)
+        engine_target = enemy_effective if enemy_effective is not None else player
         result = self.ability.resolve(eidolon_stats, engine_target, ability_meta)
 
         session.eidolon_ability_cooldowns.setdefault(pid, {})[ability_id] = ability_meta.get("cooldown", 0)
@@ -2174,7 +2225,12 @@ class BattleSystem(commands.Cog):
         if not player:
             return await self._send_interaction_message(interaction, "❌ Could not retrieve your stats.")
 
-        engine_target = enemy if enemy is not None else player
+        player_effects = session.battle_state.get("player_effects", [])
+        enemy_effects = session.battle_state.get("enemy_effects", [])
+        player = self._apply_status_stat_modifiers(player, player_effects)
+        enemy_effective = self._apply_status_stat_modifiers(enemy, enemy_effects) if enemy else None
+
+        engine_target = enemy_effective if enemy_effective is not None else player
         result = self.ability.resolve(player, engine_target, ability_meta)
         target = ability_meta.get("target_type", "self")
 
@@ -2351,13 +2407,18 @@ class BattleSystem(commands.Cog):
         player = cursor.fetchone()
         cursor.close(); conn.close()
 
+        player_effects = session.battle_state.get("player_effects", []) if session.battle_state else []
+        enemy_effects = session.battle_state.get("enemy_effects", []) if session.battle_state else []
+        player_effective = self._apply_status_stat_modifiers(player, player_effects)
+        enemy_effective = self._apply_status_stat_modifiers(enemy, enemy_effects)
+
         # 3) pick an ability (or None)
         ability = self.choose_enemy_ability(session, enemy)
 
         # 4) fallback to plain attack
         if not ability:
             dmg = self.ability.jrpg_damage(
-                enemy, player,
+                enemy_effective, player_effective,
                 base_damage=0,
                 scaling_stat="attack_power",
                 scaling_factor=1.0
@@ -2371,7 +2432,7 @@ class BattleSystem(commands.Cog):
             return await self._advance_battle_turn(interaction, session, enemy, acting_side="enemy")
 
         # 5) otherwise resolve the chosen ability
-        result = self.ability.resolve(enemy, player, ability)
+        result = self.ability.resolve(enemy_effective, player_effective, ability)
 
         # 6) apply any status effects first (e.g. enemy‐inflicted DoT/HoT)
         for raw_se in getattr(result, "status_effects", []):
