@@ -406,7 +406,7 @@ MERGED_ELEMENTS: List[Tuple] = [
 ]
 
 # --- element oppositions ------------------------------------------------------
-MERGED_ELEMENT_OPPOSITIONS: List[Tuple[str, str]] = [
+MERGED_ELEMENT_OPPOSITIONS: List[Tuple] = [
     ('Fire', 'Ice'),
     ('Ice', 'Fire'),
     ('Holy', 'Death'),
@@ -415,14 +415,6 @@ MERGED_ELEMENT_OPPOSITIONS: List[Tuple[str, str]] = [
     ('Lightning', 'Water'),
     ('Water', 'Lightning'),
     ('Earth', 'Air'),
-    (1, 1, 2, '2025-12-20 16:34:38'),
-    (2, 2, 1, '2025-12-20 16:34:38'),
-    (3, 3, 4, '2025-12-20 16:34:38'),
-    (4, 4, 3, '2025-12-20 16:34:38'),
-    (5, 5, 8, '2025-12-20 16:34:38'),
-    (6, 6, 7, '2025-12-20 16:34:38'),
-    (7, 7, 6, '2025-12-20 16:34:38'),
-    (8, 8, 5, '2025-12-20 16:34:38'),
 ]
 
 # --- difficulties -------------------------------------------------------------
@@ -1833,18 +1825,40 @@ def insert_elements(cur):
 
 def insert_element_oppositions(cur):
     logger.info("Checking element_oppositions seed data…")
-    cur.executemany(
-        """
-        INSERT IGNORE INTO element_oppositions
-          (element_id, opposing_element_id)
-        SELECT e.element_id, o.element_id
-        FROM elements e
-        JOIN elements o
-          ON e.element_name = %s
-         AND o.element_name = %s
-        """,
-        MERGED_ELEMENT_OPPOSITIONS
-    )
+    name_pairs = []
+    id_rows = []
+    for opposition in MERGED_ELEMENT_OPPOSITIONS:
+        if len(opposition) == 2:
+            name_pairs.append(opposition)
+        elif len(opposition) == 4:
+            id_rows.append(opposition)
+        else:
+            logger.warning(
+                "Skipping element_oppositions seed row with unexpected shape: %s",
+                opposition,
+            )
+    if name_pairs:
+        cur.executemany(
+            """
+            INSERT IGNORE INTO element_oppositions
+              (element_id, opposing_element_id)
+            SELECT e.element_id, o.element_id
+            FROM elements e
+            JOIN elements o
+              ON e.element_name = %s
+             AND o.element_name = %s
+            """,
+            name_pairs,
+        )
+    if id_rows:
+        cur.executemany(
+            """
+            INSERT IGNORE INTO element_oppositions
+              (opposition_id, element_id, opposing_element_id, created_at)
+            VALUES (%s, %s, %s, %s)
+            """,
+            id_rows,
+        )
     logger.info("Ensured element_oppositions.")
 
 def insert_abilities(cur):
