@@ -406,7 +406,7 @@ MERGED_ELEMENTS: List[Tuple] = [
 ]
 
 # --- element oppositions ------------------------------------------------------
-MERGED_ELEMENT_OPPOSITIONS: List[Tuple[str, str]] = [
+MERGED_ELEMENT_OPPOSITIONS: List[Tuple] = [
     ('Fire', 'Ice'),
     ('Ice', 'Fire'),
     ('Holy', 'Death'),
@@ -1825,18 +1825,40 @@ def insert_elements(cur):
 
 def insert_element_oppositions(cur):
     logger.info("Checking element_oppositions seed data…")
-    cur.executemany(
-        """
-        INSERT IGNORE INTO element_oppositions
-          (element_id, opposing_element_id)
-        SELECT e.element_id, o.element_id
-        FROM elements e
-        JOIN elements o
-          ON e.element_name = %s
-         AND o.element_name = %s
-        """,
-        MERGED_ELEMENT_OPPOSITIONS
-    )
+    name_pairs = []
+    id_rows = []
+    for opposition in MERGED_ELEMENT_OPPOSITIONS:
+        if len(opposition) == 2:
+            name_pairs.append(opposition)
+        elif len(opposition) == 4:
+            id_rows.append(opposition)
+        else:
+            logger.warning(
+                "Skipping element_oppositions seed row with unexpected shape: %s",
+                opposition,
+            )
+    if name_pairs:
+        cur.executemany(
+            """
+            INSERT IGNORE INTO element_oppositions
+              (element_id, opposing_element_id)
+            SELECT e.element_id, o.element_id
+            FROM elements e
+            JOIN elements o
+              ON e.element_name = %s
+             AND o.element_name = %s
+            """,
+            name_pairs,
+        )
+    if id_rows:
+        cur.executemany(
+            """
+            INSERT IGNORE INTO element_oppositions
+              (opposition_id, element_id, opposing_element_id, created_at)
+            VALUES (%s, %s, %s, %s)
+            """,
+            id_rows,
+        )
     logger.info("Ensured element_oppositions.")
 
 def insert_abilities(cur):
