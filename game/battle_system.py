@@ -1262,22 +1262,10 @@ class BattleSystem(commands.Cog):
             player_label += f" (Lv {player_level})"
         eb.add_field(name=player_label, value=stats_text, inline=False)
 
-        active_beast = getattr(session, "active_beasts", {}).get(pid)
+        pid = session.current_turn or player_id
+        active_beast = getattr(session, "active_beasts", {}).get(pid) if session else None
         if active_beast:
             beast_state = self._get_beast_state(session.session_id, pid, active_beast["beast_id"])
-            if beast_state:
-                beast_stats = self._calculate_beast_stats(beast_state, beast_state["level"])
-                beast_hp = beast_state.get("current_hp", beast_stats.get("hp", 0))
-                beast_mp = beast_state.get("current_mp", beast_stats.get("mp", 0))
-                beast_text = f"❤️ HP: {create_health_bar(beast_hp, beast_stats.get('max_hp', beast_hp))}"
-                if beast_stats.get("max_mp"):
-                    beast_text += f"\n💠 MP: {create_health_bar(beast_mp, beast_stats.get('max_mp', beast_mp))}"
-                beast_text += f"\n⚔️ ATK: {beast_stats.get('attack', 0)}\n🛡️ DEF: {beast_stats.get('defense', 0)}"
-                eb.add_field(name=f"Beast: {beast_state['name']} (Lv {beast_state['level']})", value=beast_text, inline=False)
-
-        active_beast = getattr(session, "active_beasts", {}).get(player_id) if session else None
-        if active_beast:
-            beast_state = self._get_beast_state(session.session_id, player_id, active_beast["beast_id"])
             if beast_state:
                 beast_stats = self._calculate_beast_stats(beast_state, beast_state["level"])
                 beast_hp = beast_state.get("current_hp", beast_stats.get("hp", 0))
@@ -1294,7 +1282,6 @@ class BattleSystem(commands.Cog):
         if enemy.get("image_url"):
             eb.set_image(url=enemy["image_url"] + f"?t={int(time.time())}")
 
-        pid    = session.current_turn
         trance = getattr(session, "trance_states", {}).get(pid)
         if trance:
             bar   = create_progress_bar(trance["remaining"], trance["max"], length=6)
