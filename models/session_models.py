@@ -790,6 +790,153 @@ class SessionPlayerModel:
             cur.close()
             conn.close()
 
+    @staticmethod
+    def get_unlocked_beasts(session_id: int, player_id: int) -> List[Dict[str, Any]]:
+        conn = Database().get_connection()
+        try:
+            cur = conn.cursor(dictionary=True)
+            cur.execute(
+                """
+                SELECT pb.beast_id, pb.level, pb.experience, pb.current_hp, pb.current_mp,
+                       bt.enemy_id, bt.name, bt.description, bt.base_hp, bt.base_mp,
+                       bt.base_attack, bt.base_magic, bt.base_defense, bt.base_magic_defense,
+                       bt.base_accuracy, bt.base_evasion, bt.base_speed, bt.image_url
+                  FROM player_beasts pb
+                  JOIN beast_templates bt ON bt.beast_id = pb.beast_id
+                 WHERE pb.session_id = %s
+                   AND pb.player_id = %s
+                 ORDER BY pb.beast_id
+                """,
+                (session_id, player_id),
+            )
+            return cur.fetchall()
+        except Exception:
+            logger.exception("Error fetching unlocked beasts")
+            return []
+        finally:
+            cur.close()
+            conn.close()
+
+    @staticmethod
+    def get_beast_template_by_enemy(enemy_id: int) -> Optional[Dict[str, Any]]:
+        conn = Database().get_connection()
+        try:
+            cur = conn.cursor(dictionary=True)
+            cur.execute("SELECT * FROM beast_templates WHERE enemy_id = %s", (enemy_id,))
+            return cur.fetchone()
+        except Exception:
+            logger.exception("Error fetching beast template")
+            return None
+        finally:
+            cur.close()
+            conn.close()
+
+    @staticmethod
+    def unlock_beast(
+        session_id: int,
+        player_id: int,
+        beast_id: int,
+        level: int = 1,
+    ) -> bool:
+        conn = Database().get_connection()
+        try:
+            cur = conn.cursor(dictionary=True)
+            cur.execute("SELECT base_hp, base_mp FROM beast_templates WHERE beast_id=%s", (beast_id,))
+            template = cur.fetchone()
+            if not template:
+                return False
+            cur.execute(
+                """
+                INSERT IGNORE INTO player_beasts
+                  (session_id, player_id, beast_id, level, experience, current_hp, current_mp)
+                VALUES (%s,%s,%s,%s,0,%s,%s)
+                """,
+                (session_id, player_id, beast_id, level, template["base_hp"], template["base_mp"]),
+            )
+            conn.commit()
+            return cur.rowcount > 0
+        except Exception:
+            logger.exception("Error unlocking beast")
+            return False
+        finally:
+            cur.close()
+            conn.close()
+
+    @staticmethod
+    def award_beast_experience(
+        session_id: int,
+        player_id: int,
+        beast_id: int,
+        xp_gain: int,
+    ) -> Optional[Dict[str, Any]]:
+        conn = Database().get_connection()
+        try:
+            cur = conn.cursor(dictionary=True)
+            cur.execute(
+                """
+                SELECT level, experience
+                  FROM player_beasts
+                 WHERE session_id=%s AND player_id=%s AND beast_id=%s
+                """,
+                (session_id, player_id, beast_id),
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+
+            total_xp = row["experience"] + xp_gain
+            new_level = row["level"]
+
+            while True:
+                cur.execute("SELECT required_exp FROM levels WHERE level=%s", (new_level + 1,))
+                nxt = cur.fetchone()
+                if not nxt or total_xp < nxt["required_exp"]:
+                    break
+                total_xp -= nxt["required_exp"]
+                new_level += 1
+
+            cur.execute(
+                """
+                UPDATE player_beasts
+                   SET experience=%s, level=%s
+                 WHERE session_id=%s AND player_id=%s AND beast_id=%s
+                """,
+                (total_xp, new_level, session_id, player_id, beast_id),
+            )
+            conn.commit()
+            return {"level": new_level, "experience": total_xp}
+        except Exception:
+            logger.exception("Error awarding beast experience")
+            return None
+        finally:
+            cur.close()
+            conn.close()
+
+    @staticmethod
+    def update_beast_hp_mp(
+        session_id: int,
+        player_id: int,
+        beast_id: int,
+        hp: int,
+        mp: int,
+    ) -> None:
+        conn = Database().get_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                UPDATE player_beasts
+                   SET current_hp=%s, current_mp=%s
+                 WHERE session_id=%s AND player_id=%s AND beast_id=%s
+                """,
+                (hp, mp, session_id, player_id, beast_id),
+            )
+            conn.commit()
+        except Exception:
+            logger.exception("Error updating beast HP/MP")
+        finally:
+            cur.close()
+            conn.close()
 
 
     # ── class selection ───────────────────────────────────────────────

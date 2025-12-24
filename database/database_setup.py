@@ -227,7 +227,14 @@ MERGED_ABILITIES: List[Tuple] = [
     (115, 'Speed Break', 'Hinder the target’s speed and reaction time.', '{"status_effects": [{"name": "Slow", "duration": 2, "chance": 0.6}], "status_only": true}', 1, '⏳🔽', 'enemy', None, None, None, None, '2025-09-20 00:00:00', 'attack_power'),
     (116, 'Full Break', 'Cripple the target’s offensive and defensive power.', '{"attack_power_down": 15, "defense_down": 15, "magic_power_down": 15, "magic_defense_down": 15}', 3, '💥🔽', 'enemy', None, None, None, None, '2025-09-20 00:00:00', 'attack_power'),
     (117, 'Cleave', 'A wide, heavy swing that cuts through the foe.', '{"base_damage": 120}', 1, '⚔️', 'enemy', None, None, None, None, '2025-09-20 00:00:00', 'attack_power'),
-    (118, 'Double Cut', 'Strike twice in rapid succession.', '{"multi_hit": {"hits": 2, "base_damage": 80, "scaling_stat": "attack_power", "scaling_factor": 1.0}}', 1, '⚔️', 'enemy', None, None, None, None, '2025-09-20 00:00:00', 'attack_power')
+    (118, 'Double Cut', 'Strike twice in rapid succession.', '{"multi_hit": {"hits": 2, "base_damage": 80, "scaling_stat": "attack_power", "scaling_factor": 1.0}}', 1, '⚔️', 'enemy', None, None, None, None, '2025-09-20 00:00:00', 'attack_power'),
+    (119, 'Tame', 'Attempt to tame a weakened beast to fight alongside you.', '{"tame": {"base_chance": 0.35, "hp_bonus": 0.3, "level_penalty": 0.05}}', 2, '🐾', 'enemy', None, None, None, None, '2025-09-25 00:00:00', 'attack_power'),
+    (120, 'Train', 'Train a companion beast, boosting its combat prowess.', '{"status_effects": [{"name": "Attack Up", "duration": 3}, {"name": "Defense Up", "duration": 3}], "status_only": true}', 3, '🎯', 'self', None, None, None, None, '2025-09-25 00:00:00', 'attack_power'),
+    (121, 'Beast Command', 'Issue a commanding order that disrupts a foe.', '{"base_damage": 70, "status_effects": [{"name": "Evasion Down", "duration": 2, "chance": 0.6}]}', 2, '🪢', 'enemy', None, None, None, None, '2025-09-25 00:00:00', 'attack_power'),
+    (122, 'Angelo Search', 'Angelo sniffs out supplies, increasing your chance to find loot.', '{"status_effects": [{"name": "Haste", "duration": 3}, {"name": "Evasion Up", "duration": 3}], "status_only": true}', 0, '🐕', 'self', None, None, None, None, '2025-09-25 00:00:00', 'attack_power'),
+    (123, 'Angelo Strike', 'Angelo darts forward with a piercing strike.', '{"base_damage": 160}', 1, '🐕⚔️', 'enemy', None, None, None, None, '2025-09-25 00:00:00', 'attack_power'),
+    (124, 'Angelo Recover', 'Angelo restores HP to the party leader.', '{"heal": 120}', 1, '🐕❤️', 'self', None, None, None, None, '2025-09-25 00:00:00', 'magic_power'),
+    (125, 'Angelo Shield', 'Angelo protects you with a defensive barrier.', '{"status_effects": [{"name": "Defense Up", "duration": 3}], "status_only": true}', 2, '🐕🛡️', 'self', None, None, None, None, '2025-09-25 00:00:00', 'defense')
 ]
 
 # --- eidolon abilities (with mp_cost) -----------------------------------------
@@ -306,6 +313,9 @@ MERGED_CLASS_ABILITIES: List[Tuple[int, int, int]] = [
     (10, 31, 5),
     (10, 95, 5),
     (11, 90, 5),
+    (13, 119, 1),
+    (13, 120, 2),
+    (13, 121, 4),
     (7, 102, 7),
     (1, 42, 6),
     (1, 115, 6),
@@ -352,6 +362,7 @@ MERGED_CLASSES: List[Tuple] = [
     (10, 'Geomancer', 'A sorcerer using environmental/elemental attacks.', 500, 15, 20, 80, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1372019632139145237/out.gif?ex=6825405b&is=6823eedb&hm=b0c22f7902cc76c50ce038d3c74dc16559a02e5e3d4262b5173592491bce32e6&', None, '2025-04-03 07:05:45', 5),
     (11, 'Gun Mage', 'A mage clad in blue armor who holds a magic-infused pistol.', 600, 30, 15, 60, 5, 1, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1372162446311165983/out.gif?ex=6825c55c&is=682473dc&hm=1e03aac8f24a02d80ee1f48c84a204d43207a75b55259d5bb8c461bb7af6f35e&', None, '2025-04-03 07:05:45', 5),
     (12, 'Summoner', 'A mage who bonds with Eidolons and calls them to battle.', 480, 15, 20, 160, 5, 1, 99, 1, 10, None, None, '2025-07-01 00:00:00', 5),
+    (13, 'Beast Master', 'A handler who tames and commands beasts in battle.', 540, 35, 15, 60, 5, 1, 99, 1, 10, None, None, '2025-09-25 00:00:00', 5),
 ]
 
 # --- temporary abilities ------------------------------------------------------
@@ -483,6 +494,15 @@ MERGED_ENEMIES: List[Tuple] = [
     (101, 'Ifrit', 'eidolon', 'A blazing Eidolon wreathed in infernal flames.', 1200, 1200, 25, 18, 30, 20, 99, 5, 'Summoner', None, None, 0, 500, 800, None, 1, None, '2025-07-01 00:00:00', 6),
     (102, 'Shiva', 'eidolon', 'A frigid Eidolon whose breath freezes the air.', 1300, 1300, 22, 18, 32, 22, 99, 6, 'Summoner', None, None, 0, 600, 900, None, 1, None, '2025-07-01 00:00:00', 6),
     (103, 'Ramuh', 'eidolon', 'A stormbound Eidolon crackling with lightning.', 1400, 1400, 24, 20, 34, 24, 99, 6, 'Summoner', None, None, 0, 700, 1000, None, 1, None, '2025-07-01 00:00:00', 6)
+]
+
+# --- beast templates ----------------------------------------------------------
+MERGED_BEAST_TEMPLATES: List[Tuple] = [
+    (1, 1, 'Behemoth', 'large, purple, canine-esque creature...', 100, 0, 15, 10, 10, 5, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1362833225860382731/behemoth.png?ex=680db819&is=680c6699&hm=f09b8b78e76629b607f0aec017f5aef75c003a1965508701c7b7de48b5279dd7&', '2025-09-25 00:00:00'),
+    (2, 3, 'Drake', 'An ancient creature with scales and fangs, said to be extinct for over 1,000 years.', 200, 0, 15, 10, 10, 10, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1375114639914045480/drake.png?ex=683082ce&is=682f314e&hm=92fdeabf72b3026f912674b0faa2f98bf993aea384119831b63492d607c84d3e&', '2025-09-25 00:00:00'),
+    (3, 11, 'Chimera', "A beast taking on three forms, each having it's own abilities.", 200, 0, 20, 13, 11, 10, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1362835172298592508/chimera.png?ex=6803d6a9&is=68028529&hm=c207c28cc8df7b77ee82552ce183d27c2161576dcaff80cf08cdae7a98e95df6&', '2025-09-25 00:00:00'),
+    (4, 15, 'Marlboro', 'A smelly creature with large sharp teeth, long vine-like tentacles, and multiple eyes.', 175, 0, 17, 12, 12, 5, 99, 1, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1362835177486680437/marlboro.png?ex=6803d6aa&is=6802852a&hm=1c750b1405bda87627ad13f8d16b3f717c1f0298afdac7a3d2387bac69724363&', '2025-09-25 00:00:00'),
+    (5, 19, 'Cactuar', "An evasive cactus species that is known to attack and run, watch our for it's Needles!", 200, 0, 15, 10, 12, 7, 99, 2, 10, 'https://cdn.discordapp.com/attachments/1362832151485354065/1375114595626389514/Cactuar.png?ex=683082c3&is=682f3143&hm=6dc61cc626160c8ed9d1619142eb319365330b98641bd2e9db5359c4fef1c373&', '2025-09-25 00:00:00')
 ]
 
 # --- enemy ↔ ability links ----------------------------------------------------
@@ -656,7 +676,9 @@ MERGED_STATUS_EFFECTS: List[Tuple] = [
     (18, 'Slow', 'debuff', '⏳🔽', '2025-05-25 02:36:07', 0, 0),
     (19, 'Confuse', 'debuff', '🌀', '2025-07-05 00:00:00', 0, 0),
     (20, 'Frog', 'debuff', '🐸', '2025-07-05 00:00:00', 0, 0),
-    (21, 'Reflect', 'buff', '🔁🛡️', '2025-07-05 00:00:00', 0, 0)
+    (21, 'Reflect', 'buff', '🔁🛡️', '2025-07-05 00:00:00', 0, 0),
+    (22, 'Evasion Down', 'debuff', '🎯🔽', '2025-09-25 00:00:00', 0, 0),
+    (23, 'Tamed', 'debuff', '🐾', '2025-09-25 00:00:00', 0, 0)
 ]
 
 
@@ -715,7 +737,8 @@ MERGED_CLASS_TRANCES: List[Tuple] = [
     (8, 8, 'Dbl White', 15),
     (9, 9, 'Dbl Black', 15),
     (10, 10, 'Enviro', 15),
-    (11, 11, 'Eat', 15)
+    (11, 11, 'Eat', 15),
+    (12, 13, 'Angelo', 15)
 ]
 
 # --- trance abilities ---------------------------------------------------------
@@ -758,7 +781,11 @@ MERGED_TRANCE_ABILITIES: List[Tuple[int, int]] = [
     (10, 71),
     (10, 72),
     (10, 73),
-    (11, 79)
+    (11, 79),
+    (12, 122),
+    (12, 123),
+    (12, 124),
+    (12, 125)
 ]
 
 # --- crystal templates --------------------------------------------------------
@@ -1453,6 +1480,44 @@ TABLES = {
             FOREIGN KEY (ability_id) REFERENCES abilities(ability_id) ON DELETE CASCADE
         )
     ''',
+    # ---------- beast_templates ----------
+    'beast_templates': '''
+        CREATE TABLE IF NOT EXISTS beast_templates (
+            beast_id INT AUTO_INCREMENT PRIMARY KEY,
+            enemy_id INT NOT NULL,
+            name VARCHAR(80) NOT NULL,
+            description TEXT,
+            base_hp INT NOT NULL,
+            base_mp INT NOT NULL DEFAULT 0,
+            base_attack INT NOT NULL,
+            base_magic INT NOT NULL,
+            base_defense INT NOT NULL,
+            base_magic_defense INT NOT NULL,
+            base_accuracy INT NOT NULL,
+            base_evasion INT NOT NULL,
+            base_speed INT NOT NULL DEFAULT 10,
+            image_url VARCHAR(255),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_beast_enemy (enemy_id),
+            FOREIGN KEY (enemy_id) REFERENCES enemies(enemy_id) ON DELETE CASCADE
+        )
+    ''',
+    # ---------- player_beasts ----------
+    'player_beasts': '''
+        CREATE TABLE IF NOT EXISTS player_beasts (
+            session_id INT NOT NULL,
+            player_id BIGINT NOT NULL,
+            beast_id INT NOT NULL,
+            level INT NOT NULL DEFAULT 1,
+            experience INT NOT NULL DEFAULT 0,
+            current_hp INT NOT NULL,
+            current_mp INT NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (session_id, player_id, beast_id),
+            FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE,
+            FOREIGN KEY (beast_id) REFERENCES beast_templates(beast_id) ON DELETE CASCADE
+        )
+    ''',
     # ---------- status_effects ----------
     'status_effects': '''
         CREATE TABLE IF NOT EXISTS status_effects (
@@ -1568,9 +1633,11 @@ TABLE_ORDER = [
     'session_vendor_instances',
     'session_vendor_items',
     'enemies',
+    'beast_templates',
     'eidolons',
     'eidolon_abilities',
     'player_eidolons',
+    'player_beasts',
     'room_templates',
     'crystal_templates',
     'rooms',
@@ -2081,6 +2148,20 @@ def insert_enemies(cur):
     )
     logger.info("Ensured enemies.")
 
+def insert_beast_templates(cur):
+    logger.info("Checking beast_templates seed data…")
+    cur.executemany(
+        """
+        INSERT IGNORE INTO beast_templates
+          (beast_id, enemy_id, name, description, base_hp, base_mp, base_attack,
+           base_magic, base_defense, base_magic_defense, base_accuracy, base_evasion,
+           base_speed, image_url, created_at)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """,
+        MERGED_BEAST_TEMPLATES
+    )
+    logger.info("Ensured beast_templates.")
+
 def insert_enemy_abilities(cur):
     logger.info("Checking enemy_abilities links…")
     cur.executemany(
@@ -2325,6 +2406,8 @@ def main() -> None:
                     insert_key_items(cur)
                 if "enemies" in tables_to_seed:
                     insert_enemies(cur)
+                if "beast_templates" in tables_to_seed:
+                    insert_beast_templates(cur)
                 if "enemy_abilities" in tables_to_seed:
                     insert_enemy_abilities(cur)
                 if "eidolons" in tables_to_seed:

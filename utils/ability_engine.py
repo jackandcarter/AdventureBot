@@ -585,7 +585,7 @@ class AbilityEngine:
             # status-only abilities
             if result is None and effect_data.get("status_only"):
                 logs.append(f"{name} applies lingering effects.")
-                result = AbilityResult(type="damage", amount=0, logs=logs)
+                result = AbilityResult(type="buff", amount=0, logs=logs)
 
         # 5) Fallback physical damage
         if result is None:
