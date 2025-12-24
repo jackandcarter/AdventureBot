@@ -2261,10 +2261,10 @@ def insert_enemies(cur):
         """
         INSERT IGNORE INTO enemies
           (enemy_id, enemy_name, role, description, hp, max_hp, attack_power, defense,
-           magic_power, magic_defense, accuracy, evasion, difficulty,
-           abilities, image_url, spawn_chance, gil_drop, xp_reward,
-           loot_item_id, loot_quantity, creator_id, created_at, atb_max)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+           magic_power, magic_defense, accuracy, evasion, difficulty, abilities,
+           image_url, spawn_chance, gil_drop, xp_reward, loot_item_id, loot_quantity,
+           creator_id, created_at, atb_max, speed, mp, max_mp)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """,
         MERGED_ENEMIES
     )
