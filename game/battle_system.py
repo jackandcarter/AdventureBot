@@ -1275,6 +1275,7 @@ class BattleSystem(commands.Cog):
         eb.add_field(name=player_label, value=stats_text, inline=False)
 
         pid = session.current_turn or player_id
+        pid = player_id
         active_beast = getattr(session, "active_beasts", {}).get(pid) if session else None
         if active_beast:
             beast_state = self._get_beast_state(session.session_id, pid, active_beast["beast_id"])
@@ -1399,6 +1400,7 @@ class BattleSystem(commands.Cog):
             player_label += f" (Lv {player_level})"
         eb.add_field(name=player_label, value=stats_text, inline=False)
 
+        pid = player_id
         active_beast = getattr(session, "active_beasts", {}).get(pid) if session else None
         if active_beast:
             beast_state = self._get_beast_state(session.session_id, pid, active_beast["beast_id"])
