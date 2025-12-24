@@ -1863,15 +1863,38 @@ def insert_element_oppositions(cur):
 
 def insert_abilities(cur):
     logger.info("Checking abilities seed data…")
+    normalized_abilities = []
+    for ability in MERGED_ABILITIES:
+        if len(ability) == 13:
+            ability = (
+                ability[0],
+                ability[1],
+                ability[2],
+                ability[3],
+                ability[4],
+                0,
+                ability[5],
+                ability[6],
+                ability[7],
+                ability[8],
+                ability[9],
+                ability[10],
+                ability[11],
+                ability[12],
+            )
+        if len(ability) != 14:
+            logger.warning("Skipping abilities seed row with unexpected shape: %s", ability)
+            continue
+        normalized_abilities.append(ability)
     cur.executemany(
         """
         INSERT IGNORE INTO abilities
-          (ability_id, ability_name, description, effect, cooldown, icon_url,
+          (ability_id, ability_name, description, effect, cooldown, mp_cost, icon_url,
            target_type, special_effect, element_id, status_effect_id,
            status_duration, created_at, scaling_stat)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """,
-        MERGED_ABILITIES
+        normalized_abilities
     )
     cur.executemany(
         """
