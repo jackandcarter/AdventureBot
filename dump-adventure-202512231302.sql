@@ -412,7 +412,7 @@ CREATE TABLE `class_trances` (
   PRIMARY KEY (`trance_id`),
   KEY `class_id` (`class_id`),
   CONSTRAINT `class_trances_ibfk_1` FOREIGN KEY (`class_id`) REFERENCES `classes` (`class_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -433,7 +433,8 @@ INSERT INTO `class_trances` VALUES
 (9,9,'Dbl Black',15),
 (10,10,'Enviro',15),
 (11,11,'Eat',15),
-(12,12,'Esper',15);
+(12,12,'Esper',15),
+(13,13,'Angelo Trance',15);
 /*!40000 ALTER TABLE `class_trances` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -4016,7 +4017,11 @@ INSERT INTO `trance_abilities` VALUES
 (11,79),
 (12,204),
 (12,205),
-(12,206);
+(12,206),
+(13,122),
+(13,123),
+(13,124),
+(13,125);
 /*!40000 ALTER TABLE `trance_abilities` ENABLE KEYS */;
 UNLOCK TABLES;
 
