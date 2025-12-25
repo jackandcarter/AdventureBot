@@ -131,6 +131,14 @@ class InventoryShop(commands.Cog):
     def _item_has_healing_effect(self, effect: Dict[str, Any]) -> bool:
         return bool(effect.get("heal") or effect.get("restore_mp"))
 
+    def _get_revive_beast_targets(
+        self,
+        session_id: int,
+        player_id: int,
+    ) -> List[Dict[str, Any]]:
+        beasts = SessionPlayerModel.get_unlocked_beasts(session_id, player_id)
+        return [beast for beast in beasts if beast.get("current_hp", 0) <= 0]
+
     # --------------------------------------------------------------------- #
     # Interaction router
     # --------------------------------------------------------------------- #
@@ -424,10 +432,24 @@ class InventoryShop(commands.Cog):
             return  # not your turn during battle
 
         full_inv = self.get_full_inventory(interaction.user.id, session.session_id)
-        usable_inv = [
-            it for it in filter_inventory(full_inv)
-            if not is_revive_key(it)
-        ]
+        in_battle = bool(session.current_enemy)
+        revive_targets = (
+            self._get_revive_beast_targets(session.session_id, interaction.user.id)
+            if in_battle
+            else []
+        )
+        has_eidolon_revive_target = (
+            in_battle
+            and getattr(session, "summon_used", {}).get(interaction.user.id)
+            and not getattr(session, "active_summons", {}).get(interaction.user.id)
+        )
+        usable_inv = []
+        for item in filter_inventory(full_inv):
+            if is_revive_key(item):
+                if in_battle and (revive_targets or has_eidolon_revive_target):
+                    usable_inv.append(item)
+                continue
+            usable_inv.append(item)
 
         with self.db.get_connection() as conn, conn.cursor(dictionary=True) as cur:
             cur.execute(
@@ -451,17 +473,23 @@ class InventoryShop(commands.Cog):
         self,
         interaction: Interaction,
         item_row: Dict[str, Any],
-        beast_name: str,
+        targets: List[Dict[str, str]],
     ) -> None:
         emb_mgr = self.bot.get_cog("EmbedManager")
         if not emb_mgr:
             return await interaction.followup.send("❌ EmbedManager unavailable.", ephemeral=True)
 
-        buttons = [
-            ("Use on You", discord.ButtonStyle.primary, f"use_item_target_{item_row['item_id']}_player", 0),
-            (f"Use on {beast_name}", discord.ButtonStyle.primary, f"use_item_target_{item_row['item_id']}_beast", 0),
-            ("Back", discord.ButtonStyle.secondary, "back_from_use", 1),
-        ]
+        buttons = []
+        for target in targets:
+            buttons.append(
+                (
+                    target["label"],
+                    discord.ButtonStyle.primary,
+                    f"use_item_target_{item_row['item_id']}_{target['id']}",
+                    0,
+                )
+            )
+        buttons.append(("Back", discord.ButtonStyle.secondary, "back_from_use", 1))
         await emb_mgr.send_or_update_embed(
             interaction,
             "🎒 Choose Item Target",
@@ -508,40 +536,68 @@ class InventoryShop(commands.Cog):
                 return
 
             effect = json.loads(item_row["effect"]) if item_row.get("effect") else {}
-            if (
-                prompt_for_target
-                and session.current_enemy
-                and self._item_has_healing_effect(effect)
-                and target == "player"
-                and getattr(session, "active_beasts", None)
-                and session.active_beasts.get(interaction.user.id)
-            ):
-                return await self.display_use_item_target_menu(
-                    interaction,
-                    item_row,
-                    session.active_beasts[interaction.user.id]["name"],
-                )
+            if prompt_for_target and session.current_enemy and target == "player":
+                targets = [{"label": "Use on You", "id": "player"}]
+                has_heal = self._item_has_healing_effect(effect)
+                is_revive = bool(effect.get("revive"))
+                active_beast = getattr(session, "active_beasts", {}).get(interaction.user.id)
+                if has_heal and active_beast:
+                    targets.append(
+                        {
+                            "label": f"Use on {active_beast['name']}",
+                            "id": f"beast_{active_beast['beast_id']}",
+                        }
+                    )
+                if is_revive:
+                    for beast in self._get_revive_beast_targets(session.session_id, interaction.user.id):
+                        targets.append(
+                            {
+                                "label": f"Revive {beast['name']}",
+                                "id": f"beast_{beast['beast_id']}",
+                            }
+                        )
+                    if (
+                        getattr(session, "summon_used", {}).get(interaction.user.id)
+                        and not getattr(session, "active_summons", {}).get(interaction.user.id)
+                    ):
+                        targets.append({"label": "Revive Eidolon", "id": "eidolon"})
+                if len(targets) > 1:
+                    return await self.display_use_item_target_menu(interaction, item_row, targets)
             heal = effect.get("heal", 0)
             restore_mp = effect.get("restore_mp", 0)
             is_trance = effect.get("trance", False)
+            is_revive = bool(effect.get("revive"))
             txt = f"You used **{item_row['item_name']}**."
-            if target == "beast":
+            if target.startswith("beast"):
                 bs = self.bot.get_cog("BattleSystem")
-                active = getattr(session, "active_beasts", {}).get(interaction.user.id)
-                if not active or not bs:
+                beast_id = None
+                if "_" in target:
+                    _, beast_id_str = target.split("_", 1)
+                    if beast_id_str.isdigit():
+                        beast_id = int(beast_id_str)
+                if beast_id is None:
+                    active = getattr(session, "active_beasts", {}).get(interaction.user.id)
+                    beast_id = active["beast_id"] if active else None
+                if not beast_id or not bs:
                     await interaction.followup.send("❌ No active beast to heal.", ephemeral=True)
                     return
-                beast_state = bs._get_beast_state(session.session_id, interaction.user.id, active["beast_id"])
+                beast_state = bs._get_beast_state(session.session_id, interaction.user.id, beast_id)
                 if not beast_state:
                     await interaction.followup.send("❌ Beast data missing.", ephemeral=True)
                     return
-                if beast_state.get("current_hp", 0) <= 0:
+                beast_stats = bs._calculate_beast_stats(beast_state, beast_state["level"])
+                if beast_state.get("current_hp", 0) <= 0 and not is_revive:
                     await interaction.followup.send("❌ That beast is KO'd and cannot be healed.", ephemeral=True)
                     return
-                beast_stats = bs._calculate_beast_stats(beast_state, beast_state["level"])
                 if heal:
                     max_hp = beast_stats.get("max_hp", beast_state["current_hp"])
-                    new_hp = min(beast_state["current_hp"] + heal, max_hp)
+                    if beast_state.get("current_hp", 0) <= 0 and is_revive:
+                        new_hp = min(heal, max_hp)
+                    else:
+                        new_hp = min(beast_state["current_hp"] + heal, max_hp)
+                elif is_revive and beast_state.get("current_hp", 0) <= 0:
+                    max_hp = beast_stats.get("max_hp", beast_state["current_hp"])
+                    new_hp = max_hp
                 else:
                     new_hp = beast_state["current_hp"]
                 if restore_mp and beast_stats.get("max_mp"):
@@ -558,10 +614,29 @@ class InventoryShop(commands.Cog):
                     new_hp,
                     new_mp,
                 )
-                if heal:
+                if is_revive and beast_state.get("current_hp", 0) <= 0:
+                    txt += f" Revived **{beast_state['name']}** with **{new_hp}** HP!"
+                elif heal:
                     txt += f" Healed **{beast_state['name']}** for **{heal}** HP!"
                 if restore_mp and beast_stats.get("max_mp"):
                     txt += f" Restored **{restore_mp}** MP to **{beast_state['name']}**!"
+            elif target == "eidolon":
+                if not is_revive:
+                    await interaction.followup.send("❌ That item cannot target an Eidolon.", ephemeral=True)
+                    return
+                if not session.current_enemy:
+                    await interaction.followup.send("❌ Eidolons can only be revived in battle.", ephemeral=True)
+                    return
+                session.summon_used = getattr(session, "summon_used", {}) or {}
+                session.active_summons = getattr(session, "active_summons", {}) or {}
+                if not session.summon_used.get(interaction.user.id):
+                    await interaction.followup.send("❌ No fallen Eidolon to revive.", ephemeral=True)
+                    return
+                if session.active_summons.get(interaction.user.id):
+                    await interaction.followup.send("❌ Your Eidolon is already active.", ephemeral=True)
+                    return
+                session.summon_used[interaction.user.id] = False
+                txt += " Your Eidolon regains its strength and can be summoned again!"
             else:
                 if heal:
                     new_hp = min(player["hp"] + heal, player["max_hp"])

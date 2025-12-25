@@ -463,6 +463,11 @@ class AbilityEngine:
                 logs.append(f"{name} deals {dmg} damage.")
                 result = AbilityResult(type="damage", amount=dmg, logs=logs)
 
+            if result is None and "heal" in effect_data:
+                amt = int(effect_data.get("heal", 0))
+                logs.append(f"{name} restores {amt} HP.")
+                result = AbilityResult(type="heal", amount=amt, logs=logs)
+
             if result is None and "heal_current_pct" in effect_data:
                 pct = effect_data["heal_current_pct"]
                 amt = int(target["hp"] * pct)

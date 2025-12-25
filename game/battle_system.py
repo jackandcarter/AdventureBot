@@ -528,7 +528,10 @@ class BattleSystem(commands.Cog):
         if ability_meta.get("can_heal"):
             return True
         effect_data = self._get_ability_effect_data(ability_meta)
-        return any(key in effect_data for key in ("heal_current_pct", "healing_over_time"))
+        return any(
+            key in effect_data
+            for key in ("heal", "heal_current_pct", "healing_over_time", "revive")
+        )
 
     def _normalize_se(self, raw: Dict[str,Any]) -> Dict[str,Any]:
         """
@@ -1723,6 +1726,11 @@ class BattleSystem(commands.Cog):
         active = getattr(session, "active_beasts", {}).get(pid)
         if not active:
             return await interaction.response.send_message("❌ No active beast to command.", ephemeral=True)
+        beast_state = self._get_beast_state(session.session_id, pid, active["beast_id"])
+        if not beast_state:
+            return await interaction.response.send_message("❌ Beast data missing.", ephemeral=True)
+        if beast_state.get("current_hp", 0) <= 0:
+            return await interaction.response.send_message("❌ That beast is KO'd and cannot act.", ephemeral=True)
         buttons = [
             ("Attack", discord.ButtonStyle.danger, "combat_beast_attack", 0),
             ("Skill", discord.ButtonStyle.primary, "combat_beast_skill_menu", 0),
@@ -1814,6 +1822,11 @@ class BattleSystem(commands.Cog):
         active = getattr(session, "active_beasts", {}).get(pid)
         if not active:
             return await interaction.response.send_message("❌ No active beast to command.", ephemeral=True)
+        beast_state = self._get_beast_state(session.session_id, pid, active["beast_id"])
+        if not beast_state:
+            return await interaction.response.send_message("❌ Beast data missing.", ephemeral=True)
+        if beast_state.get("current_hp", 0) <= 0:
+            return await interaction.response.send_message("❌ That beast is KO'd and cannot act.", ephemeral=True)
 
         conn = self.db_connect()
         cur = conn.cursor(dictionary=True)
@@ -1862,6 +1875,8 @@ class BattleSystem(commands.Cog):
         beast_state = self._get_beast_state(session.session_id, pid, active["beast_id"])
         if not beast_state:
             return await interaction.response.send_message("❌ Beast data missing.", ephemeral=True)
+        if beast_state.get("current_hp", 0) <= 0:
+            return await interaction.response.send_message("❌ That beast is KO'd and cannot act.", ephemeral=True)
         enemy = session.current_enemy
         level = beast_state["level"]
         beast_stats = self._calculate_beast_stats(beast_state, level)
@@ -1892,6 +1907,8 @@ class BattleSystem(commands.Cog):
         beast_state = self._get_beast_state(session.session_id, pid, active["beast_id"])
         if not beast_state:
             return await interaction.response.send_message("❌ Beast data missing.", ephemeral=True)
+        if beast_state.get("current_hp", 0) <= 0:
+            return await interaction.response.send_message("❌ That beast is KO'd and cannot act.", ephemeral=True)
 
         session.beast_ability_cooldowns = getattr(session, "beast_ability_cooldowns", {}) or {}
         current_cd = session.beast_ability_cooldowns.get(pid, {}).get(ability_id, 0)
@@ -2220,6 +2237,44 @@ class BattleSystem(commands.Cog):
         engine_target = enemy_effective if enemy_effective is not None else player
         result = self.ability.resolve(player, engine_target, ability_meta)
         target = ability_meta.get("target_type", "self")
+
+        if in_battle and effect_data.get("revive") and target in ("self", "ally"):
+            revived = False
+            active_beast = getattr(session, "active_beasts", {}).get(pid)
+            if active_beast:
+                beast_state = self._get_beast_state(session.session_id, pid, active_beast["beast_id"])
+                if beast_state and beast_state.get("current_hp", 0) <= 0:
+                    beast_stats = self._calculate_beast_stats(beast_state, beast_state["level"])
+                    max_hp = beast_stats.get("max_hp", beast_state["current_hp"])
+                    revive_amount = result.amount or effect_data.get("heal", 0) or max_hp
+                    new_hp = min(revive_amount, max_hp)
+                    SessionPlayerModel.update_beast_hp_mp(
+                        session.session_id,
+                        pid,
+                        beast_state["beast_id"],
+                        new_hp,
+                        beast_state.get("current_mp"),
+                    )
+                    session.game_log.append(
+                        f"You revive {beast_state['name']} with {new_hp} HP!"
+                    )
+                    revived = True
+
+            if (
+                not revived
+                and getattr(session, "summon_used", {}).get(pid)
+                and not getattr(session, "active_summons", {}).get(pid)
+            ):
+                session.summon_used[pid] = False
+                session.game_log.append("Your Eidolon is revived and can be summoned again!")
+                revived = True
+
+            if revived:
+                session.ability_cooldowns.setdefault(pid, {})[ability_id] = ability_meta.get("cooldown", 0)
+                self.reduce_player_cooldowns(session, pid)
+                await self.update_battle_embed(interaction, pid, enemy)
+                await self._advance_battle_turn(interaction, session, enemy, acting_side="player")
+                return
         # ── out‑of‑battle self‑buff / HoT ──
         if not in_battle and target == "self":
             gm = self.bot.get_cog("GameMaster")
@@ -2982,7 +3037,6 @@ class BattleSystem(commands.Cog):
         if active_beast:
             beast_state = self._get_beast_state(session.session_id, pid, active_beast["beast_id"])
             if beast_state and beast_state.get("current_hp", 0) <= 0:
-                session.active_beasts.pop(pid, None)
                 beast_state = None
             if beast_state:
                 beast_stats = self._calculate_beast_stats(beast_state, beast_state["level"])
@@ -3014,7 +3068,6 @@ class BattleSystem(commands.Cog):
                 )
                 if new_hp <= 0:
                     session.game_log.append(f"{beast_state['name']} has been defeated!")
-                    session.active_beasts.pop(pid, None)
             else:
                 session.game_log.append(f"{enemy['enemy_name']} attacks for {dmg} damage!")
                 new_hp = max(player["hp"] - dmg, 0)
@@ -3076,7 +3129,6 @@ class BattleSystem(commands.Cog):
                 )
                 if new_hp <= 0:
                     session.game_log.append(f"{beast_state['name']} has been defeated!")
-                    session.active_beasts.pop(pid, None)
             else:
                 # apply the DoT on the **player** side
                 session.battle_state["player_effects"].append(dot)
@@ -3154,7 +3206,6 @@ class BattleSystem(commands.Cog):
                 )
                 if new_hp <= 0:
                     session.game_log.append(f"{beast_state['name']} has been defeated!")
-                    session.active_beasts.pop(pid, None)
             else:
                 new_hp = max(player["hp"] - dmg, 0)
                 self._update_player_hp(pid, session.session_id, new_hp)
