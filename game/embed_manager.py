@@ -620,7 +620,11 @@ class EmbedManager(commands.Cog):
         view = View(timeout=None)
         for item in inventory_items:
             tgt = item.get("target_type", "any")
-            usable = (tgt in ["self", "enemy", "any"]) if allowed_context == "battle" else (tgt in ["self", "ally", "any"])
+            usable = (
+                tgt in ["self", "enemy", "any", "ally"]
+                if allowed_context == "battle"
+                else tgt in ["self", "ally", "any"]
+            )
             note = "" if usable else " (Not usable here)"
             inv_text += f"**{item['item_name']}**: {item.get('description','')} {note}\nQuantity: {item.get('quantity',0)}\n\n"
             btn = Button(
