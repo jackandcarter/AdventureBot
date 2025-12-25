@@ -441,6 +441,52 @@ class BattleSystem(commands.Cog):
         stats["max_mp"] = stats.get("mp", beast.get("base_mp", 0))
         return stats
 
+    def _heal_all_beasts(
+        self,
+        session_id: int,
+        player_id: int,
+        heal_pct: float,
+    ) -> List[Dict[str, Any]]:
+        heal_pct = max(float(heal_pct), 0.0)
+        beasts = SessionPlayerModel.get_unlocked_beasts(session_id, player_id)
+        results: List[Dict[str, Any]] = []
+        if not beasts or heal_pct <= 0:
+            return results
+
+        for beast in beasts:
+            level = beast.get("level", 1)
+            stats = self._calculate_beast_stats(beast, level)
+            max_hp = stats.get("max_hp", beast.get("current_hp", 0)) or 0
+            if max_hp <= 0:
+                continue
+            current_hp = beast.get("current_hp") or 0
+            if heal_pct >= 1.0:
+                new_hp = max_hp
+            else:
+                heal_amount = int(max_hp * heal_pct)
+                if heal_amount <= 0 and current_hp <= 0:
+                    heal_amount = 1
+                new_hp = min(current_hp + heal_amount, max_hp)
+
+            if new_hp != current_hp:
+                SessionPlayerModel.update_beast_hp_mp(
+                    session_id,
+                    player_id,
+                    beast["beast_id"],
+                    new_hp,
+                    beast.get("current_mp"),
+                )
+            results.append(
+                {
+                    "beast_id": beast["beast_id"],
+                    "name": beast.get("name", "Beast"),
+                    "healed": max(new_hp - current_hp, 0),
+                    "new_hp": new_hp,
+                    "max_hp": max_hp,
+                }
+            )
+        return results
+
     def _get_beast_state(
         self,
         session_id: int,
@@ -2205,6 +2251,44 @@ class BattleSystem(commands.Cog):
                 return await self.handle_enemy_defeat(interaction, session, enemy)
             await self.update_battle_embed(interaction, pid, enemy)
             return await self._advance_battle_turn(interaction, session, enemy, acting_side="player")
+
+        heal_all_beasts_pct = effect_data.get("heal_all_beasts_pct")
+        if heal_all_beasts_pct is not None:
+            beasts = SessionPlayerModel.get_unlocked_beasts(session.session_id, pid)
+            if not beasts:
+                return await self._send_interaction_message(
+                    interaction,
+                    "❌ You have not tamed any beasts yet.",
+                )
+            mp_cost = ability_meta.get("mp_cost", 0) or 0
+            if mp_cost:
+                mp_state = self._get_player_mp(session.session_id, session.current_turn)
+                if not mp_state or mp_state.get("mp", 0) < mp_cost:
+                    return await self._send_interaction_message(interaction, "❌ Not enough MP.")
+                new_mp = max(mp_state.get("mp", 0) - mp_cost, 0)
+                self._set_player_mp(session.session_id, session.current_turn, new_mp)
+            heal_pct = max(float(heal_all_beasts_pct), 0.0)
+            self._heal_all_beasts(session.session_id, pid, heal_pct)
+            pct_label = int(min(heal_pct, 1.0) * 100)
+            message = f"🐾 You restore your tamed beasts for {pct_label}% of their max HP!"
+            if heal_pct >= 1.0:
+                message = "🐾 You fully restore your tamed beasts!"
+
+            if in_battle:
+                session.game_log.append(message)
+                session.ability_cooldowns.setdefault(pid, {})[ability_id] = ability_meta.get("cooldown", 0)
+                self.reduce_player_cooldowns(session, pid)
+                await self.update_battle_embed(interaction, pid, enemy)
+                await self._advance_battle_turn(interaction, session, enemy, acting_side="player")
+                return
+
+            gm = self.bot.get_cog("GameMaster")
+            if gm:
+                gm.append_game_log(session.session_id, message)
+            sm = self.bot.get_cog("SessionManager")
+            if sm:
+                return await sm.refresh_current_state(interaction)
+            return
 
         mp_cost = ability_meta.get("mp_cost", 0) or 0
         if mp_cost:

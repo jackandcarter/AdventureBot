@@ -241,6 +241,7 @@ MERGED_ABILITIES: List[Tuple] = [
     (204, 'Inferno', 'Engulf the enemy in infernal flames.', '{"base_damage": 275}', 0, 50, None, 'enemy', None, 1, 6, 10, '2025-12-20 23:44:43', 'magic_power'),
     (205, 'Cold Snap', 'Freeze Enemies while causing damage.', '{"base_damage": 275}', 0, 50, None, 'enemy', None, 2, 7, 10, '2025-12-20 23:44:43', 'magic_power'),
     (206, 'Storm Tempest', 'Stun your foe with a devistating storm.', '{"base_damage": 275}', 0, 50, None, 'enemy', None, 6, 5, 10, '2025-12-20 23:44:43', 'magic_power'),
+    (207, 'Beast Mend', 'Restore all tamed beasts by a percentage of their maximum health.', '{"heal_all_beasts_pct": 1.0}', 3, 20, '🐾❤️', 'self', None, None, None, None, '2025-12-20 23:44:43', 'magic_power'),
 ]
 
 # --- eidolon abilities (with mp_cost) -----------------------------------------
@@ -357,6 +358,7 @@ MERGED_CLASS_ABILITIES: List[Tuple[int, int, int]] = [
     (3, 43, 20),
     (3, 49, 20),
     (7, 108, 18),
+    (13, 207, 3),
     (9, 24, 20)
 ]
 
