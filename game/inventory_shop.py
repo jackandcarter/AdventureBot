@@ -202,6 +202,14 @@ class InventoryShop(commands.Cog):
                     pass
                 await self.process_sale(interaction, int(vid), int(iid))
             # --------------- Use-item flow --------------
+            elif cid.startswith("use_item_target_"):
+                parts = cid.split("_", 4)
+                if len(parts) >= 5:
+                    item_id = int(parts[3])
+                    target = parts[4]
+                    await self.process_use_item(interaction, item_id, target=target, prompt_for_target=False)
+                else:
+                    await self.display_use_item_menu(interaction)
             elif cid.startswith("use_item_"):
                 parts = cid.split("_")
                 if len(parts) >= 3:
@@ -212,14 +220,6 @@ class InventoryShop(commands.Cog):
                     except discord.errors.HTTPException:
                         pass
                     await self.process_use_item(interaction, iid)
-                else:
-                    await self.display_use_item_menu(interaction)
-            elif cid.startswith("use_item_target_"):
-                parts = cid.split("_", 4)
-                if len(parts) >= 5:
-                    item_id = int(parts[3])
-                    target = parts[4]
-                    await self.process_use_item(interaction, item_id, target=target, prompt_for_target=False)
                 else:
                     await self.display_use_item_menu(interaction)
             elif cid == "back_from_use":
